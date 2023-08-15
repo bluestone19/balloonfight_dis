@@ -1,12 +1,9 @@
 # Balloon Fight (USA) NES Disassembly
 
-Requires ARM9's bass fork to assemble here: https://github.com/ARM9/bass
+Requires CC65 to assemble: https://cc65.github.io/
+Specifically, uses CA65 & LD65
 
-## Build iNES ROM
+## Build ROM
 
-- Include CHR ROM file of Balloon Fight as "BalloonFight.chr"
-- Assemble "BalloonFight_iNES.asm" with bass.
-
-## Build PRG ROM
-
-- Assemble "BalloonFight_PRG.asm" with bass.
+- Include CHR ROM file of Balloon Fight as "BalloonFight.chr" in Src
+- Run build.bat, it will output the PRG ROM, as well as the iNES ROM if the CHR ROM is present
