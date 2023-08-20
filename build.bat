@@ -2,7 +2,7 @@
 if not exist "Build" mkdir Build
 echo [36mAssembling PRG ROM[0m
 ca65 -t nes Src/BalloonFight_PRG.asm -o BalloonFightPRG.o
-ld65 -C BalloonFight.cfg BalloonFightPRG.o -o Build/BalloonFightBuild.prg
+ld65 -C BalloonFightPRG.cfg BalloonFightPRG.o -o Build/BalloonFightBuild.prg
 echo [36mPRG ROM build complete[0m
 rm BalloonFightPRG.o
 if not exist "Src/BalloonFight.chr" echo [31mBalloonFight.chr was not found, cannot build iNES ROM[0m

@@ -1,15 +1,16 @@
 ;Balloon Fight (USA) Disassembly - iNES ROM
 ;-----------------------
 
-.PC02
+.P02
 
 .SEGMENT "HEADER"
 ;iNES header
-.BYTE $4E, $45, $53, $1A, $01, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.BYTE "NES", $1A
+.BYTE $01, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
 ;Assemble PRG ROM code
 .include "BalloonFight_PRG.asm"
 
-.SEGMENT "TILES"
 ;Insert CHR ROM data
+.SEGMENT "TILES"
 .incbin "BalloonFight.chr"

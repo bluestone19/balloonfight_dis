@@ -1,270 +1,33 @@
-;Balloon Fight (USA) Disassembly - PRG ROM
+;Balloon Fight (JP/USA/EU) Disassembly - PRG ROM
 ;-----------------------
 ;Starting disassembly with nesrevplus v0.3b (2018-09-18 16:39, 5ms)
 ;Manual disassembly and commenting by LuigiBlood
+;CA65 Conversion and multi-region support by Bluestone19
 
-.pc02
+REGION	.set 0	;0 = JP, 1 = US, 2 = EU
 
-;----------------------
-; RAM Map:
-;----------------------
+.p02
 
-; - Main RAM:
-; $0000 = PPUCTRL Shadow
-; $0001 = PPUMASK Shadow
-; $0002 = Video Frame Processed Flag
-; $0003-$0007 = Current Player 1 Score
-; $0008-$000C = Current Player 2 Score
-; $000D-$0011 = Current Top Score
-; $0012 = (Temp) Used for Division, Balloon Trip Ranking, Player Y
-; $0013 = (Temp?)
-; $0014 = (Temp?)
-; $0015 = (Temp) Player X, Balloon Trip Ranking Scores
-; $0016 = Game Mode (0 = Balloon Fight, 1 = Balloon Trip)
-; $0017 = PPUSCROLL X Shadow (Balloon Trip)
-; $0018 = PPUCTRL Shadow (Balloon Trip)
-; $0019 = Frame Counter
-; $001A = Unused
-; $001B = RNG Output/Seed?
-; $001C = RNG Seed?
-; $001D = Loading Pointer
-; $001F = Graphics/Enemy Data Pointer
-; $0021 = Top Score Pointer
-; $0023 = Left Side   - Platform Collision Pointer
-;			Also used for Balloon Trip Screen Layout?
-; $0025 = Right Side  - Platform Collision Pointer
-;			Also used for Balloon Trip Screen Layout Functions
-; $0027 = Top Side    - Platform Collision Pointer
-; $0029 = Bottom Side - Platform Collision Pointer
+.include "Macros.asm"
+.include "MemoryDefines.asm"
 
-; $002B = (Temp?) Y Velocity Frac?
-; $002C = (Temp?) Y Velocity Int?
-
-; $002F = 
-
-; $0031-$0039 = Object Action
-
-; $003A = Demo Flag
-; $003B = Current Level Header
-; $003C = Current Phase
-; $003D = Phase Number Display Time
-; $003E = Score ID to Update (0 = Player 1, 1 = Player 2, 2 = Top Score)
-; $003F = Main Menu Cursor
-; $0040 = 2 Player Flag
-; $0041 = Player 1 Lives
-; $0042 = Player 2 Lives
-; $0043 = Division Dividend & Modulo Result
-;		 & 1st Digit score to add
-; $0044 = 2nd Digit score to add
-; $0045 = 3rd Digit score to add
-; $0046 = Status Bar Update Flag
-; $0047 = 4th Digit score to add
-; $0048 = 5th Digit score to add
-; $0049 = Balloon Trip Rank 0x
-; $004A = Balloon Trip Rank x0
-; $004B = ?
-
-; Star Animation:
-; $004C = Star Update?
-; $004D-$004E = Unused
-; $004F = Star Animation - Star ID
-; $0050 = PPU Address Low
-; $0051 = PPU Address High
-
-; PPU Upload Buffer:
-; $0050 = PPU Address High
-; $0051 = ???
-; $0052 = PPU Upload Buffer Position
-; $0053 = PPU Upload Buffer Size
-
-; $0054 = (Temp) Cloud/Flipper X coordinate used for rendering
-; $0055 = (Temp) Cloud/Flipper Y coordinate used for rendering
-
-; $0056 = Size of upload to PPU Buffer
-; $0057-$007E? = Data to upload to PPU Buffer Blocks
-
-; $005A-$0079 = Palette
-; $007A-$007E = Unused?
-
-; See Object RAM notes
-; $007F-$0087 = Object Status
-; $0088-$0090 = Object Balloons
-; $0091-$0099 = Object X Positions (Int)
-; $009A-$00A2 = Object Y Positions (Int)
-
-; $00A3 = Amount of Clouds (zero-based) (-1 if none)
-; $00A4 = Selected Cloud ID? (Blink?)
-; $00A5 = Selected Cloud ID?? (Lightning?)
-; $00A6-$00A8 = Cloud 16x16 Tile Attribute $23xx (Top?)
-; $00A9-$00AB = Cloud 16x16 Tile Attribute $23xx
-; $00AC-$00AE = Cloud 16x16 Tile Attribute $23xx
-; $00AF-$00B1 = Cloud 16x16 Tile Attribute $23xx
-; $00B2-$00B4 = Cloud related
-; $00B5-$00B7 = Cloud related
-; $00B8 = Lightning Bolt Countdown
-; $00B9 = Unused?
-; $00BA = Lightning Bolt Intensity (Speed)
-; $00BB = Water Plonk Animation Frame
-; $00BC = ?
-; $00BD-$00BE = Player 1/2 Invincibility Flag
-; $00BF-$00C0 = Player 1/2 Invincibility Time
-; $00C1-$00C2 = Player 1/2 Freeze Flag
-; $00C3-$00C4 = Player 1/2 Respawn Delay
-; $00C5 = Lock Scrolling Time (Balloon Trip)
-; $00C6 = ???
-; $00C7 = ???
-; $00C8 = Phase Type (00 = Regular, 01 = Bonus)
-; $00C9 = Tile Scroll Counter (Balloon Trip)
-; $00CA = Screen Scroll Counter (Balloon Trip)
-; $00CB = ???
-; $00CC = Collision related
-; $00CD = Amount of Platforms
-; $00CE = Unused
-; $00CF = Unused
-
-; Sound:
-; $00D0 = ?
-; $00D1 = ?
-; $00D2 = ?
-; $00D3 = ?
-
-; $00DC = ?
-; $00DD = ?
-
-; $00DF = ?
-; $00E0 = Track Pointer
-; $00E2 = Track Pointer
-; $00E4 = Track Pointer
-; $00E6 = Track Pointer
-
-; $00E8 = ?
-; $00E9 = ?
-; $00EA = ?
-; $00EB = ?
-
-; $00F0 = SFX 1
-; $00F1 = SFX 2
-; $00F2 = Music/Jingle
-; $00F3 = SFX 3
-; $00F4 = Current SFX?
-; $00F5 = 
-; $00F6 = Currently Playing Music/Jingle
-; $00F7 = 
-; $00F8 = Unused?
-; $00F9-$00FC = Written but not read?
-; $00FD = ?
-; $00FE-$00FF = Written but not read?
-
-; $0100-$01FF = Stack
-; $0200-$02FF = OAM Buffer
-; $0300-$03FF = PPU Upload Buffer Blocks
-;					(16-bit PPU Address,
-;					 8-bit Size,
-;					 Data, and repeat)
-
-; - Object RAM:
-; Note: One byte per object (Player, Enemy...)
-; +0 = Player 1
-; +1 = Player 2
-; +2 to +7 = Enemies
-; +8 = Fish (Mostly Unused)
-
-; $0400-$0408 = X Positions (Frac)
-; $0409-$0411 = Y Positions (Frac)
-; $0412-$041A = Y Velocity (Frac)
-; $041B-$0423 = Y Velocity (Int)
-; $0424-$042C = X Velocity (Frac)
-; $042D-$0435 = X Velocity (Int)
-; $0436-$043E = Animation Frame
-; $043F-$0447 = ?
-; $0448-$0450 = Direction (0 = Left, 1 = Right)
-; $0451-$0459 = Object Type
-; $045A-$0462 = ?
-; $0463-$046B = ?
-; $046C-$0474 = ?
-; $0475-$047D = ?
-; $047E-$0486 = ?
-
-; $0487 = ???
-; $0488 = Balloon Trip Starting Platform X Position
-; $0489 = Fish Y Direction (0 = Up, 1 = Down)
-; $048A = Fish Animation?
-; $048B = Fish Target ID (Object ID)
-; $048C = Fish Target Eaten Flag
-; $048D = Fish Frame Time?
-; $048E = Fish? Unused?
-; $048F = Fish? Unused?
-
-; $0490-$04A3 = Lightning Bolt X Position (Int)
-; $04A4-$04B7 = Lightning Bolt Y Position (Int)
-; $04B8-$04CB = Lightning Bolt X Position (Frac)
-; $04CC-$04DF = Lightning Bolt Y Position (Frac)
-; $04E0-$04F3 = Lightning Bolt X Velocity (Int)
-; $04F4-$0507 = Lightning Bolt Y Velocity (Int)
-; $0508-$051B = Lightning Bolt X Velocity (Frac)
-; $051C-$052F = Lightning Bolt Y Velocity (Frac)
-; $0530-$0543 = Lightning Bolt Animation Frame?
-; $0544-$0557 = Lightning Bolt?
-
-; $0558 = Bonus Phase Intensity Level
-; $0559 = Bonus Phase / Balloon Trip x00 points per balloon
-; $055A = Balloon Rising Speed
-; $055B = Bonus Phase Super Bonus x0000 points
-; $055C = Bonus Phase Super Bonus 0x000 points
-; $055D-$0566 = Balloon GFX (Type? Status?)
-; $0567-$0570 = Balloon X positions
-; $0571-$057A = Balloon?
-; $057B-$0584 = Balloon Y positions
-
-; $05CB = ?
-; $05CC = ?
-; $05CD-$05CE = Player 1/2 Touched Balloons Counter
-; $05CE = Balloon Trip Balloon Counter
-
-; $05D1 = Amount of Flippers
-; $05D2-$05DB = Flipper X positions
-; $05DC-$05E5 = Flipper Y positions
-; $05E6-$05EF = ?
-; $05F0-$05F9 = ?
-; $05FA-$0603 = Flippers Type
-
-
-; $0618-$0619 = ?
-; $061A-$061B = ?
-
-; $061C-$061D = Controller 1/2 Pressed Buttons
-; $061E-$061F = Controller 1/2 Held Buttons
-; $0620-$0628 = ???
-; $0629 = Highest 1-Player Game Top Score
-; $062E = Highest 2-Player Game Top Score
-; $0633 = Highest Balloon Trip Top Score
-
-; $0700-$07F9 = Balloon Trip Rank 01 to 50 Scores (5 bytes each)
-;				 Rank 47 = Score 000000
-
-; $07E8 = Balloon Trip Music Flag
-; $07F0 = Audio related?
-; $07F5 = $F0 SFX Flags for Balloon Trip?
-; $07FA = Audio related?
-; $07FA = "HAL" Reset Check
-
-;----------------------
-; RESET code
-;----------------------
 .SEGMENT "CODE"
-lc000_reset:
-	lda #$00	; \
-	sta $2000	; | Initialize PPU registers
-	sta $2001	; /
-lc008:
-	lda $2002	; \
-	bpl lc008	; |
-lc00d:
-	lda $2002	; | Get to next V-Blank
-	bmi lc00d	; |
-lc012:
-	lda $2002	; |
-	bpl lc012	; /
+Reset:
+	lda #0		; \
+	sta PPUCTRL	; | Initialize PPU registers
+	sta PPUMASK	; /
+
+.IF REGION >= 1
+FrameWaitLoop1:
+	lda PPUSTATUS		; \
+	bpl FrameWaitLoop1	; |
+FrameWaitLoop2:
+	lda PPUSTATUS		; | Get to next V-Blank
+	bmi FrameWaitLoop2	; |
+.ENDIF
+FrameWaitLoop3:
+	lda PPUSTATUS		; |
+	bpl FrameWaitLoop3	; /
 
 	sei			; Disable Interrupts
 	cld			; Clear Decimal Mode (Useless on NES/Famicom)
@@ -272,93 +35,91 @@ lc012:
 	txs			; / to $01FF
 
 	ldx #$12	; \
-	lda #$00	; | Initialize part of RAM
-lc020:
+	lda #0		; | Initialize part of RAM
+PartialRamInit:
 	sta $00,x	; | $0012 - $00FF
 	inx			; |
-	bne lc020	; /
+	bne PartialRamInit	; /
 
-	ldx #$02	; \
-lc027:
-	lda $07fa,x	; | Check if system was reset
-	cmp lc082,x	; | by checking if $07FA has "HAL" string
-	bne lc034	; |
-	dex			; | If found, then skip to the end
-	bpl lc027	; | Else, proceed with initialization code
-	bmi lc077	; / (BUG: It gets rewritten during gameplay so it never skips.)
+	ldx #$02			; \
+HALCheckLoop:
+	lda HALStringMem,x			; | Check if system was reset
+	cmp HALString,x		; | by checking if $07FA has "HAL" string
+	bne FullRAMInit		; |
+	dex					; | If found, then skip to the end
+	bpl HALCheckLoop	; | Else, proceed with initialization code
+	bmi FinishRAMInit	; / (BUG: It gets rewritten during gameplay so it never skips.)
 
-lc034:
-	ldx #$00	; \
-	txa			; | Initialize parts of RAM
-lc037:
-	sta $00,x	; | $0000 - $00FF: Main RAM
-	sta $0700,x	; | $0700 - $07FF: Balloon Trip RAM
-	inx			; |
-	bne lc037	; /
+FullRAMInit:
+	ldx #$00		; \
+	txa				; | Initialize parts of RAM
+RAMInitLoop:
+	sta $00,x		; | $0000 - $00FF: Main RAM
+	sta $0700,x		; | $0700 - $07FF: Balloon Trip RAM
+	inx				; |
+	bne RAMInitLoop	; /
 
-	lda #$32					; \
-	sta $15						; | - Initialize Balloon Trip Ranking Scores -
-lc043:
-	lda #$32					; | Add +50 to Score
+	lda #50						; \
+	sta Temp15					; | - Initialize Balloon Trip Ranking Scores -
+BTRankScoreInit:
+	lda #50						; | Add +50 to Score
 	jsr ld6de_scoreadd			; | and update
-	lda #$00					; |
+	lda #0						; |
 	sta $46						; | Clear Status Bar Update Flag
 	jsr lc579_rankscoreupdate	; | Update Balloon Trip Rank 01 to 50 Scores
-	dec $15						; | with multiples of 50
-	bne lc043					; /
+	dec Temp15					; | with multiples of 50
+	bne BTRankScoreInit			; /
 
-	ldx #$0e	; \
-lc055:
-	lda lc085,x	; | Write default High Scores
-	sta $0629,x	; | for each game mode
-	dex			; |
-	bpl lc055	; /
+	ldx #14					; \
+TopScoreInitLoop:
+	lda DefaultTopScores,x	; | Write default High Scores
+	sta $0629,x				; | for each game mode
+	dex						; |
+	bpl TopScoreInitLoop	; /
 
-	ldx #$04	; \
-lc060:
-	lda #$00	; | Initialize Player 1 Score
-	sta $03,x	; |
-	dex			; |
-	bpl lc060	; /
+	ldx #$04		; \
+P1ScoreInit:
+	lda #$00		; | Initialize Player 1 Score
+	sta P1Score,x	; |
+	dex				; |
+	bpl P1ScoreInit	; /
 
 	lda #$00			; \
 	jsr ld6de_scoreadd	; / Update Score
 
-	ldx #$02	; \
-lc06e:
-	lda lc082,x	; | Write "HAL" to $07FA
-	sta $07fa,x	; | for future Reset checking
-	dex			; |
-	bpl lc06e	; /
-lc077:
-	lda #$1e	; \ PPUMASK Shadow
-	sta $01		; / Enable Background and Sprites
-	lda #$90	; \ PPUCTRL Shadow
-	sta $00		; / Enable NMI at V-Blank, BG Pattern Table at $1000
+	ldx #2				; \
+HALWriteLoop:
+	lda HALString,x		; | Write "HAL" to $07FA
+	sta HALStringMem,x			; | for future Reset checking
+	dex					; |
+	bpl HALWriteLoop	; /
+FinishRAMInit:
+	lda #%00011110		; \ PPUMASK Shadow
+	sta PPUMASKShadow	; / Enable Background and Sprites
+	lda #%10010000		; \ PPUCTRL Shadow
+	sta PPUCTRLShadow	; / Enable NMI at V-Blank, BG Pattern Table at $1000
 	jmp lf1d4	; Start
 
-lc082:	;"HAL" string
-.BYTE $48,$41,$4c
+HALString:
+.BYTE "HAL"
 
-lc085:	; Default High Scores
-.BYTE $00,$00,$00,$01,$00	;1 Player Mode
-.BYTE $00,$00,$00,$01,$00	;2 Player Mode
-.BYTE $00,$00,$05,$02,$00	;Balloon Trip Mode
+DefaultTopScores:
+.BYTE 0,0,0,1,0	;1 Player Mode
+.BYTE 0,0,0,1,0	;2 Player Mode
+.BYTE 0,0,5,2,0	;Balloon Trip Mode
 
 ;----------------------
 ; NMI code
 ;----------------------
 
-lc094_nmi:
+NMI:
 	pha			; \
-	txa			; |
-	pha			; | Push A, X, Y
-	tya			; |
-	pha			; /
-	lda #$00	; \
-	sta $2003	; | Upload OAM Buffer
-	lda #$02	; | $0200 - $02FF to OAM (via DMA)
-	sta $4014	; /
+	phx			; | Push A, X, Y
+	phy			; /
+	lda #0		; \
+	sta OAMADDR	; | Upload OAM Buffer
+	lda #2		; | $0200 - $02FF to OAM (via DMA)
+	sta OAMDMA	; /
 	lda $52						; \ Check for PPU Buffer Upload
 	cmp $53						; |
 	beq lc0ac					; | If Position in buffer != Buffer Size
@@ -368,13 +129,13 @@ lc0ac:
 	jsr ld798_updatestatusbar	; Update Status Bar
 	inc $19		; Increment Frame Counter
 	lda #$20	; \
-	sta $2006	; | PPUADDR = $2000
+	sta PPUADDR	; | PPUADDR = $2000
 	lda #$00	; | (Nametable 0)
-	sta $2006	; /
-	lda #$00	; \
-	sta $2005	; | PPUSCROLL = X:0, Y:0
-	sta $2005	; /
-	jsr lfff7_audiomain	; Manage Audio
+	sta PPUADDR	; /
+	lda #$00		; \
+	sta PPUSCROLL	; | PPUSCROLL = X:0, Y:0
+	sta PPUSCROLL	; /
+	jsr GotoAudioMain	; Manage Audio
 	lda #$01	; \ Set Video Frame Done Flag
 	sta $02		; /
 
@@ -383,11 +144,15 @@ lc0ac:
 lc0d1:
 	lda $2002	; \ Wait for V-Blank End
 	bmi lc0d1	; /
-
-	ldx #$04	; \
-	ldy #$c6	; |
+.IF REGION <= 1		; NTSC Timing for BT Scroll Shear (JP/US)
+	ldx #$04
+	ldy #$c6
+.ELSEIF REGION = 2	; PAL Timing for BT Scroll Shear (EU)
+	ldx #$08
+	ldy #$10
+.ENDIF
 lc0da:
-	dey			; | Wait 6125 cycles
+	dey			; \ Wait X*Y loops
 	bne lc0da	; | for updating the scrolling
 	dex			; | mid frame (under scoreboard)
 	bne lc0da	; /
@@ -396,15 +161,13 @@ lc0da:
 	ora $00		; | PPUCTRL = [$0018] | [$0000]
 	sta $2000	; /
 	lda $17		; \
-	sta $2005	; | Input X scroll value
+	sta PPUSCROLL	; | Input X scroll value
 	lda #$00	; | PPUSCROLL = X:[$17], Y:0
-	sta $2005	; /
+	sta PPUSCROLL	; /
 
 lc0f1:
-	pla			; \
-	tay			; |
-	pla			; | Pull A, X, Y
-	tax			; |
+	ply			; \
+	plx			; | Pull A, X, Y
 	pla			; /
 	rti
 
@@ -413,8 +176,8 @@ lc0f1:
 ; BRK code
 ;----------------------
 
-lc0f7_brk:
-	jmp lc0f7_brk	; Loop
+BRKLoop:
+	jmp BRKLoop	; Loop
 
 
 ;----------------------
@@ -516,15 +279,11 @@ lc154_newppublock:
 ;-----------------------
 
 lc17c_uploadppubuffer:
-	tya			; \
-	pha			; | Push X & Y
-	txa			; |
-	pha			; /
+	phy			; \ Push Y & X
+	phx			; /
 	jsr lc188	; 
-	pla			; \
-	tax			; | Pull X & Y
-	pla			; |
-	tay			; /
+	plx			; \ Pull X & Y
+	ply			; /
 	rts
 ;-----------------------
 
@@ -533,16 +292,16 @@ lc188:
 	lda $0300,x	; \
 	inx			; |
 	sta $50		; |
-	sta $2006	; | Get PPU Address
+	sta PPUADDR	; | Get PPU Address
 	lda $0300,x	; | And Set PPUADDR
 	inx			; |
-	sta $2006	; /
+	sta PPUADDR	; /
 	ldy $0300,x	; Get Upload Size to Y
 	inx
 lc19e:
 	lda $0300,x	; \
 	inx			; |
-	sta $2007	; | Upload Y bytes to PPU
+	sta PPUDATA	; | Upload Y bytes to PPU
 	dey			; |
 	bne lc19e	; /
 
@@ -550,11 +309,11 @@ lc19e:
 	cmp #$3f	; | If Upload Address != $3FXX (Palette Data)
 	bne lc1be	; / Then Skip this section
 	lda #$3f	; \
-	sta $2006	; |
+	sta PPUADDR	; |
 	lda #$00	; | PPUADDR = $3F00
-	sta $2006	; | PPUADDR = $0000
-	sta $2006	; | ???
-	sta $2006	; /
+	sta PPUADDR	; | PPUADDR = $0000
+	sta PPUADDR	; | ???
+	sta PPUADDR	; /
 lc1be:
 	stx $52		; \
 	cpx $53		; | If PPU Buffer Position != PPU Buffer Size
@@ -573,10 +332,7 @@ lc1c5:
 	jsr lc539_rankupdate
 	lda #$ff	; \ No platforms?
 	sta $cd		; /
-	lda #$ad	; \
-	sta $23		; | Set Pointer
-	lda #$c4	; | [$23] = $C4AD
-	sta $24		; /
+	tpa BTStartLayout, $23
 	lda #$80	; \ Set Player 1 X Position
 	sta $91		; / to #$80
 	sta $0488	; Set Balloon Trip Starting Platform X Position to #$80
@@ -714,12 +470,10 @@ lc2d2:
 	beq lc2ef	; | Every balloon touched
 	dec $05cd	; | counts towards the
 	inc $05ce	; / main counter
-	txa			; \ Push X
-	pha			; /
+	phx
 	lda $0559			; \ Add Score
 	jsr ld6de_scoreadd	; /
-	pla			; \ Pull X
-	tax			; /
+	plx
 lc2ef:
 	jsr lce2f_balloonxspritemanage
 	dex			; \ Check next balloon
@@ -826,7 +580,7 @@ lc3b5:	; Screen Layout Subroutines
 .WORD lc3c9, lc3f7, lc43e, lc45f, lc45e
 
 lc3bf:	; Screen Layout Order
-.BYTE $00,$00,$02,$02,$02,$02,$02,$04,$03,$01
+.BYTE 0,0,2,2,2,2,2,4,3,1
 
 lc3c9:
 	ldy #$00	; \
@@ -879,11 +633,11 @@ lc40c:
 	asl				; | then spawn Lightning Bolt
 	asl				; | at Tile Y position value
 	asl				; | and set Y velocity value
-	sta $15			; | using lc43a value
+	sta $15			; | using BTSparkVelOptions value
 	jsr lf1b3_rng	; | (depending on full loop)
 	and #$3f		; | + RNG value up to 63
 	ldx $ba			; |
-	adc lc43a,x		; |
+	adc BTSparkVelOptions,x		; |
 	sta $14			; |
 	jsr lc486		; /
 	jsr lf1b3_rng	; \
@@ -893,7 +647,7 @@ lc40c:
 	jmp lc40c		; /
 lc439:
 	rts
-lc43a:
+BTSparkVelOptions:
 .BYTE $20,$30,$40,$60
 
 lc43e:
@@ -961,7 +715,7 @@ lc491:
 	sta $04a4,x	; /
 	rts
 
-lc4ad:	; Screen Premade Layout Data
+BTStartLayout:	; Screen Premade Layout Data
 .BYTE $00,$00
 .BYTE $09,$00,$08,$8c,$00,$07,$18,$00,$18,$00,$19,$00,$1a,$00,$84
 .BYTE $94,$1a,$00,$1a,$00,$1a,$00,$0b,$12,$00,$0c,$13,$00,$0d,$14
@@ -2339,14 +2093,11 @@ lcf51:
 	ldx #2
 	stx $46
 	jsr lf45e_waityframes
-	lda #$2b
-	ldy #$d1
+	lday ld12b
 	jsr lc131_copyppublock
-	lda #$5a
-	ldy #$d1
+	lday ld15a
 	jsr lc131_copyppublock
-	lda #$65
-	ldy #$d1
+	lday ld165
 	jsr lc131_copyppublock
 	ldx $40
 lcf7e:
@@ -2441,8 +2192,7 @@ ld02e:
 	sta $f0
 	jsr ld121
 	bne ld068
-	lda #$70
-	ldy #$d1
+	lday ld170
 	jsr lc131_copyppublock
 	jsr lf465_clearframeflag
 	ldx #$1a
@@ -2545,9 +2295,9 @@ ld10d:	; Points per balloon
 ld112:	; Rising Speed
 .BYTE $80,$90,$98,$a0,$a8
 ld117:	; Super Bonus x0000 Points
-.BYTE $01,$01,$02,$02,$03
+.BYTE 1,1,2,2,3
 ld11c:	; Super Bonus 0x000 Points
-.BYTE $00,$05,$00,$05,$00
+.BYTE 0,5,0,5,0
 
 ld121:
 	lda $05cd
@@ -2558,18 +2308,18 @@ ld121:
 ;-----------------------
 
 ld12b:
-    ;19 bytes
-.BYTE $3f,$00,$10,$0f,$30,$30,$30,$0f,$30,$27,$15,$0f,$30,$02,$21
-.BYTE $0f,$16,$16,$16
+.BYTE $3f,$00,$10,$0f,$30,$30,$30,$0f,$30,$27,$15,$0f,$30,$02,$21,$0f,$16,$16,$16
 ld13e:
-    ;70 bytes
-.BYTE $21,$73,$0b,$29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26,$21
-.BYTE $f3,$0b,$29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26,$23,$e8
-.BYTE $08,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$23,$c0,$08,$40,$50,$50
-.BYTE $50,$50,$90,$a0,$a0,$22,$88,$11,$19,$24,$0e,$24,$1b,$24,$0f
-.BYTE $24,$0e,$24,$0c,$24,$1d,$24,$2c,$2c,$2c
+.BYTE $21,$73,$0b,$29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26
+ld14c:
+.BYTE $21,$f3,$0b,$29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26
+ld15a:
+.BYTE $23,$e8,$08,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
+ld165:
+.BYTE $23,$c0,$08,$40,$50,$50,$50,$50,$90,$a0,$a0
+ld170:
+.BYTE $22,$88,$11,$19,$24,$0e,$24,$1b,$24,$0f,$24,$0e,$24,$0c,$24,$1d,$24,$2c,$2c,$2c
 ld184:
-    ;26 bytes
 .BYTE $22,$c6,$17,$1c,$1e,$19,$0e,$1b,$24,$0b,$18,$17,$1e,$1c,$24
 .BYTE $24,$24,$01,$00,$00,$00,$00,$19,$1d,$1c,$2c
 ld19e:
@@ -2683,9 +2433,9 @@ ld246_clearppu:	;Clear PPU?
 	jsr lc10a_clearppumask
 	jsr lc0fa_disablenmi
 	lda #$20	; \
-	sta $2006	; | PPUADDR = $2000
+	sta PPUADDR	; | PPUADDR = $2000
 	lda #$00	; | Nametable 0 Address
-	sta $2006	; /
+	sta PPUADDR	; /
 	jsr ld275_clearnametable	; \ Clear Nametable 0
 	jsr ld275_clearnametable	; / Clear Nametable 1
 	jsr lc104_enablenmi
@@ -2709,17 +2459,17 @@ ld275_clearnametable:
 	ldx #$f0	; \
 	lda #$24	; |
 ld279:
-	sta $2007	; |
-	sta $2007	; | Fill PPU Nametable with empty tiles
-	sta $2007	; | $3C0 bytes
-	sta $2007	; |
+	sta PPUDATA	; |
+	sta PPUDATA	; | Fill PPU Nametable with empty tiles
+	sta PPUDATA	; | $3C0 bytes
+	sta PPUDATA	; |
 	dex			; |
 	bne ld279	; /
 
 	ldx #$40	; \
 	lda #$00	; |
 ld28c:
-	sta $2007	; | Fill rest of nametable with Tile 00
+	sta PPUDATA	; | Fill rest of nametable with Tile 00
 	dex			; | $40 bytes
 	bne ld28c	; /
 	rts			; Total: $400 bytes
@@ -2733,9 +2483,9 @@ ld293_initgamemode:
 	jmp ld572
 ld2a0:			; Initialize Balloon Fight Game Mode
 	ldy $3b						; \
-	lda ldb2a,y					; |
+	lda PhasePointersLow,y		; |
 	sta $1d						; | Load Phase Graphics
-	lda ldb3a,y					; |
+	lda PhasePointersHigh,y		; |
 	sta $1e						; |
 	jsr ld497_uploadbackground	; /
 	ldx #$00							; \
@@ -2753,7 +2503,7 @@ ld2c1:
 	sta $12						; | Render Cloud
 	lda ld493,y					; | to the screen
 ld2cb:
-	sta $2007					; |
+	sta PPUDATA					; |
 	clc							; |
 	adc #$04					; |
 	dec $12						; |
@@ -2924,9 +2674,9 @@ ld40d:
 	jmp lc12d_copypputempblock
 ld410:
 	ldx $0558	; ...If Bonus Phase
-	lda ld46a,x	; \
+	lda BalloonPalPointerLower,x	; \
 	sta $1d		; | Select Balloon Palette
-	lda ld46f,x	; | based on Intensity Level
+	lda BalloonPalPointerUpper,x	; | based on Intensity Level
 	sta $1e		; /
 	ldx #$03	; \
 	ldy #$07	; |
@@ -2954,14 +2704,18 @@ ld45a:
 .BYTE $0f,$2a,$09,$07,$0f,$26,$06,$07,$0f,$1b,$0c,$07,$0f,$2c,$01
 .BYTE $06
 
-ld46a:
-.BYTE $74,$7c,$84,$84,$84
-ld46f:
-.BYTE $d4,$d4,$d4,$d4,$d4
+.define BonusBalloonPalettes GreenBalloonPalette, OrangeBalloonPalette, RedBalloonPalette, RedBalloonPalette, RedBalloonPalette
+BalloonPalPointerLower:
+.LOBYTES BonusBalloonPalettes
+BalloonPalPointerUpper:
+.HIBYTES BonusBalloonPalettes
 
-ld474:
-.BYTE $0f,$02,$08,$06,$0f,$2b,$30,$12,$0f,$07
-.BYTE $0a,$19,$0f,$26,$30,$2b,$0f,$07,$0c,$1c,$0f,$15,$30,$26
+GreenBalloonPalette:
+.BYTE $0f,$02,$08,$06,$0f,$2b,$30,$12
+OrangeBalloonPalette:
+.BYTE $0f,$07,$0a,$19,$0f,$26,$30,$2b
+RedBalloonPalette:
+.BYTE $0f,$07,$0c,$1c,$0f,$15,$30,$26
 
 ld48c_nextplatformptr:
 	sec
@@ -2987,9 +2741,9 @@ ld4a4:
 	tax
 	beq ld497_uploadbackground
 	and #$7f
-	sta $2006
+	sta PPUADDR
 	jsr ld4f0_getbytefromgfxpointer
-	sta $2006
+	sta PPUADDR
 	jsr ld4f0_getbytefromgfxpointer
 	sta $12
 	txa
@@ -3006,14 +2760,14 @@ ld4a4:
 	bne ld4d8
 ld4cc:
 	jsr ld4f0_getbytefromgfxpointer
-	sta $2007
+	sta PPUDATA
 	dec $12
 	bne ld4cc
 	beq ld4a4
 ld4d8:
 	jsr ld4f0_getbytefromgfxpointer
 ld4db:
-	sta $2007
+	sta PPUDATA
 	dec $12
 	bne ld4db
 	beq ld4a4
@@ -3053,11 +2807,11 @@ ld4fb_setppuaddr_render:
 	asl $12
 	rol
 	ora #$20
-	sta $2006
+	sta PPUADDR
 	sta $13
 	lda $12
 	ora $54
-	sta $2006
+	sta PPUADDR
 	rts
 ;-----------------------
 
@@ -3086,20 +2840,20 @@ ld51c:
 
 ld53c:
 	lda #$23
-	sta $2006
+	sta PPUADDR
 	jsr ld51c
-	sta $2006
-	lda $2007
-	lda $2007
+	sta PPUADDR
+	lda PPUDATA
+	lda PPUDATA
 	and ld564,y
 	ora ld568,y
 	pha
 	lda #$23
-	sta $2006
+	sta PPUADDR
 	jsr ld51c
-	sta $2006
+	sta PPUADDR
 	pla
-	sta $2007
+	sta PPUDATA
 	rts
 ;-----------------------
 
@@ -3126,12 +2880,12 @@ ld572:			; Initialize Balloon Trip Game Mode
 	inc $c8
 	jmp ld3e1
 ld593:
-	sty $2006
-	sta $2006
+	sty PPUADDR
+	sta PPUADDR
 	ldx #0
 ld59b:
-	lda ldcae,x
-	sta $2007
+	lda BGAttributes,x
+	sta PPUDATA
 	inx
 	cpx #8
 	bne ld59b
@@ -3141,15 +2895,15 @@ ld59b:
 	lda #$aa
 	ldx #$10
 ld5b1:
-	sta $2007
+	sta PPUDATA
 	dex
 	bne ld5b1
 	rts
 ;-----------------------
 
 ld5b8:
-	sty $2006
-	sta $2006
+	sty PPUADDR
+	sta PPUADDR
 	ldx #$20
 	lda #$58
 	jsr ld5c9
@@ -3162,7 +2916,7 @@ ld5cb:
 	and #3
 	eor #3
 	ora $12
-	sta $2007
+	sta PPUDATA
 	dex
 	bne ld5cb
 	rts
@@ -3186,11 +2940,11 @@ ld5db:
 
 ld5f1:
 	lda $51
-	sta $2006
+	sta PPUADDR
 	lda $50
-	sta $2006
-	lda $2007
-	lda $2007
+	sta PPUADDR
+	lda PPUDATA
+	lda PPUDATA
 	cmp #$24
 	bne ld60c
 	txa
@@ -3213,14 +2967,14 @@ ld60d_updatestarbganim:
 	tax			; /
 	jsr ld651	; \
 	lda $51		; |
-	sta $2006	; | Set PPU Address for Star Tile
+	sta PPUADDR	; | Set PPU Address for Star Tile
 	lda $50		; |
-	sta $2006	; /
-	lda $2007	; \
-	lda $2007	; |
+	sta PPUADDR	; /
+	lda PPUDATA	; \
+	lda PPUDATA	; |
 	ldy #$03	; | Check if Tile is part of
 ld632:
-	cmp ld64c,y	; | Star Animation tiles
+	cmp StarAnimTiles,y	; | Star Animation tiles
 	beq ld63b	; | If not: Stop
 	dey			; |
 	bpl ld632	; /
@@ -3228,35 +2982,34 @@ ld63a:
 	rts
 
 ld63b:
-	lda $51			; \
-	sta $2006		; |
-	lda $50			; | Write Next Star Tile
-	sta $2006		; |
-	lda ld64c+1,y	; |
-	sta $2007		; /
+	lda $51					; \
+	sta PPUADDR				; |
+	lda $50					; | Write Next Star Tile
+	sta PPUADDR				; |
+	lda StarAnimTiles+1,y	; |
+	sta PPUDATA				; /
 	rts
 
-ld64c:	;Star Tile Animation Frames
+StarAnimTiles:	;Star Tile Animation Frames
 .BYTE $24,$ed,$ee,$ef,$24
 
 ld651:
-	lda ld65c,x
+	lda StarPositions,x
 	sta $50
-	lda ld65c+1,x
+	lda StarPositions+1,x
 	sta $51
 	rts
 
-ld65c:
+StarPositions:
     ;128 bytes
-.BYTE $63,$21,$a5,$21,$cb,$20,$b7,$20,$7d,$21,$9b,$22,$f2,$20,$49
-.BYTE $22,$6d,$21,$0b,$22,$92,$22,$95,$21,$1c,$21,$48,$21,$e0,$20
-.BYTE $0b,$23,$ce,$20,$d0,$21,$06,$21,$19,$21,$30,$22,$8a,$22,$88
-.BYTE $22,$a4,$20,$42,$22,$68,$21,$3c,$22,$36,$21,$ca,$21,$bc,$20
-.BYTE $96,$21,$4c,$21,$35,$22,$ef,$20,$68,$22,$a6,$20,$bb,$21,$7a
-.BYTE $21,$ea,$20,$f1,$21,$c2,$20,$77,$21,$54,$21,$ba,$20,$c5,$22
-.BYTE $be,$20,$fa,$20,$ae,$21,$46,$21,$9a,$21,$d2,$20,$3d,$21,$2b
-.BYTE $22,$b0,$20,$b6,$21,$ac,$20,$b3,$20,$db,$20,$f6,$20,$2c,$21
-.BYTE $e7,$20,$62,$21,$e4,$21,$4e,$21
+.WORD $2163,$21A5,$20CB,$20B7,$217D,$229B,$20F2,$2249
+.WORD $216D,$220B,$2292,$2195,$211C,$2148,$20E0,$230B
+.WORD $20CE,$21D0,$2106,$2119,$2230,$228A,$2288,$20A4
+.WORD $2242,$2168,$223C,$2136,$21CA,$20BC,$2196,$214C
+.WORD $2235,$20EF,$2268,$20A6,$21BB,$217A,$20EA,$21F1
+.WORD $20C2,$2177,$2154,$20BA,$22C5,$20BE,$20FA,$21AE
+.WORD $2146,$219A,$20D2,$213D,$222B,$20B0,$21B6,$20AC
+.WORD $20B3,$20DB,$20F6,$212C,$20E7,$2162,$21E4,$214E
 
 ld6dc_scoreupdate:
 	lda #$00	; Only Update Score
@@ -3292,10 +3045,10 @@ ld6e5:
 	ora $3e		; |
 	tax			; /
 	clc
-	lda $03,x	; \ Add Score 0000X
+	lda P1Score,x	; \ Add Score 0000X
 	adc $43		; | Lock Score between 0 and 9
 	jsr ld78f	; | First Digit
-	sta $03,x	; /
+	sta P1Score,x	; /
 	lda $04,x	; \ Add Score 000X0
 	adc $44		; | Lock Score between 0 and 9
 	jsr ld78f	; | Second Digit
@@ -3318,7 +3071,7 @@ ld6e5:
 	inx			; /
 	ldy #$04	; \ From highest digit
 ld746:
-	lda $03,x	; | If this score digit is
+	lda P1Score,x	; | If this score digit is
 	cmp ($21),y	; | under Highest Top Score Digit
 	bcc ld765	; | then Top Score was not beaten
 	bne ld752	; | so go to ld765 (stop checking)
@@ -3333,7 +3086,7 @@ ld752:
 	ora $3e		; |
 	tax			; /
 ld75b:
-	lda $03,x	; \
+	lda P1Score,x	; \
 	sta ($21),y	; | Copy Current Score
 	inx			; | to Highest Top Score
 	iny			; |
@@ -3390,41 +3143,41 @@ ld798_updatestatusbar:
 
 ld7a0:
 	lda #$20	; \
-	sta $2006	; | PPUADDR = $2043
+	sta PPUADDR	; | PPUADDR = $2043
 	lda #$43	; |
-	sta $2006	; /
+	sta PPUADDR	; /
 	lda #$8e	; \ Upload I- to PPU
-	sta $2007	; /
+	sta PPUDATA	; /
 
 	ldx #$04	; \
 ld7b1:
-	lda $03,x	; | Upload Player 1 Score to PPU
-	sta $2007	; |
+	lda P1Score,x	; | Upload Player 1 Score to PPU
+	sta PPUDATA	; |
 	dex			; |
 	bpl ld7b1	; |
 	lda #$00	; |
-	sta $2007	; /
+	sta PPUDATA	; /
 
 	lda #$24	; \
-	sta $2007	; | Upload 2 empty spaces to PPU
-	sta $2007	; /
+	sta PPUDATA	; | Upload 2 empty spaces to PPU
+	sta PPUDATA	; /
 	ldx #$8c	; \
-	stx $2007	; | Upload TOP- to PPU
+	stx PPUDATA	; | Upload TOP- to PPU
 	inx			; |
-	stx $2007	; /
+	stx PPUDATA	; /
 
 	ldx #$04	; \
 ld7d1:
 	lda $0d,x	; | Upload Top Score to PPU
-	sta $2007	; |
+	sta PPUDATA	; |
 	dex			; |
 	bpl ld7d1	; |
 	lda #0		; |
-	sta $2007	; /
+	sta PPUDATA	; /
 
 	lda #$24	; \
-	sta $2007	; | Upload 2 empty spaces to PPU
-	sta $2007	; /
+	sta PPUDATA	; | Upload 2 empty spaces to PPU
+	sta PPUDATA	; /
 
 	lda $16		; \ If Game Mode is Balloon Trip Mode
 	bne ld854	; / then render RANK 
@@ -3432,16 +3185,16 @@ ld7d1:
 	beq ld802	; / then don't render Player 2 Score
 
 	lda #$8f	; \ Upload II- to PPU
-	sta $2007	; /
+	sta PPUDATA	; /
 
 	ldx #$04	; \
 ld7f5:
 	lda $08,x	; | Upload Player 2 Score to PPU
-	sta $2007	; |
+	sta PPUDATA	; |
 	dex			; |
 	bpl ld7f5	; |
 	lda #0		; |
-	sta $2007	; /
+	sta PPUDATA	; /
 ld802:
 	dec $46
 	rts
@@ -3450,17 +3203,17 @@ ld802:
 ld805:
 	dec $46
 	lda #$20	; \
-	sta $2006	; | PPUADDR = $2062
+	sta PPUADDR	; | PPUADDR = $2062
 	lda #$62	; | GAME OVER Player 1 Status Bar
-	sta $2006	; /
+	sta PPUADDR	; /
 	lda $41		; \ If Player 1 Lives is negative
 	jsr ld826	; / Then upload GAME OVER
 	lda $40		; \ If Single Player
 	beq ld83a	; / then return
 	lda #$20	; \
-	sta $2006	; | PPUADDR = $2075
+	sta PPUADDR	; | PPUADDR = $2075
 	lda #$75	; | GAME OVER Player 2 Status Bar
-	sta $2006	; /
+	sta PPUADDR	; /
 	lda $42		; \ If Player 2 Lives is negative
 ld826:
 	bmi ld83b	; / Then upload GAME OVER
@@ -3473,7 +3226,7 @@ ld82c:
 	bcs ld834	; |
 	lda #$2a	; |
 ld834:
-	sta $2007	; |
+	sta PPUDATA	; |
 	dex			; |
 	bpl ld82c	; /
 ld83a:
@@ -3482,32 +3235,32 @@ ld83a:
 ld83b:
 	lda $40		; \ If Single Player
 	beq ld828	; / then go back
-	ldx #$08	; \
+	ldx #$08			; \
 ld841:
-	lda ld84b,x	; | Upload GAME OVER to PPU
-	sta $2007	; |
-	dex			; |
-	bpl ld841	; /
+	lda GameOverText,x	; | Upload GAME OVER to PPU
+	sta PPUDATA			; |
+	dex					; |
+	bpl ld841			; /
 	rts
 
-ld84b:	;GAME OVER
+GameOverText:	;GAME OVER
 .BYTE $1b,$0e,$1f,$18,$24,$0e,$16,$0a,$10
 
 ld854:
 	ldy #$04	; \
 ld856:
-	lda ld86c,y	; | Upload RANK- to PPU
-	sta $2007	; |
+	lda RankText,y	; | Upload RANK- to PPU
+	sta PPUDATA	; |
 	dey			; |
 	bpl ld856	; /
 	lda $4a		; \
-	sta $2007	; | Upload Rank Number to PPU
+	sta PPUDATA	; | Upload Rank Number to PPU
 	lda $49		; |
-	sta $2007	; /
+	sta PPUDATA	; /
 	dec $46
 	rts
 
-ld86c:	;RANK-
+RankText:	;RANK-
 .BYTE $fb,$fa,$f9,$f8,$f7
 
 ld871:
@@ -3536,9 +3289,9 @@ ld88c:
 	asl
 	asl
 	tax
-	lda ld8d1,y
+	lda ScorePopupLeft,y
 	sta $02f1,x
-	lda ld8d7,y
+	lda ScorePopupRight,y
 	sta $02f5,x
 	ldy $13
 	lda $009a,y
@@ -3560,9 +3313,9 @@ ld88c:
 	rts
 ;-----------------------
 
-ld8d1:
+ScorePopupLeft:
 .BYTE $f4,$f5,$f6,$f7,$f8,$f9
-ld8d7:
+ScorePopupRight:
 .BYTE $fb,$fb,$fa,$fb,$fb,$fb
 
 ld8dd:
@@ -3605,45 +3358,12 @@ ld90f_uploadtitlescreen:
 	jsr lc10a_clearppumask
 	jsr lf465_clearframeflag
 	jsr lc0fa_disablenmi
-	lda #$2C
-	sta $1d
-	lda #$D9
-	sta $1e
+	tpa TitleScreenHeader, $1d
 	jsr ld497_uploadbackground
 	jsr lc104_enablenmi
 	jmp lc115
 
-ld92c:
-.WORD ld930,$0000
-
-ld930:	;Title Screen Data
-.BYTE $3f,$00,$04,$0f,$30,$27,$2a,$3f,$18,$04,$0f
-.BYTE $16,$30,$21,$20,$7c,$21,$f0,$f1,$24,$24,$24,$24,$e0,$e1,$e1
-.BYTE $e2,$e0,$e1,$e1,$e2,$e0,$e2,$24,$e0,$e2,$24,$e0,$e1,$e1,$e2
-.BYTE $e0,$e1,$e1,$e2,$e0,$ec,$24,$e0,$e2,$20,$a2,$1b,$e3,$e3,$e3
-.BYTE $e5,$e3,$e3,$e3,$e5,$e3,$e5,$24,$e3,$e5,$24,$e3,$e3,$e3,$e5
-.BYTE $e3,$e3,$e3,$e5,$e3,$e3,$f3,$e3,$e5,$20,$c2,$1b,$e3,$e4,$e3
-.BYTE $e7,$e3,$e4,$e3,$e5,$e3,$e5,$24,$e3,$e5,$24,$e3,$e4,$e3,$e5
-.BYTE $e3,$e4,$e3,$e5,$e3,$e3,$e3,$e3,$e5,$20,$e2,$1b,$e3,$e3,$e3
-.BYTE $e2,$e3,$e3,$e3,$e5,$e3,$e5,$24,$e3,$e5,$24,$e3,$e3,$e3,$e5
-.BYTE $e3,$e3,$e3,$e5,$e3,$e3,$e3,$e3,$e5,$21,$02,$1b,$e3,$e4,$e3
-.BYTE $e5,$e3,$f2,$e3,$e5,$e3,$e3,$e2,$e3,$e3,$e2,$e3,$e3,$e3,$e5
-.BYTE $e3,$e3,$e3,$e5,$e3,$f2,$e3,$e3,$e5,$21,$22,$1b,$e6,$e3,$e3
-.BYTE $e7,$eb,$24,$e6,$e7,$e6,$e3,$e7,$e6,$e3,$e7,$e6,$e3,$e3,$e7
-.BYTE $e6,$e3,$e3,$e7,$eb,$24,$e6,$e3,$e7,$21,$4c,$12,$e0,$e1,$e1
-.BYTE $e2,$e0,$e2,$e0,$e1,$e1,$e2,$e8,$24,$e0,$e2,$e0,$e1,$e1,$e2
-.BYTE $21,$6c,$12,$e3,$e3,$e3,$e7,$e3,$e5,$e3,$f5,$f6,$e7,$e3,$f3
-.BYTE $e3,$e5,$e6,$e3,$e3,$e7,$21,$8c,$12,$e3,$e3,$ef,$24,$e3,$e5
-.BYTE $e3,$24,$24,$24,$e3,$e3,$e3,$e5,$24,$e3,$e5,$24,$21,$ac,$12
-.BYTE $e3,$e3,$e1,$ea,$e3,$e5,$e3,$e9,$e3,$e2,$e3,$e3,$e3,$e5,$24
-.BYTE $e3,$e5,$24,$21,$cc,$12,$e3,$e3,$ef,$24,$e3,$e5,$e3,$f3,$e3
-.BYTE $e5,$e3,$f2,$e3,$e5,$24,$e3,$e5,$24,$21,$ec,$12,$e6,$e7,$24
-.BYTE $24,$e6,$e7,$e6,$e7,$e6,$e7,$eb,$24,$e6,$e7,$24,$e6,$e7,$24
-.BYTE $22,$48,$10,$0a,$24,$24,$01,$25,$19,$15,$0a,$22,$0e,$1b,$24
-.BYTE $10,$0a,$16,$0e,$22,$88,$10,$0b,$24,$24,$02,$25,$19,$15,$0a
-.BYTE $22,$0e,$1b,$24,$10,$0a,$16,$0e,$22,$c8,$10,$0c,$24,$24,$0b
-.BYTE $0a,$15,$15,$18,$18,$17,$24,$24,$1d,$1b,$12,$19,$23,$49,$0e
-.BYTE $f4,$01,$09,$08,$04,$24,$17,$12,$17,$1d,$0e,$17,$0d,$18,$00
+.include "TitleScreenData.asm"
 
 ldac1_titlescreenloop:	; Manage Title Screen
 	jsr lc104_enablenmi
@@ -3685,7 +3405,7 @@ ldaf1:
 	beq ldac1_titlescreenloop
 
 ldb05:	;Title Screen choices
-.BYTE $01,$02,$00
+.BYTE 1,2,0
 
 ldb08:
 	lda $3f		; \
@@ -3695,205 +3415,28 @@ ldb08:
 	tax			; | Set Amount of players
 	and #$01	; | depending on selected mode
 	sta $40		; /
-	lda ldb27,x	; \ Set Y position of menu cursor balloon
-	sta $057b	; /
+	lda MenuCursorYOptions,x	; \ Set Y position of menu cursor balloon
+	sta $057b					; /
 	lda #$2c	; \ Set X position of menu cursor balloon
 	sta $0567	; /
 	ldx #$00	; \ Set graphics of menu cursor balloon
 	stx $055d	; /
 	jmp lce2f_balloonxspritemanage
 
-ldb27:
+MenuCursorYOptions:
 .BYTE $8c,$9c,$ac
 
-ldb2a:
-    ;16 bytes
-.BYTE $4a,$59,$f2,$6c,$77,$88,$e1,$6c,$99,$03,$ca,$6c,$ad,$17,$e1
-.BYTE $6c
-ldb3a:
-    ;372 bytes
-.BYTE $db,$db,$db,$db,$db,$db,$db,$db,$db,$dc,$db,$db,$db,$dc,$db
-.BYTE $db
-.BYTE $2b,$dc,$39,$dd,$00,$00,$10,$06,$ff,$ff,$96,$df,$02,$7a
-.BYTE $de,$2b,$dc,$39,$dd,$4b,$dd,$00,$00,$18,$0c,$04,$0e,$ff,$ff
-.BYTE $a0,$df,$04,$86,$de,$ca,$dc,$00,$00,$ff,$ff,$b0,$df,$00,$9a
-.BYTE $de,$2b,$dc,$5e,$dd,$00,$00,$08,$06,$18,$0a,$ff,$ff,$b1,$df
-.BYTE $06,$9e,$de,$2b,$dc,$7d,$dd,$00,$00,$04,$06,$12,$08,$ff,$ff
-.BYTE $c1,$df,$07,$ba,$de,$2b,$dc,$a3,$dd,$00,$00,$06,$06,$14,$10
-.BYTE $ff,$0f,$0d,$01,$ff,$d4,$df,$09,$da,$de,$2b,$dc,$ce,$dd,$00
-.BYTE $00,$04,$06,$10,$0e,$ff,$08,$0e,$03,$0d,$09,$03,$12,$08,$03
-.BYTE $17,$0d,$03,$ff,$e7,$df,$03,$02,$df,$2b,$dc,$5e,$dd,$00,$00
-.BYTE $10,$06,$1a,$0c,$ff,$08,$08,$01,$18,$04,$01,$ff,$b1,$df,$06
-.BYTE $9e,$de,$2b,$dc,$db,$dd,$00,$00,$0e,$06,$0c,$14,$ff,$ff,$f7
-.BYTE $df,$06,$12,$df,$2b,$dc,$01,$de,$00,$00,$04,$08,$16,$10,$ff
-.BYTE $ff,$07,$e0,$09,$2e,$df,$2b,$dc,$32,$de,$00,$00,$04,$10,$18
-.BYTE $10,$ff,$0e,$06,$01,$ff,$17,$e0,$07,$56,$df,$2b,$dc,$5b,$de
-.BYTE $00,$00,$04,$08,$0e,$10,$ff,$10,$07,$01,$ff,$2a,$e0,$07,$76
-.BYTE $df,$23,$40,$88,$39,$38,$39,$38,$39,$38,$39,$33,$24,$24,$24
-.BYTE $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$30,$38
-.BYTE $39,$38,$39,$38,$39,$38,$3c,$3b,$3c,$3b,$3c,$3b,$3c,$3d,$58
-.BYTE $59,$5a,$5b,$58,$59,$5a,$5b,$58,$59,$5a,$5b,$58,$59,$5a,$5b
-.BYTE $3a,$3b,$3c,$3b,$3c,$3b,$3c,$3b,$60,$61,$62,$63,$60,$61,$62
-.BYTE $63,$5c,$5d,$5e,$5f,$5c,$5d,$5e,$5f,$5c,$5d,$5e,$5f,$5c,$5d
-.BYTE $5e,$5f,$60,$61,$62,$63,$60,$61,$62,$63,$5c,$5d,$5e,$5f,$5c
-.BYTE $5d,$5e,$5f,$5c,$5d,$5e,$5f,$5c,$5d,$5e,$5f,$5c,$5d,$5e,$5f
-.BYTE $5c,$5d,$5e,$5f,$5c,$5d,$5e,$5f,$5c,$5d,$5e,$5f
-ldcae:
-    ;911 bytes
-.BYTE $40,$50,$50,$50,$50,$90,$a0,$a0,$23,$f0,$10,$00,$00,$a0,$a0
-.BYTE $a0,$a0,$00,$00,$0a,$0a,$0a,$0a,$0a,$0a,$0a,$0a,$00,$a3,$04
-.BYTE $04,$93,$94,$94,$94,$a3,$05,$04,$95,$96,$96,$96,$a2,$ea,$05
-.BYTE $93,$94,$94,$94,$94,$a2,$eb,$05,$95,$96,$96,$96,$96,$a3,$34
-.BYTE $03,$93,$94,$94,$a3,$35,$03,$95,$96,$96,$a3,$1a,$04,$93,$94
-.BYTE $94,$94,$a3,$1b,$04,$95,$96,$96,$96,$63,$80,$20,$97,$23,$a0
-.BYTE $20,$98,$99,$98,$99,$98,$99,$98,$99,$98,$99,$98,$99,$98,$99
-.BYTE $98,$99,$98,$99,$98,$99,$98,$99,$98,$99,$98,$99,$98,$99,$98
-.BYTE $99,$98,$99,$23,$c0,$08,$40,$50,$50,$50,$50,$90,$a0,$a0,$63
-.BYTE $e8,$10,$ff,$00,$22,$49,$0e,$30,$31,$32,$31,$32,$31,$32,$31
-.BYTE $32,$31,$32,$31,$32,$33,$00,$21,$57,$06,$30,$31,$32,$31,$32
-.BYTE $33,$21,$65,$06,$30,$31,$32,$31,$32,$33,$00,$21,$90,$03,$30
-.BYTE $31,$33,$22,$26,$03,$30,$31,$33,$22,$57,$03,$30,$31,$33,$22
-.BYTE $6c,$03,$30,$31,$33,$22,$f2,$03,$30,$31,$33,$00,$20,$cb,$03
-.BYTE $30,$31,$33,$a1,$6d,$03,$3e,$3f,$40,$a1,$59,$04,$3e,$3f,$3f
-.BYTE $40,$a1,$a5,$03,$3e,$3f,$40,$22,$aa,$03,$30,$31,$33,$22,$b3
-.BYTE $03,$30,$31,$33,$00,$20,$e2,$02,$30,$33,$20,$fb,$02,$30,$33
-.BYTE $21,$57,$02,$30,$33,$21,$93,$02,$30,$33,$22,$0b,$02,$30,$33
-.BYTE $22,$47,$02,$30,$33,$22,$83,$02,$30,$33,$22,$cf,$04,$30,$31
-.BYTE $32,$33,$00,$22,$ca,$03,$30,$31,$33,$22,$d2,$03,$30,$31,$33
-.BYTE $00,$21,$08,$04,$30,$31,$32,$33,$21,$14,$04,$30,$31,$32,$33
-.BYTE $a1,$a5,$04,$3e,$3f,$3f,$40,$a1,$ba,$04,$3e,$3f,$3f,$40,$22
-.BYTE $6c,$06,$30,$31,$32,$31,$32,$33,$00,$22,$ee,$04,$30,$31,$32
-.BYTE $33,$20,$f9,$03,$30,$31,$33,$a1,$1a,$03,$3f,$3f,$40,$21,$90
-.BYTE $03,$30,$31,$33,$a1,$b1,$03,$3f,$3f,$40,$22,$28,$03,$30,$31
-.BYTE $33,$a2,$49,$03,$3f,$3f,$40,$20,$ea,$02,$30,$33,$00,$a2,$6c
-.BYTE $03,$3e,$3f,$40,$a2,$73,$03,$3e,$3f,$40,$20,$e4,$04,$30,$31
-.BYTE $32,$33,$20,$f8,$04,$30,$31,$32,$33,$21,$a8,$04,$30,$31,$32
-.BYTE $33,$21,$b5,$04,$30,$31,$32,$33,$00,$22,$64,$02,$30,$33,$22
-.BYTE $08,$02,$30,$33,$21,$ac,$02,$30,$33,$21,$b4,$02,$30,$33,$22
-.BYTE $18,$02,$30,$33,$22,$7c,$02,$30,$33,$00,$10,$c8,$48,$38,$ff
-.BYTE $b8,$cf,$cf,$8f,$e0,$e0,$98,$10,$c4,$48,$b8,$28,$3c,$ff,$b8
-.BYTE $e8,$58,$cf,$cf,$8f,$4f,$57,$e0,$e0,$98,$58,$60,$10,$ff,$df
-.BYTE $ec,$10,$c8,$80,$30,$b8,$60,$90,$38,$ff,$98,$48,$d0,$78,$a8
-.BYTE $cf,$cf,$5f,$87,$8f,$97,$b7,$e0,$e0,$68,$90,$98,$a0,$c0,$10
-.BYTE $c8,$58,$68,$c8,$28,$50,$98,$38,$ff,$70,$78,$d0,$30,$68,$b0
-.BYTE $cf,$cf,$2f,$57,$4f,$67,$a7,$a7,$e0,$e0,$38,$6c,$6c,$7c,$b0
-.BYTE $b0,$10,$c8,$12,$da,$ba,$9a,$5a,$3a,$1a,$7a,$38,$ff,$1e,$e6
-.BYTE $c6,$a6,$66,$46,$26,$96,$cf,$cf,$37,$37,$4f,$5f,$7f,$8f,$9f
-.BYTE $af,$e0,$e0,$40,$40,$58,$68,$88,$98,$a8,$b8,$10,$c8,$52,$92
-.BYTE $38,$ff,$66,$a6,$cf,$cf,$af,$af,$e0,$e0,$b8,$b8,$10,$c8,$40
-.BYTE $a0,$28,$d0,$60,$38,$ff,$60,$c0,$30,$d8,$90,$cf,$cf,$3f,$3f
-.BYTE $67,$67,$97,$e0,$e0,$48,$48,$88,$88,$a0,$10,$c8,$50,$c8,$88
-.BYTE $40,$70,$d0,$88,$48,$38,$ff,$60,$e0,$98,$58,$90,$d8,$90,$50
-.BYTE $cf,$cf,$37,$37,$5f,$87,$b7,$3c,$64,$8c,$e0,$e0,$40,$40,$68
-.BYTE $90,$c0,$60,$80,$a8,$10,$c8,$20,$c0,$40,$a8,$60,$98,$38,$ff
-.BYTE $40,$e0,$60,$c8,$68,$a0,$cf,$cf,$37,$37,$67,$67,$97,$97,$e0
-.BYTE $e0,$40,$40,$70,$70,$b0,$b0,$10,$c8,$20,$40,$60,$a0,$c0,$e0
-.BYTE $38,$ff,$30,$50,$70,$b0,$d0,$f0,$cf,$cf,$97,$7f,$67,$67,$7f
-.BYTE $97,$e0,$e0,$a0,$88,$70,$70,$88,$a0,$03,$58,$78,$04,$78,$78
-.BYTE $04,$98,$78,$04,$05,$c8,$38,$05,$38,$40,$05,$58,$78,$04,$78
-.BYTE $78,$04,$98,$78,$04,$00,$05,$94,$a0,$06,$84,$48,$05,$34,$70
-.BYTE $04,$64,$80,$04,$bc,$78,$04,$06,$5c,$18,$06,$24,$50,$05,$64
-.BYTE $40,$05,$c4,$38,$05,$54,$90,$04,$9c,$90,$04,$06,$10,$20,$06
-.BYTE $d8,$20,$06,$b8,$38,$05,$98,$48,$05,$58,$68,$05,$38,$78,$04
-.BYTE $05,$54,$98,$05,$94,$98,$05,$6c,$39,$06,$94,$31,$06,$bc,$59
-.BYTE $06,$05,$50,$28,$06,$a8,$28,$06,$24,$50,$06,$cc,$50,$06,$70
-.BYTE $80,$04,$05,$50,$20,$06,$c8,$20,$06,$84,$48,$05,$44,$70,$05
-.BYTE $78,$a0,$04,$06,$28,$20,$06,$c8,$20,$06,$48,$50,$05,$b0,$50
-.BYTE $05,$5c,$80,$04,$94,$80,$04,$06,$20,$80,$04,$40,$68,$05,$60
-.BYTE $50,$06,$a0,$50,$06,$c0,$68,$05,$e0,$80,$04
-le03d:
-    ;527 bytes
-.BYTE $08,$08,$f0,$08,$08,$00,$00,$00,$00,$08,$08,$08,$00,$00,$01
-.BYTE $08,$08,$09,$00,$00,$ff,$08,$08,$07,$fe,$00,$00,$06,$08,$08
-.BYTE $02,$00,$00,$0a,$08,$08,$02,$00,$01,$0a,$08,$09,$04,$00,$00
-.BYTE $0c,$08,$08,$00,$00,$fe,$08,$08,$06,$fd,$fd,$fd,$05,$05,$05
-.BYTE $08,$08,$08,$00,$00,$00,$08,$08,$07,$00,$00,$ff,$08,$08,$09
-.BYTE $00,$00,$01,$0a,$08,$08,$02,$00,$00,$06,$08,$08,$fe,$00,$00
-.BYTE $06,$08,$07,$fe,$00,$ff,$04,$08,$08,$fc,$00,$00,$08,$08,$0a
-.BYTE $00,$00,$02,$0b,$0b,$0b,$03,$03,$03,$00,$00,$01,$02,$03,$04
-.BYTE $05,$00,$00,$01,$02,$03,$06,$07,$00,$00,$01,$02,$03,$06,$08
-.BYTE $00,$09,$0a,$02,$0b,$0c,$05,$00,$00,$01,$02,$03,$04,$05,$00
-.BYTE $00,$01,$02,$0d,$0e,$05,$00,$1a,$1b,$1c,$1d,$1e,$1f,$01,$1a
-.BYTE $1b,$20,$1d,$1e,$fc,$00,$1a,$21,$22,$1d,$23,$24,$00,$00,$38
-.BYTE $35,$0d,$39,$37,$00,$00,$34,$35,$03,$36,$37,$00,$09,$3a,$35
-.BYTE $0b,$3b,$37,$00,$ce,$cf,$d0,$d1,$d2,$d3,$00,$25,$26,$27,$28
-.BYTE $29,$2a,$01,$28,$29,$2c,$25,$26,$2b,$00,$4c,$cc,$02,$4d,$cd
-.BYTE $05,$00,$4c,$2f,$22,$4d,$30,$24,$07,$4c,$2f,$35,$4d,$30,$37
-.BYTE $02,$4c,$2f,$27,$4d,$30,$2a,$07,$4c,$2f,$2b,$4d,$30,$2c,$00
-.BYTE $0f,$10,$02,$11,$12,$05,$00,$0f,$10,$02,$11,$19,$07,$00,$0f
-.BYTE $10,$02,$11,$19,$08,$00,$13,$14,$02,$15,$16,$05,$00,$0f,$10
-.BYTE $02,$11,$12,$05,$03,$13,$17,$02,$15,$18,$05,$04,$13,$2d,$1c
-.BYTE $15,$2e,$1f,$05,$13,$2d,$20,$15,$2e,$fc,$04,$13,$2f,$22,$15
-.BYTE $30,$24,$00,$13,$3c,$35,$15,$3d,$37,$00,$0f,$40,$35,$11,$41
-.BYTE $37,$03,$13,$3e,$35,$15,$3f,$37,$00,$d4,$d5,$d0,$d6,$d7,$d3
-.BYTE $00,$25,$31,$27,$32,$33,$2a,$02,$25,$31,$27,$32,$33,$2a,$00
-.BYTE $fc,$48,$42,$fc,$49,$43,$00,$fc,$48,$44,$fc,$49,$45,$00,$fc
-.BYTE $4a,$46,$fc,$4b,$47,$00,$fc,$a4,$a5,$fc,$a6,$a7,$08,$fc,$71
-.BYTE $fc,$fc,$72,$73,$08,$fc,$74,$fc,$fc,$75,$76,$08,$fc,$71,$77
-.BYTE $fc,$72,$73,$08,$fc,$74,$77,$fc,$75,$76,$08,$fc,$71,$78,$fc
-.BYTE $72,$73,$08,$fc,$74,$78,$fc,$75,$76,$08,$fc,$71,$79,$fc,$72
-.BYTE $73,$08,$fc,$74,$79,$fc,$75,$76,$00,$4e,$4f,$50,$51,$52,$53
-.BYTE $00,$4e,$4f,$50,$51,$5e,$58,$00,$4e,$4f,$50,$51,$5e,$5d,$00
-.BYTE $54,$55,$50,$56,$57,$53,$00,$4e,$4f,$50,$51,$52,$53,$00,$59
-.BYTE $5a,$50,$5b,$5c,$53,$00,$fc,$5f,$60,$fc,$61,$62,$06,$63,$64
-.BYTE $60,$fc,$65,$62,$00,$66,$67,$60,$68,$69,$62,$00,$6a,$67,$60
-.BYTE $6b,$69,$62,$00,$fc,$6c,$6d,$fc,$6e,$6f,$00,$fc,$6c,$6d,$fc
-.BYTE $6e,$70
-le24c:
-    ;76 bytes
-.BYTE $af,$b6,$bd,$b6,$c4,$cb,$d2,$cb,$d9,$e0,$e7,$e0,$ee,$f5,$fc
-.BYTE $f5,$0a,$0a,$0a,$0a,$11,$11,$11,$11,$18,$18,$18,$18,$1f,$1f
-.BYTE $1f,$1f,$26,$26,$26,$26,$2d,$2d,$2d,$2d,$34,$34,$34,$34,$3b
-.BYTE $42,$49,$42,$50,$57,$5e,$57,$65,$6c,$73,$6c,$7a,$81,$88,$81
-.BYTE $96,$96,$96,$96,$9d,$9d,$9d,$9d,$a4,$ab,$b2,$ab,$b9,$a4,$b9
-.BYTE $a4
-le298:
-    ;76 bytes
-.BYTE $e0,$e0,$e0,$e0,$e0,$e0,$e0,$e0,$e0,$e0,$e0,$e0,$e0,$e0,$e0
-.BYTE $e0,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1
-.BYTE $e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1
-.BYTE $e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1
-.BYTE $e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1
-.BYTE $e1
-le2e4:
-.BYTE $81,$81,$8f,$81,$f5,$f5,$03,$f5
-le2ec:
-.BYTE $e1,$e1,$e1,$e1,$e0,$e0,$e1,$e0
-le2f4:
-    ;44 bytes
-.BYTE $f8,$ff,$06,$ff,$0d,$14,$1b,$14,$3e,$3e,$22,$29,$30,$30,$30
-.BYTE $30,$c0,$c0,$c0,$c0,$c0,$c7,$c0,$c7,$ce,$d5,$ce,$d5,$dc,$e3
-.BYTE $dc,$e3,$ea,$f1,$ea,$f1,$3e,$45,$3e,$45,$37,$37,$37,$37
-le320:
-    ;44 bytes
-.BYTE $e1,$e1,$e2,$e1,$e2,$e2,$e2,$e2,$e2,$e2,$e2,$e2,$e2,$e2,$e2
-.BYTE $e2,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1,$e1
-.BYTE $e1,$e1,$e1,$e1,$e1,$e1,$e2,$e2,$e2,$e2,$e2,$e2,$e2,$e2
-le34c:
-.BYTE $44,$2c,$00,$00,$00,$04
-le352:
-    ;50 bytes
-.BYTE $24,$08,$00,$00,$fc,$fc,$fe,$fc,$00,$7b,$fc,$fc,$7c,$fc,$fc
-.BYTE $00,$7d,$7e,$fc,$7f,$80,$fc,$00,$81,$82,$83,$84,$85,$86,$00
-.BYTE $87,$88,$fc,$89,$8a,$fc,$00,$8b,$8c,$fc,$8d,$8e,$fc,$00,$8f
-.BYTE $90,$fc,$fc,$fc,$fc
-le384:
-.BYTE $55,$5a,$61,$68,$6f,$76,$7d
-le38b:
-.BYTE $e3,$e3,$e3,$e3,$e3,$e3,$e3
+.include "PhaseData.asm"
 
-le392:
-.BYTE $20,$38,$50,$68,$80,$98,$b0,$c8,$08
-le39b:
-.BYTE $20,$38,$c8,$b0,$98,$80,$68,$50,$08
+.include "SpriteAnimData.asm"
 
 le3a4:
-	lda le392,x	; \ Set Pointer from the first table
+	lda OAMObjectOrder1,x	; \ Set Pointer from the first table
 	sta $1f		; /
 	lda $19		; \
 	lsr			; | Every 2 frames
 	bcc le3b3	; | Set Pointer from the second table
-	lda le39b,x	; |
+	lda OAMObjectOrder2,x	; |
 	sta $1f		; /
 le3b3:
 	lda #$02	; \ Set Pointer to $02xx
@@ -3926,37 +3469,37 @@ le3cf:
 	ldy $88,x	; \ 
 	adc le34c,y	; | Y = (Object Status * 4) + Animation Frame
 	tay			; / + [le34c + Balloons]
-	lda le24c,y	; \
-	sta $1d		; | Set pointer
-	lda le298,y	; |
-	sta $1e		; /
+	lda PlayerAnimLower,y	; \
+	sta $1d					; | Set pointer
+	lda PlayerAnimUpper,y	; |
+	sta $1e					; /
 	lda $bd,x	; \ If Player X is invincible
 	beq le429	; /
 	ldy $88,x	; Y = Player X Balloons
 	lda le34c+3,y	; \
 	adc $0436,x		; | Y = [le34c+3+Balloons+Frame]
 	tay				; /
-	lda le2e4,y	; \
-	sta $1d		; | Set pointer
-	lda le2ec,y	; |
-	sta $1e		; /
+	lda PlayerFlashAnimLower,y	; \
+	sta $1d						; | Set pointer
+	lda PlayerFlashAnimUpper,y	; |
+	sta $1e						; /
 	jmp le429
 le408:
 	ldy $88,x
 	clc
 	adc le352,y
 	tay
-	lda le2f4,y
+	lda EnemyAnimLower,y
 	sta $1d
-	lda le320,y
+	lda EnemyAnimUpper,y
 	sta $1e
 	bne le429
 le41b:
 	ldy $7f,x
 	bmi le3c2
-	lda le384,y
+	lda FishSprPointersLower,y
 	sta $1d
-	lda le38b,y
+	lda FishSprPointersUpper,y
 	sta $1e
 le429:
 	lda $91,x
@@ -3996,16 +3539,10 @@ le463:
 	ora #$20
 le465:
 	sta $14
-	lda #$43
-	sta $21
-	lda #$e0
-	sta $22
+	tpa le043, $21
 	lda $0448,x
 	beq le47c
-	lda #$79
-	sta $21
-	lda #$e0
-	sta $22
+	tpa le079, $21
 le47c:
 	ldy #0
 	lda ($1d),y
@@ -4193,15 +3730,23 @@ le5c4:
 	rts
 ;-----------------------
 
+.define SplashPointers Splash5, Splash4, Splash3, Splash2, Splash1
 le5c5:
-.BYTE $fd,$ed,$e0,$d6,$cf
+.LOBYTES SplashPointers
 le5ca:
-    ;55 bytes
-.BYTE $e5,$e5,$e5,$e5,$e5
-.BYTE $d0,$ae,$03,$04,$f0,$f0,$f0,$c8,$af,$03
-.BYTE $04,$d0,$b0,$03,$04,$f0,$f0,$c8,$b1,$03,$fc,$c8,$b2,$03,$04
-.BYTE $d0,$b3,$03,$04,$f0,$c8,$b4,$03,$00,$c8,$b4,$43,$08,$d0,$b5
-.BYTE $03,$00,$d0,$b5,$43,$08,$f0,$f0,$f0,$f0
+.HIBYTES SplashPointers
+
+Splash1:
+.BYTE $d0,$ae,$03,$04,$f0,$f0,$f0
+Splash2:
+.BYTE $c8,$af,$03,$04,$d0,$b0,$03,$04,$f0,$f0
+Splash3:
+.BYTE $c8,$b1,$03,$fc,$c8,$b2,$03,$04,$d0,$b3,$03,$04,$f0
+Splash4:
+.BYTE $c8,$b4,$03,$00,$c8,$b4,$43,$08,$d0,$b5,$03,$00,$d0,$b5,$43,$08
+Splash5:
+.BYTE $f0,$f0,$f0,$f0
+
 le601:
     ;12 bytes
 .BYTE $04,$04,$05,$06,$03,$03,$03,$06,$0a,$0a,$0a,$0a
@@ -4366,12 +3911,12 @@ le768_polljoypad0:
 	ldx #$00	; Read Controller 0
 le76a_polljoypadx:
 	lda #$01	; \
-	sta $4016	; | Output Strobe to both controllers
+	sta JOY1	; | Output Strobe to both controllers
 	lda #$00	; |
-	sta $4016	; /
+	sta JOY1	; /
 	ldy #$07
 le776:
-	lda $4016,x	; \
+	lda JOY1,x	; \
 	sta $12		; |
 	lsr			; | Poll Controller X
 	ora $12		; | to $061C + X
@@ -5724,8 +5269,7 @@ lf119:
 	rts
 
 lf143:
-	txa			; \ Push X
-	pha			; /
+	phx
 	lda #$00	; \
 	sta $2e		; | Init
 	sta $2f		; |
@@ -5750,8 +5294,7 @@ lf14f:
 lf16c:
 	dex			; |
 	bne lf14f	; /
-	pla			; \ Pull X
-	tax			; /
+	plx
 	rts
 ;-----------------------
 
@@ -5796,28 +5339,26 @@ lf1a8:
 ;-----------------------
 
 lf1b3_rng:
-	txa			; \ Push X
-	pha			; /
-	ldx #$0b	; \ Loop 11 times
+	phx
+	ldx #11			; \ Loop 11 times
 lf1b7:
-	asl $1b		; |
-	rol $1c		; |
-	rol			; |
-	rol			; | Do Pseudo Random
-	eor $1b		; | Number Generator stuff?
-	rol			; |
-	eor $1b		; |
-	lsr			; |
-	lsr			; |
-	eor #$ff	; |
-	and #$01	; |
-	ora $1b		; |
-	sta $1b		; |
-	dex			; |
-	bne lf1b7	; /
-	pla			; \ Pull X
-	tax			; /
-	lda $1b		; Return A = [$1B]
+	asl RNGLower	; |
+	rol RNGUpper	; |
+	rol				; |
+	rol				; | Do Pseudo Random
+	eor RNGLower	; | Number Generator stuff?
+	rol				; |
+	eor RNGLower	; |
+	lsr				; |
+	lsr				; |
+	eor #$ff		; |
+	and #$01		; |
+	ora RNGLower	; |
+	sta RNGLower	; |
+	dex				; |
+	bne lf1b7		; /
+	plx
+	lda RNGOutput	; Return A = [$1B]
 	rts
 ;-----------------------
 
@@ -5826,7 +5367,7 @@ lf1d4:
 	ldx #$09	; \
 lf1d9:
 	lda #$00	; | Player 1 Score to 000000
-	sta $03,x	; |
+	sta P1Score,x	; |
 	dex			; |
 	bpl lf1d9	; /
 	sta $3e		; Update Player 1 Score
@@ -5967,11 +5508,9 @@ lf2e4:
 	bmi lf30d	; / then skip respawn code
 	dec $c3,x	; \ Decrease Player X Respawn Delay
 	bne lf327	; / If not 0 then ?
-	txa			; \ Push X
-	pha			; /
+	phx
 	jsr lc726
-	pla			; \ Pull X
-	tax			; /
+	plx
 	ldy #$02
 	dec $41,x	; Decrement Player X Lives
 	sty $46		; Update Status Bar
@@ -6115,8 +5654,7 @@ lf3d4:
 	sta $61				; / Phase Number
 	jmp lc12d_copypputempblock
 lf3ee:
-	lda #$00				; \
-	ldy #$f4				; | Copy Empty PPU Block
+	lday lf400				; \ Copy Empty PPU Block
 	jmp lc131_copyppublock	; /
 lf3f5:	; $206C - $08 - "PHASE-  "
 .BYTE $20,$6c,$08,$19,$11,$0a,$1c,$0e,$25,$00,$00
@@ -6151,8 +5689,11 @@ lf42f:
 	bpl lf42f					; /
 	rts
 
+.define PPUBlockPointers lf442, lf455
 lf43b:	; Pointers to PPU Blocks
-.BYTE $42,$55,$f4,$f4
+.LOBYTES PPUBlockPointers
+lf43d:
+.HIBYTES PPUBlockPointers
 lf43f:	; Empty tiles lower PPUADDR
 .BYTE $88,$a8,$e8
 lf442:	; "   GAME  OVER   "
@@ -6227,1040 +5768,9 @@ lf4a5_initfish:
 	rts
 ;-----------------------
 
-    ;59 bytes
-.BYTE $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-.BYTE $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-.BYTE $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-.BYTE $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-lf500:
-	jsr lf78f
-lf503:
-	rts
-;-----------------------
+.include "Sound.asm"
 
-lf504:
-	lda #0
-	tax
-	sta $fd
-	beq lf51b
-lf50b:
-	txa
-	lsr
-	tax
-lf50e:
-	inx
-	txa
-	cmp #4
-	beq lf503
-	lda $fd
-	clc
-	adc #4
-	sta $fd
-lf51b:
-	txa
-	asl
-	tax
-	lda $e0,x
-	sta $fe
-	lda $e1,x
-	sta $ff
-	lda $e1,x
-	beq lf50b
-	txa
-	lsr
-	tax
-	dec $d0,x
-	bne lf50e
-lf531:
-	ldy $e8,x
-	inc $e8,x
-	lda ($fe),y
-	beq lf500
-	tay
-	cmp #$ff
-	beq lf547
-	and #$c0
-	cmp #$c0
-	beq lf553
-	jmp lf561
-lf547:
-	lda $d8,x
-	beq lf55e
-	dec $d8,x
-	lda $ec,x
-	sta $e8,x
-	bne lf55e
-lf553:
-	tya
-	and #$3f
-	sta $d8,x
-	dec $d8,x
-	lda $e8,x
-	sta $ec,x
-lf55e:
-	jmp lf531
-lf561:
-	tya
-	bpl lf57b
-	and #$0f
-	clc
-	adc $df
-	tay
-	lda lf660,y
-	sta $d4,x
-	tay
-	txa
-	cmp #2
-	beq lf5c4
-lf575:
-	ldy $e8,x
-	inc $e8,x
-	lda ($fe),y
-lf57b:
-	tay
-	txa
-	cmp #3
-	beq lf5e1
-	pha
-	tax
-	cmp #1
-	beq lf5b9
-lf587:
-	ldx $fd
-	lda lf601,y
-	beq lf599
-	sta $4002,x
-	lda lf600,y
-	ora #8
-	sta $4003,x
-lf599:
-	tay
-	pla
-	tax
-	tya
-	bne lf5aa
-	ldy #0
-	txa
-	cmp #2
-	beq lf5ac
-	ldy #$10
-	bne lf5ac
-lf5aa:
-	ldy $dc,x
-lf5ac:
-	tya
-	ldy $fd
-	sta $4000,y
-lf5b2:
-	lda $d4,x
-	sta $d0,x
-	jmp lf50e
-lf5b9:
-	lda $f5
-	and #2
-	beq lf587
-	pla
-	tax
-	jmp lf5b2
-lf5c4:
-	tya
-	ldy $07f0
-	beq lf5ce
-	lda #$ff
-	bne lf5d9
-lf5ce:
-	clc
-	adc #$fe
-	asl
-	asl
-	cmp #$3c
-	bcc lf5d9
-	lda #$3c
-lf5d9:
-	sta $4008
-	sta $de
-	jmp lf575
-lf5e1:
-	lda $f4
-	cmp #2
-	beq lf5f9
-	lda lf700,y
-	sta $400c
-	lda lf700+1,y
-	sta $400e
-	lda lf700+2,y
-	sta $400f
-lf5f9:
-	jmp lf5b2
-.BYTE $16,$ff,$10,$c5
-lf600:
-.BYTE $07
-lf601:
-    ;95 bytes
-.BYTE $f0,$00,$00,$00,$d4,$00,$c8,$00,$bd,$00,$b2,$00,$a8,$00,$9f
-.BYTE $00,$96,$00,$8d,$00,$85,$00,$7e,$00,$76,$00,$70,$01,$ab,$01
-.BYTE $93,$01,$7c,$01,$67,$01,$52,$01,$3f,$01,$2d,$01,$1c,$01,$0c
-.BYTE $00,$fd,$00,$ee,$00,$e1,$03,$57,$03,$27,$02,$f9,$02,$cf,$02
-.BYTE $a6,$02,$80,$02,$5c,$02,$3a,$02,$1a,$01,$fc,$01,$df,$01,$c4
-.BYTE $03,$f8,$00,$69,$00,$63,$00,$5e,$00,$58,$00,$53,$00,$4f,$00
-.BYTE $4a,$00,$46,$00,$42
-lf660:
-    ;35 bytes
-.BYTE $03,$06,$0c,$18,$30,$12,$24,$09,$08,$04,$07,$01,$04,$08,$10
-.BYTE $20,$40,$18,$30,$0c,$01,$06,$0c,$18,$30,$60,$24,$48,$12,$10
-.BYTE $08,$0e,$02,$03,$04
-lf683:
-	lda #0
-	beq lf691
-lf687:
-	lda #8
-	bne lf691
-lf68b:
-	lda #$0c
-	bne lf691
-lf68f:
-	lda #4
-lf691:
-	sta $f9
-	lda #$40
-	sta $fa
-	stx $fb
-	sty $fc
-	ldy #0
-lf69d:
-	lda ($fb),y
-	sta ($f9),y
-	iny
-	tya
-	cmp #4
-	bne lf69d
-	rts
-;-----------------------
-
-lf6a8_loadsndseq:
-	tax			; \
-	jsr lf798	; | Initialize Sound Channels
-	stx $f6		; / and Sound Variables
-	lda $07f5	; \
-	beq lf6be	; | Check [$07F5] == $00 or $02
-	cmp #$02	; |
-	bne lf6be	; /
-	sta $f0		; [$00F0] = [$07F5] (!= 00 or 02)
-	lda #$00	; \
-	sta $07f5	; / Clear [$07F5]
-lf6be:
-	lda lfbca,y	; \ Load Sound Sequence Pointer to Y
-	tay			; /
-	ldx #$00	; \
-lf6c4:
-	lda lfbca,y	; |
-	sta $df,x	; | Load Sound Sequence Header
-	iny			; | (9 bytes)
-	inx			; |
-	txa			; |
-	cmp #$09	; |
-	bne lf6c4	; /
-
-	lda #$01	; \
-	sta $d0		; |
-	sta $d1		; |
-	sta $d2		; | Initialize Sequence stuff
-	sta $d3		; |
-	lda #$00	; |
-	sta $e8		; |
-	sta $e9		; |
-	sta $ea		; |
-	sta $eb		; /
-	rts
-;-----------------------
-
-    ;27 bytes
-.BYTE $94,$ab,$fd,$58,$00,$7f,$04,$18,$3f,$7f,$00,$00,$06,$7f,$0a
-.BYTE $c0,$08,$7f,$05,$c0,$c1,$89,$02,$0f,$ff,$ff,$ff
-lf700:
-    ;18 bytes
-.BYTE $10,$00,$18,$10,$01,$18,$00,$01,$88,$02,$02,$40,$03,$05,$40
-.BYTE $04,$07,$40
-lf712:
-	lda #$7f	; \ Set Pulse Channels:
-	sta $4001	; | No Sweep
-	sta $4005	; /
-lf71a:
-	stx $dc
-	sty $dd
-	rts
-;-----------------------
-
-lf71f:
-	ldx #$e5
-	ldy #$f6
-	bne lf745
-lf725:
-	lda $f3
-	lsr
-	bcs lf736
-	lda $f7
-	lsr
-	bcs lf749
-	lda $f0
-	and #$10
-	bne lf71f
-	rts
-;-----------------------
-
-lf736:
-	lda $f7
-	ora #1
-	sta $f7
-	lda #0
-	sta $07e4
-	ldx #$fc
-	ldy #$f5
-lf745:
-	jsr lf683
-	rts
-;-----------------------
-
-lf749:
-	inc $07e4
-	lda $07e4
-	cmp #$58
-	bne lf77b
-	lda #0
-	sta $f7
-	rts
-;-----------------------
-
-lf758:
-	lda #$c0	; \ Set Frame Counter
-	sta $4017	; / to 4-step sequence, clear frame interrupt flag
-	jsr lfb25_music
-	jsr lf90a
-	jsr lfa38
-	jsr lfaac
-	jsr lf824
-	lda $f1
-	sta $07e9
-	lda #$00	; \
-	sta $f0		; |
-	sta $f1		; | Clear Music/SFX Flags
-	sta $f2		; |
-	sta $f3		; /
-lf77b:
-	rts
-;-----------------------
-
-lf77c:
-	lda $f4
-	and #6
-	bne lf77b
-	lda $f4
-	and #$f0
-	sta $f4
-	ldx #$e9
-	ldy #$f6
-	jmp lf879
-lf78f:
-	lda $f6
-	cmp #$20
-	bne lf79f
-	inc $07e8
-lf798:
-	and #$0f	; \ Initialize Sound Channels
-	cmp #$0f	; | differently depending on
-	bne lf7a5	; / Music/Jingle needs
-	txa
-lf79f:
-	lda $f4
-	and #$20
-	bne lf7c7
-lf7a5:
-	lda #$10	; \ Constant volume on:
-	sta $400c	; | - Noise Channel
-	sta $4000	; | - Pulse 1 Channel
-	sta $4004	; / - Pulse 2 Channel
-	lda #$00
-	sta $f4
-lf7b4:
-	sta $f5
-	sta $f6		; Clear Current Music/Jingle
-	sta $07fa
-	sta $f7
-	sta $4008	; Clear Triangle Channel Linear Counter
-	sta $4011	; Clear DMC Channel Load Counter
-	sta $07f0
-	rts
-;-----------------------
-
-lf7c7:
-	lda #$10	; \ Constant volume on:
-	sta $4004	; | - Pulse 2 Channel
-	sta $400c	; / - Noise Channel
-	lda #$00
-	beq lf7b4
-lf7d3:
-	lda #$00
-	sta $07fa
-	rts
-;-----------------------
-
-lf7d9:
-	ldx #$f5
-	ldy #$f6
-	jmp lf879
-lf7e0:
-	inc $07fb
-	lda $07fb
-	cmp #$10
-	beq lf7d9
-	cmp #$20
-	beq lf7d3
-	rts
-;-----------------------
-
-lf7ef:
-	lda #0
-	sta $07fb
-	lda #$f0
-	sta $07fa
-	ldx #$f1
-	ldy #$f6
-	jmp lf879
-lf800:
-	lda $f4
-	and #$f0
-	ora #2
-	sta $f4
-	lda #0
-	sta $07f7
-	ldx #$f1
-	ldy #$f6
-	jmp lf879
-lf814:
-	inc $07f7
-	lda $07f7
-	cmp #$10
-	bne lf85b
-	jmp lf89b
-lf821:
-	jmp lf7a5
-lf824:
-	lda $f0
-	lsr
-	bcs lf821
-	lda $f6
-	cmp #$df
-	beq lf83b
-	cmp #$7f
-	beq lf83b
-	cmp #$20
-	beq lf83b
-	lda $f6
-	bne lf85b
-lf83b:
-	lda $07fa
-	cmp #$0f
-	beq lf7ef
-	cmp #$f0
-	beq lf7e0
-	lda $f0
-	lsr
-	lsr
-	bcs lf800
-	lsr
-	bcs lf85f
-	lsr
-	bcs lf85c
-	lda $f4
-	lsr
-	lsr
-	bcs lf814
-	lsr
-	bcs lf87d
-lf85b:
-	rts
-;-----------------------
-
-lf85c:
-	jmp lf77c
-lf85f:
-	lda $f4
-	and #$80
-	bne lf85b
-	lda $f4
-	and #$f0
-	ora #4
-	sta $f4
-	lda #0
-	sta $07f3
-	sta $07f1
-	ldx #$ed
-	ldy #$f6
-lf879:
-	jsr lf68b
-	rts
-;-----------------------
-
-lf87d:
-	inc $07f3
-	lda $07f3
-	cmp #3
-	bne lf8a1
-	lda #0
-	sta $07f3
-	inc $07f1
-	lda $07f1
-	cmp #$10
-	bne lf8a2
-	lda #$10
-	sta $400c
-lf89b:
-	lda $f4
-	and #$f0
-	sta $f4
-lf8a1:
-	rts
-;-----------------------
-
-lf8a2:
-	sta $400e
-	rts
-;-----------------------
-
-lf8a6:
-	lda #0
-	sta $07e0
-	clc
-	lda $1b
-	and #7
-	adc #2
-	sta $07e1
-	lda $f7
-	and #0
-	ora #$80
-	sta $f7
-	bne lf8e8
-lf8bf:
-	inc $07e0
-	lda $07e0
-	cmp $07e1
-	bne lf8e8
-lf8ca:
-	lda #$10
-	sta $4000
-	sta $4004
-	lda #0
-	sta $f7
-	lda $f4
-	and #$0f
-	sta $f4
-	rts
-;-----------------------
-
-lf8dd:
-	jsr lf7a5
-	lda #$80
-	sta $f4
-	lda #2
-	sta $f0
-lf8e8:
-	ldx #$f9
-	ldy #$f6
-	jsr lf683
-	lda $1b
-	and #$0f
-	sta $4002
-	ldx #$f9
-	ldy #$f6
-	jsr lf68f
-	lda $1b
-	lsr
-	lsr
-	and #$0f
-	sta $4006
-	rts
-;-----------------------
-
-lf907:
-	jmp lf8a6
-
-lf90a:
-	lda $f6		; \ Check if music is not playing
-	beq lf91b	; / If not playing then continue as normal
-	cmp #$df	; \ Songs #$DF?
-	beq lf91b	; / Wouldn't that be redundant?
-	lda $f0		; \
-	and #$e0	; | Check for sound effects that stops the music
-	beq lf94e	; / if found, then return
-	jsr lf7a5
-lf91b:
-	lda $f0
-	asl
-	bcs lf8dd
-	asl
-	bcs lf952
-	asl
-	bcs lf965
-	lda $f4
-	asl
-	bcs lf8e8
-	lda $f4
-	and #$e0
-	bne lf94e
-	lda $f6
-	cmp #$df
-	beq lf94b
-	lda $f6
-	bne lf94e
-	lda $f3
-	asl
-	bcs lf907
-	asl
-	bcs lf977
-	lda $f7
-	asl
-	bcs lf94f
-	asl
-	bcs lf993
-lf94b:
-	jsr lf725
-lf94e:
-	rts
-;-----------------------
-
-lf94f:
-	jmp lf8bf
-lf952:
-	lda #$0f
-	sta $07fa
-	lda $f4
-	and #$0f
-	ora #$40
-	sta $f4
-	ldx #$d1
-	ldy #$f9
-	bne lf98f
-lf965:
-	lda #2
-	sta $f0
-	lda $f4
-	and #$0f
-	ora #$20
-	sta $f4
-	ldx #$cd
-	ldy #$f9
-	bne lf98f
-lf977:
-	lda #0
-	sta $07fc
-	lda $f7
-	and #0
-	ora #$40
-	sta $f7
-	ldx #$d5
-	ldy #$f9
-	jsr lf68f
-	ldx #$d9
-	ldy #$f9
-lf98f:
-	jsr lf683
-	rts
-;-----------------------
-
-lf993:
-	inc $07fc
-	lda $07fc
-	cmp #$12
-	beq lf9ca
-	cmp #6
-	bcc lf9b1
-	lda $1b
-	ora #$10
-	and #$7f
-	sta $07fe
-	rol
-	sta $07fd
-	jmp lf9bd
-lf9b1:
-	inc $07fd
-	inc $07fd
-	inc $07fe
-	inc $07fe
-lf9bd:
-	lda $07fd
-	sta $4006
-	lda $07fe
-	sta $4002
-	rts
-;-----------------------
-
-lf9ca:
-	jmp lf8ca
-    ;28 bytes
-.BYTE $b8,$d5,$20,$00,$9f,$93,$80,$22,$3f,$ba,$e0,$06,$3f,$bb,$ce
-.BYTE $06,$b8,$93,$50,$02,$80,$7f,$60,$68,$80,$7f,$62,$68
-lf9e9:
-	lda $f5
-	and #2
-	bne lfa26
-	lda $f6
-	cmp #$df
-	beq lf9f9
-	lda $f6
-	bne lfa26
-lf9f9:
-	lda #0
-	sta $07f9
-	lda $f5
-	and #$e0
-	ora #2
-	sta $f5
-	ldx #$dd
-	ldy #$f9
-	bne lfa7f
-lfa0c:
-	inc $07f9
-	lda $07f9
-	cmp #7
-	bne lfa26
-	lda #$7f
-	sta $4005
-	lda #$10
-	sta $4004
-	lda $f5
-	and #$e0
-	sta $f5
-lfa26:
-	rts
-;-----------------------
-
-lfa27:
-	jsr lf7a5
-	ldx #$e1
-	ldy #$f9
-	jsr lf683
-	ldx #$e5
-	ldy #$f9
-	jmp lfa7f
-lfa38:
-	lda $f6
-	beq lfa42
-	and #$0f
-	cmp #$0f
-	bne lfa63
-lfa42:
-	lda $f4
-	and #$80
-	bne lfa63
-	lda $f7
-	and #$c0
-	bne lfa63
-	lda $f1
-	lsr
-	bcs lfa27
-	lsr
-	bcs lf9e9
-	lsr
-	bcs lfa83
-	lsr
-	lsr
-	bcs lfa64
-	lda $f5
-	lsr
-	lsr
-	bcs lfa0c
-lfa63:
-	rts
-;-----------------------
-
-lfa64:
-	lda $f6
-	bne lfa63
-	lda $f5
-	and #2
-	bne lfa63
-	ldx #$8a
-	ldy #$fa
-	jsr lf68f
-	lda $1b
-	and #$3f
-	ora #$10
-	sta $4006
-	rts
-;-----------------------
-
-lfa7f:
-	jsr lf68f
-	rts
-;-----------------------
-
-lfa83:
-	ldy #$0a
-	lda #$ef
-	jmp lfba5
-    ;12 bytes
-.BYTE $d9,$86,$a8,$48,$08,$7f,$40,$28,$08,$7f,$45,$28
-lfa96:
-	inc $07f6
-	lda $07f6
-	cmp #4
-	bne lfad8
-	lda $f5
-	and #$1f
-	sta $f5
-	ldx #$92
-	ldy #$fa
-	bne lfb00
-lfaac:
-	lda $f6
-	beq lfaba
-	cmp #8
-	beq lfaba
-	and #$0f
-	cmp #$0f
-	bne lfad8
-lfaba:
-	lda $f4
-	and #$80
-	bne lfad8
-	lda $f1
-	asl
-	bcs lfb17
-	asl
-	bcs lfae2
-	lda $f5
-	asl
-	asl
-	bcs lfa96
-	lda $f1
-	and #$20
-	beq lfad9
-	lda $f6
-	beq lfb04
-lfad8:
-	rts
-;-----------------------
-
-lfad9:
-	lda $f6
-	cmp #$df
-	bne lfad8
-	jmp lf79f
-lfae2:
-	lda $f5
-	and #$1f
-	ora #$40
-	sta $f5
-	lda #0
-	sta $4008
-	sta $f6
-	sta $07f6
-	lda #$10
-	sta $4004
-	sta $400c
-	ldx #$8e
-	ldy #$fa
-lfb00:
-	jsr lf687
-	rts
-;-----------------------
-
-lfb04:
-	lda $07e9
-	and #$20
-	bne lfb10
-	lda #$02
-	sta $07f5
-lfb10:
-	ldy #$08
-	lda #$df
-	jmp lfba5
-
-lfb17:
-	ldy #$04
-	lda #$7f
-	jmp lfba5
-
-lfb1e:		; Music/Jingle: Stage Clear
-	ldy #$00
-	lda #$02
-	jmp lfbc1
-
-lfb25_music:
-	lda $07e8	; \ Play Balloon Trip Music
-	bne lfb5e	; /
-	lda $f2		; \ Play Music/Jingle:
-	lsr			; |
-	bcs lfb82	; | #$01 = Game Over
-	lsr			; |
-	bcs lfb1e	; | #$02 = Stage Clear
-	lsr			; |
-	bcs lfb4c	; | #$04 = Pause
-	lsr			; |
-	bcs lfb7c	; | #$08 = Stage Start
-	lsr			; |
-	bcs lfb69	; | #$10 = Bonus Phase Perfect
-	lsr			; |
-	bcs lfb5e	; | #$20 = Balloon Trip / Bonus Phase Music
-	lsr			; |
-	bcs lfb58	; | #$40 = Fish
-	lsr			; |
-	bcs lfb52	; / #$80 = Respawn
-	lda $f6		; \
-	bne lfb49	; / Current Music/Jingle
-	rts
-;-----------------------
-
-lfb49:
-	jmp lf504
-
-lfb4c:		; Music/Jingle: Pause
-	ldy #$02
-	lda #$04
-	bne lfba5
-lfb52:		; Music/Jingle: Respawn
-	ldy #$09
-	lda #$80
-	bne lfb6d
-lfb58:		; Music/Jingle: Fish
-	ldy #$07
-	lda #$40
-	bne lfb6d
-lfb5e:		; Music/Jingle: Balloon Trip / Bonus Game
-	lda #$00
-	sta $07e8
-	ldy #$06
-	lda #$20
-	bne lfbc1
-lfb69:		; Music/Jingle: Bonus Game Perfect
-	ldy #$05
-	lda #$10
-lfb6d:
-	jsr lf6a8_loadsndseq
-	ldx #$fc
-	ldy #$fc
-	jsr lf712
-	inc $07f0
-	bne lfb49
-lfb7c:		; Music/Jingle: Stage Start
-	ldy #$03
-	lda #$08
-	bne lfb86
-lfb82:		; Music/Jingle: Game Over
-	ldy #$01
-	lda #$01
-lfb86:
-	jsr lf6a8_loadsndseq
-	ldx #$80
-	ldy #$80
-lfb8d:
-	jsr lf71a
-	lda #$83	; \ Pulse 1 Channel:
-	sta $4001	; / Sweep, Shift = 3
-	lda #$7f	; \ Pulse 2 Channel:
-	sta $4005	; / No Sweep
-	bne lfbaf
-	jsr lf6a8_loadsndseq
-	ldx #$04
-	ldy #$04
-	bne lfbac
-lfba5:
-	jsr lf6a8_loadsndseq
-	ldx #$80
-	ldy #$80
-lfbac:
-	jsr lf712
-lfbaf:
-	lda #$00
-	sta $07f0
-	lda $f4
-	and #$20
-	beq lfb49
-	lda #$d5
-	sta $4001
-	bne lfb49
-lfbc1:
-	jsr lf6a8_loadsndseq
-	ldx #$80
-	ldy #$ba
-	bne lfb8d
-lfbca:
-    ;1069 bytes
-.BYTE $0b,$14,$1d,$26,$2f,$38,$41,$4a,$53,$5c,$65,$0c,$02,$ff,$0b
-.BYTE $ff,$1e,$ff,$31,$ff,$15,$18,$fe,$2a,$fe,$65,$fe,$86,$fe,$0c
-.BYTE $0d,$fe,$00,$00,$13,$fe,$00,$00,$15,$38,$ff,$5a,$ff,$79,$ff
-.BYTE $94,$ff,$00,$00,$00,$d7,$fe,$ed,$fe,$00,$00,$00,$b3,$ff,$c9
-.BYTE $ff,$da,$ff,$ef,$ff,$15,$a5,$fc,$0a,$fd,$98,$fd,$e0,$fd,$15
-.BYTE $b2,$fe,$00,$00,$c5,$fe,$00,$00,$15,$00,$00,$92,$fe,$a1,$fe
-.BYTE $00,$00,$0c,$59,$fc,$72,$fc,$8c,$fc,$00,$00,$00,$00,$00,$38
-.BYTE $fc,$49,$fc,$00,$00,$82,$02,$8b,$02,$80,$08,$02,$10,$02,$16
-.BYTE $02,$52,$02,$02,$02,$1a,$00,$82,$02,$80,$10,$02,$16,$02,$52
-.BYTE $02,$5a,$02,$02,$02,$56,$81,$02,$80,$12,$02,$0c,$02,$04,$02
-.BYTE $0c,$02,$04,$02,$2a,$02,$81,$04,$02,$80,$04,$02,$81,$04,$88
-.BYTE $02,$02,$00,$88,$02,$02,$80,$04,$02,$2a,$02,$24,$02,$2a,$02
-.BYTE $24,$02,$1c,$02,$81,$22,$02,$80,$22,$02,$81,$24,$88,$02,$88
-.BYTE $02,$80,$56,$02,$4e,$02,$12,$02,$4e,$02,$12,$02,$0c,$02,$81
-.BYTE $10,$02,$80,$10,$02,$81,$12,$88,$02,$c3,$81,$02,$02,$1c,$02
-.BYTE $02,$02,$1c,$1c,$ff,$c6,$88,$1c,$ff,$c7,$82,$4c,$4c,$2a,$4c
-.BYTE $ff,$c6,$88,$1c,$ff,$c4,$81,$46,$02,$46,$02,$32,$02,$46,$80
-.BYTE $2e,$2e,$ff,$c3,$82,$46,$46,$81,$32,$32,$46,$2e,$ff,$80,$0c
-.BYTE $0c,$81,$46,$46,$46,$80,$04,$04,$81,$46,$46,$02,$c8,$82,$4c
-.BYTE $4c,$2a,$4c,$ff,$c2,$81,$46,$80,$32,$32,$82,$46,$04,$81,$46
-.BYTE $2a,$ff,$c2,$81,$0c,$0c,$80,$04,$04,$81,$04,$80,$2e,$2e,$81
-.BYTE $2e,$82,$24,$ff,$00,$81,$32,$02,$02,$06,$0c,$32,$02,$02,$8a
-.BYTE $2e,$8b,$02,$8a,$2e,$8b,$02,$8a,$2e,$8b,$02,$88,$2e,$32,$2e
-.BYTE $d0,$8c,$2c,$24,$ff,$d0,$2e,$20,$ff,$c3,$80,$28,$02,$82,$02
-.BYTE $80,$2c,$02,$32,$02,$24,$02,$82,$02,$81,$02,$80,$28,$02,$06
-.BYTE $02,$28,$02,$81,$02,$80,$24,$02,$32,$02,$24,$02,$ff,$80,$28
-.BYTE $02,$82,$02,$80,$2c,$02,$32,$02,$24,$02,$82,$02,$89,$0c,$0a
-.BYTE $08,$06,$32,$30,$2e,$2c,$2a,$28,$26,$24,$02,$02,$02,$86,$02
-.BYTE $c7,$84,$02,$ff,$c4,$80,$28,$02,$82,$02,$80,$2c,$02,$32,$02
-.BYTE $24,$02,$82,$02,$81,$02,$80,$28,$02,$06,$02,$28,$02,$81,$02
-.BYTE $80,$24,$02,$32,$02,$24,$02,$ff,$c8,$84,$02,$ff,$81,$14,$02
-.BYTE $02,$14,$1a,$14,$02,$02,$88,$10,$10,$10,$10,$14,$10,$85,$3c
-.BYTE $81,$44,$85,$4a,$81,$44,$88,$28,$24,$20,$46,$42,$40,$c6,$81
-.BYTE $3c,$02,$02,$44,$02,$02,$02,$4a,$02,$46,$36,$36,$38,$38,$02
-.BYTE $3a,$02,$80,$3c,$3c,$81,$02,$24,$02,$02,$2c,$24,$88,$24,$1e
-.BYTE $46,$36,$38,$3a,$ff,$c4,$84,$02,$ff,$d8,$81,$06,$ff,$c6,$88
-.BYTE $06,$ff,$c7,$81,$06,$06,$80,$06,$06,$81,$06,$06,$80,$06,$06
-.BYTE $81,$06,$06,$ff,$c6,$88,$06,$ff,$e0,$81,$06,$06,$ff,$82,$0f
-.BYTE $81,$06,$06,$ea,$06,$06,$06,$06,$ff,$c5,$80,$0e,$58,$ff,$00
-.BYTE $c5,$80,$0e,$58,$ff,$82,$1c,$1c,$c3,$82,$1c,$1c,$81,$1c,$1c
-.BYTE $1c,$02,$ff,$c7,$88,$1c,$ff,$00,$83,$02,$80,$0e,$02,$0e,$02
-.BYTE $0c,$02,$0e,$02,$4e,$02,$02,$02,$0e,$02,$0c,$02,$02,$02,$0e
-.BYTE $02,$0c,$02,$0e,$02,$4e,$02,$02,$02,$0e,$02,$0c,$02,$0e,$02
-.BYTE $0e,$02,$0c,$02,$0e,$02,$4e,$02,$02,$02,$0e,$02,$0c,$02,$88
-.BYTE $4e,$18,$16,$12,$0e,$0c,$0e,$83,$02,$81,$3e,$3e,$82,$46,$1c
-.BYTE $46,$81,$02,$38,$3e,$02,$82,$46,$1c,$82,$48,$48,$81,$3e,$3e
-.BYTE $82,$38,$88,$24,$20,$1c,$48,$46,$42,$3e,$82,$09,$09,$c6,$82
-.BYTE $03,$0c,$ff,$c6,$88,$06,$ff,$ed,$89,$2a,$02,$04,$0c,$02,$04
-.BYTE $08,$02,$30,$26,$02,$30,$ff,$80,$02,$ed,$89,$0c,$02,$12,$4e
-.BYTE $02,$12,$18,$02,$0e,$08,$02,$0e,$ff,$80,$42,$02,$48,$02,$1e
-.BYTE $02,$24,$02,$02,$02,$2a,$02,$c6,$8c,$30,$2a,$ff,$00,$80,$24
-.BYTE $02,$2a,$02,$30,$02,$06,$02,$02,$02,$0c,$02,$c6,$8c,$12,$18
-.BYTE $ff,$80,$56,$54,$52,$50,$81,$02,$80,$5e,$5a,$54,$50,$18,$14
-.BYTE $10,$0a,$06,$30,$2c,$28,$02,$00,$80,$1a,$18,$16,$14,$81,$02
-.BYTE $80,$02,$5e,$5a,$54,$50,$18,$14,$10,$0a,$06,$30,$2c,$28,$82
-.BYTE $1c,$02,$1c,$02,$02,$1c,$1c,$00,$81,$10,$0a,$32,$28,$80,$32
-.BYTE $02,$32,$02,$82,$32,$81,$06,$02,$06,$02,$82,$32,$81,$54,$1a
-.BYTE $10,$0a,$80,$10,$02,$10,$02,$82,$10,$81,$16,$02,$16,$02,$82
-.BYTE $0a,$83,$03,$0c,$82,$03,$0c,$0c,$c2,$88,$1c,$1c,$1c,$1c,$1c
-.BYTE $1c,$83,$1c,$80,$04,$04,$2a,$02,$82,$1c,$ff,$81,$4c,$02,$4c
-.BYTE $02,$2a,$02,$4c,$1c,$81,$4c,$02,$4c,$02,$4c,$00,$88,$2e,$2e
-.BYTE $2e,$30,$04,$30,$c4,$80,$2e,$04,$ff,$83,$02,$88,$2e,$2e,$2e
-.BYTE $30,$04,$30,$c4,$80,$2e,$04,$ff,$83,$02,$84,$02,$02,$c2,$88
-.BYTE $3e,$3e,$3e,$42,$46,$42,$84,$3e,$ff,$85,$3e,$81,$3e,$88,$1c
-.BYTE $46,$1c,$81,$02,$3e,$3e,$3e,$82,$34,$02,$c2,$88,$06,$06,$06
-.BYTE $06,$06,$06,$82,$06,$06,$06,$06,$ff,$c2,$81,$06,$06,$80,$06
-.BYTE $06,$81,$06,$06,$06,$06,$80,$06,$06,$ff,$09,$80,$10,$02,$10
-.BYTE $02,$10,$02,$0c,$0c,$0c,$02,$0c,$02,$14,$14,$14,$02,$14,$02
-.BYTE $85,$10,$00,$80,$32,$02,$32,$02,$32,$02,$c2,$32,$32,$32,$02
-.BYTE $32,$02,$ff,$85,$32,$80,$54,$02,$54,$02,$54,$02,$50,$50,$50
-.BYTE $02,$50,$02,$56,$56,$56,$02,$56,$02,$85,$54,$c4,$85,$0c,$ff
-.BYTE $ff,$ff,$ff,$ff
-lfff7_audiomain:
-	jmp lf758
-
-.WORD lc094_nmi	;NMI
-.WORD lc000_reset	;RESET
-.WORD lc0f7_brk	;IRQ/BRK
+.SEGMENT "VECTORS"
+.WORD NMI		;NMI
+.WORD Reset		;RESET
+.WORD BRKLoop	;IRQ/BRK
