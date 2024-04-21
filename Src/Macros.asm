@@ -3,34 +3,105 @@
 	sta	var
 	lda #>addr
 	sta	var+1
-.endmacro
+	.endmacro
+
+.macro stppuaddr addr
+	lda #>addr
+	sta PPUADDR
+	lda #<addr
+	sta PPUADDR
+	.endmacro
+
+.macro styappuaddr
+	sty PPUADDR
+	sta PPUADDR
+	.endmacro
 
 .macro lday addr
 	lda #<addr
 	ldy #>addr
-.endmacro
+	.endmacro
+
+.macro ldya addr
+	ldy #>addr
+	lda #<addr
+	.endmacro
 
 .macro ldxy addr
 	ldx #<addr
 	ldy #>addr
-.endmacro
+	.endmacro
+
+.macro inyr rep
+	.repeat rep
+		iny
+		.endrep
+	.endmacro
+
+.macro inxr rep
+	.repeat rep
+		inx
+		.endrep
+	.endmacro
+
+.macro deyr rep
+	.repeat rep
+		dey
+		.endrep
+	.endmacro
+
+.macro dexr rep
+	.repeat rep
+		dex
+		.endrep
+	.endmacro
+
+.macro aslr rep
+	.repeat rep
+		asl
+		.endrep
+	.endmacro
+
+.macro rolr rep
+	.repeat rep
+		rol
+		.endrep
+	.endmacro
+
+.macro lsrr rep
+	.repeat rep
+		lsr
+		.endrep
+	.endmacro
 
 .macro phx
 	txa
 	pha
-.endmacro
+	.endmacro
 
 .macro phy
 	tya
 	pha
-.endmacro
+	.endmacro
 
 .macro plx
 	pla
 	tax
-.endmacro
+	.endmacro
 
 .macro ply
 	pla
 	tay
-.endmacro
+	.endmacro
+
+.macro aslx
+	txa
+	asl
+	tax
+	.endmacro
+
+.macro lsrx
+	txa
+	lsr
+	tax
+	.endmacro

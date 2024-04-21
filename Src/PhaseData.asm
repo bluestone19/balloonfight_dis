@@ -12,27 +12,27 @@ PhasePointersHigh:
 
 Phase1Header:
 .WORD IslandsLayout, BigCenterPlatform, $0000
-.BYTE $10,$06,$ff
-.BYTE $ff
+.BYTE $10,$06,$ff	; Cloud (1)
+.BYTE $ff			; Propellers (None)
 .WORD Phase1Enemies
-.BYTE 2
+.BYTE 2				; Collision Boxes (3)
 .WORD Phase1Collision
 
 Phase2Header:
 .WORD IslandsLayout, BigCenterPlatform, Phase2Platforms, $0000
 .BYTE $18,$0c
-.BYTE $04,$0e,$ff
-.BYTE $ff
+.BYTE $04,$0e,$ff	; Clouds (2)
+.BYTE $ff			; Propellers (None)
 .WORD Phase2Enemies
-.BYTE 4
+.BYTE 4				; Collision Boxes (5)
 .WORD Phase2Collision
 
 BonusPhaseHeader:
 .WORD BonusPhaseGround, $0000
-.BYTE $ff
-.BYTE $ff
+.BYTE $ff			; Clouds (None)
+.BYTE $ff			; Propellers (None)
 .WORD NoEnemies
-.BYTE 0
+.BYTE 0				; Collision Box (1)
 .WORD BonusPhaseCollision
 
 Phase4Header:

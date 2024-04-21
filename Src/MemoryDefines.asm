@@ -2,21 +2,96 @@
 ; RAM Map:
 ;----------------------
 
-.SEGMENT "ZEROPAGE"
 PPUCTRLShadow		.set $00
 PPUMASKShadow		.set $01
-FrameProcessFlag	.set $02
+BTXScroll			.set $17
+PPUCTRLShadowBT		.set $18
+
 P1Score				.set $03	;$03-$07
+P1Score0			.set $03
+P1Score1			.set $04
+P1Score2			.set $05
+P1Score3			.set $06
+P1Score4			.set $07
+
 P2Score				.set $08	;$08-$0C
+P2Score0			.set $08
+P2Score1			.set $09
+P2Score2			.set $0A
+P2Score3			.set $0B
+P2Score4			.set $0C
+
 TopScore			.set $0D	;$0D-$11
+TopScore0			.set $0D
+TopScore1			.set $0E
+TopScore2			.set $0F
+TopScore3			.set $10
+TopScore4			.set $11
+
 Temp12				.set $12
 Temp13				.set $13
 Temp14				.set $14
 Temp15				.set $15
-GameMode			.set $16	;0 = Balloon Fight (A/B), 1 = Balloon Trip (C)
-BTXScroll			.set $17
-PPUCTRLShadowBT		.set $18
+
+FrameProcessFlag	.set $02
 FrameCounter		.set $19
+
+GameMode			.set $16	;0 = Balloon Fight (A/B), 1 = Balloon Trip (C)
+DemoFlag			.set $3A
+TwoPlayerFlag		.set $40
+
+CurrentPhaseHeader	.set $3B
+CurrentPhaseNum		.set $3C
+PhaseDisplayTimer	.set $3D
+P1Lives				.set $41
+P2Lives				.set $42
+StatusUpdateFlag	.set $46
+
+MainMenuCursor		.set $3F
+
+TargetUpdateScore	.set $3E
+ScoreDigit1			.set $43
+ScoreDigit2			.set $44
+ScoreDigit3			.set $45
+ScoreDigit4			.set $47
+ScoreDigit5			.set $48
+
+; $0043 = Division Dividend & Modulo Result
+
+; $0049 = Balloon Trip Rank 0x
+; $004A = Balloon Trip Rank x0
+; $004B = ?
+
+; $00A3 = Amount of Clouds (zero-based) (-1 if none)
+; $00A4 = Selected Cloud ID? (Blink?)
+; $00A5 = Selected Cloud ID?? (Lightning?)
+; $00A6-$00A8 = Cloud 16x16 Tile Attribute $23xx (Top?)
+; $00A9-$00AB = Cloud 16x16 Tile Attribute $23xx
+; $00AC-$00AE = Cloud 16x16 Tile Attribute $23xx
+; $00AF-$00B1 = Cloud 16x16 Tile Attribute $23xx
+; $00B2-$00B4 = Cloud related
+; $00B5-$00B7 = Cloud related
+; $00B8 = Lightning Bolt Countdown
+; $00B9 = Unused?
+SparkIntensity		.set $BA	;Speed of sparks
+; $00BB = Water Plonk Animation Frame
+; $00BC = ?
+; $00BD-$00BE = Player 1/2 Invincibility Flag
+; $00BF-$00C0 = Player 1/2 Invincibility Time
+; $00C1-$00C2 = Player 1/2 Freeze Flag
+; $00C3-$00C4 = Player 1/2 Respawn Delay
+ScrollLockTimer		.set $C5	;Balloon Trip Scroll Lock Timer
+; $00C6 = ???
+; $00C7 = ???
+PhaseType			.set $C8	;0 = Regular, 1 = Bonus
+TileScrollCount		.set $C9	;For Balloon Trip
+ScreenScrollCount	.set $CA	;For Balloon Trip
+; $00CB = ???
+; $00CC = Collision related
+PlatformCount		.set $CD
+; $00CD = Amount of Platforms
+; $00CE = Unused
+; $00CF = Unused
 
 RNGOutput			.set $1B
 RNGLower			.set RNGOutput
@@ -54,86 +129,6 @@ TempWord			.set $2B
 TempWordLo			.set TempWord
 TempWordHi			.set $2C
 
-ObjectAction		.set $31	;$31-$39
-
-DemoFlag			.set $3A
-CurrentPhaseHeader	.set $3B
-CurrentPhaseNum		.set $3C
-; $003D = Phase Number Display Time
-; $003E = Score ID to Update (0 = Player 1, 1 = Player 2, 2 = Top Score)
-; $003F = Main Menu Cursor
-; $0040 = 2 Player Flag
-; $0041 = Player 1 Lives
-; $0042 = Player 2 Lives
-; $0043 = Division Dividend & Modulo Result
-;		 & 1st Digit score to add
-; $0044 = 2nd Digit score to add
-; $0045 = 3rd Digit score to add
-; $0046 = Status Bar Update Flag
-; $0047 = 4th Digit score to add
-; $0048 = 5th Digit score to add
-; $0049 = Balloon Trip Rank 0x
-; $004A = Balloon Trip Rank x0
-; $004B = ?
-
-; Star Animation:
-; $004C = Star Update?
-; $004D-$004E = Unused
-; $004F = Star Animation - Star ID
-; $0050 = PPU Address Low
-; $0051 = PPU Address High
-
-; PPU Upload Buffer:
-; $0050 = PPU Address High
-; $0051 = ???
-; $0052 = PPU Upload Buffer Position
-; $0053 = PPU Upload Buffer Size
-
-; $0054 = (Temp) Cloud/Flipper X coordinate used for rendering
-; $0055 = (Temp) Cloud/Flipper Y coordinate used for rendering
-
-; $0056 = Size of upload to PPU Buffer
-; $0057-$007E? = Data to upload to PPU Buffer Blocks
-
-; $005A-$0079 = Palette
-; $007A-$007E = Unused?
-
-; See Object RAM notes
-; $007F-$0087 = Object Status
-; $0088-$0090 = Object Balloons
-; $0091-$0099 = Object X Positions (Int)
-; $009A-$00A2 = Object Y Positions (Int)
-
-; $00A3 = Amount of Clouds (zero-based) (-1 if none)
-; $00A4 = Selected Cloud ID? (Blink?)
-; $00A5 = Selected Cloud ID?? (Lightning?)
-; $00A6-$00A8 = Cloud 16x16 Tile Attribute $23xx (Top?)
-; $00A9-$00AB = Cloud 16x16 Tile Attribute $23xx
-; $00AC-$00AE = Cloud 16x16 Tile Attribute $23xx
-; $00AF-$00B1 = Cloud 16x16 Tile Attribute $23xx
-; $00B2-$00B4 = Cloud related
-; $00B5-$00B7 = Cloud related
-; $00B8 = Lightning Bolt Countdown
-; $00B9 = Unused?
-; $00BA = Lightning Bolt Intensity (Speed)
-; $00BB = Water Plonk Animation Frame
-; $00BC = ?
-; $00BD-$00BE = Player 1/2 Invincibility Flag
-; $00BF-$00C0 = Player 1/2 Invincibility Time
-; $00C1-$00C2 = Player 1/2 Freeze Flag
-; $00C3-$00C4 = Player 1/2 Respawn Delay
-; $00C5 = Lock Scrolling Time (Balloon Trip)
-; $00C6 = ???
-; $00C7 = ???
-; $00C8 = Phase Type (00 = Regular, 01 = Bonus)
-; $00C9 = Tile Scroll Counter (Balloon Trip)
-; $00CA = Screen Scroll Counter (Balloon Trip)
-; $00CB = ???
-; $00CC = Collision related
-; $00CD = Amount of Platforms
-; $00CE = Unused
-; $00CF = Unused
-
 ; Sound:
 ; $00D0 = ?
 ; $00D1 = ?
@@ -144,21 +139,37 @@ CurrentPhaseNum		.set $3C
 ; $00DD = ?
 
 TrackTempo			.set $DF
-Sq1TrackPointer		.set $E0
-Sq2TrackPointer		.set $E2
-TriTrackPointer		.set $E4
-NoiseTrackPointer	.set $E6
 
+; Channel Track Pointers
+Sq1TrackPointer		.set $E0
+Sq1TrackPointerLo	.set $E0
+Sq1TrackPointerHi	.set $E1
+
+Sq2TrackPointer		.set $E2
+Sq2TrackPointerLo	.set $E2
+Sq2TrackPointerHi	.set $E3
+
+TriTrackPointer		.set $E4
+TriTrackPointerLo	.set $E4
+TriTrackPointerHi	.set $E5
+
+NoiseTrackPointer	.set $E6
+NoiseTrackPointerLo	.set $E6
+NoiseTrackPointerHi	.set $E7
+
+; Track Offsets
 Sq1TrackOffset		.set $E8
 Sq2TrackOffset		.set $E9
 TriTrackOffset		.set $EA
 NoiseTrackOffset	.set $EB
 
+; Sound Requests
 SFX1Req				.set $F0
 SFX2Req				.set $F1
 MusicReq			.set $F2
 SFX3Req				.set $F3
 
+; Current Sounds
 SFX1Cur				.set $F4
 SFX2Cur				.set $F5
 MusicCur			.set $F6
@@ -166,20 +177,55 @@ SFX3Cur				.set $F7
 
 ; $00F8 = Unused?
 ; $00F9-$00FC = Written but not read?
-; $00FD = ?
+
+SndDataTargetPtr	.set $F9
+SndDataTargetPtrLo	.set $F9
+SndDataTargetPtrHi	.set $FA
+
+SndDataSourcePtr	.set $FB
+SndDataSourcePtrLo	.set $FB
+SndDataSourcePtrHi	.set $FC
+
+SoundAttrOffset		.set $FD
 CurTrackPointer		.set $FE
+CurTrackPointerLo	.set $FE
+CurTrackPointerHi	.set $FF
 
 ; $0100-$01FF = Stack
 
-.SEGMENT "OAM"
-OAM:		.res $FF
+OAM					.set $0200
 
-.SEGMENT "PPUBUFFER"
-PPUBuffer:	.res $FF
+; PPU Buffer
+PPUBuffer			.set $0300
 ; $0300-$03FF = PPU Upload Buffer Blocks
 ;					(16-bit PPU Address,
 ;					 8-bit Size,
 ;					 Data, and repeat)
+
+; PPU Upload Buffer:
+; $0050 = PPU Address High
+; $0051 = ???
+PPUBufferPosition	.set $52
+PPUBufferSize		.set $53
+
+PPUBlockAddrLow		.set $54
+PPUBlockAddrHi		.set $55
+
+TempBlockSize		.set $56
+PPUTempBlock		.set $57
+
+; $005A-$0079 = Palette
+; $007A-$007E = Unused?
+
+
+; Star Animation:
+StarUpdateFlag		.set $4C
+; $004C = Star Update?
+; $004D-$004E = Unused
+; $004F = Star Animation - Star ID
+; $0050 = PPU Address Low
+; $0051 = PPU Address High
+
 
 ; - Object RAM:
 ; Note: One byte per object (Player, Enemy...)
@@ -188,25 +234,39 @@ PPUBuffer:	.res $FF
 ; +2 to +7 = Enemies
 ; +8 = Fish (Mostly Unused)
 
-; $0400-$0408 = X Positions (Frac)
-; $0409-$0411 = Y Positions (Frac)
-; $0412-$041A = Y Velocity (Frac)
-; $041B-$0423 = Y Velocity (Int)
-; $0424-$042C = X Velocity (Frac)
-; $042D-$0435 = X Velocity (Int)
-; $0436-$043E = Animation Frame
-; $043F-$0447 = ?
-; $0448-$0450 = Direction (0 = Left, 1 = Right)
-; $0451-$0459 = Object Type
-; $045A-$0462 = ?
-; $0463-$046B = ?
-; $046C-$0474 = ?
-; $0475-$047D = ?
-; $047E-$0486 = ?
+ObjectAction		.set $31	;$0031-$0039
 
-; $0487 = ???
-; $0488 = Balloon Trip Starting Platform X Position
-; $0489 = Fish Y Direction (0 = Up, 1 = Down)
+ObjectType			.set $0451	;$0451-$0459
+ObjectStatus		.set $7F	;$007F-$0087
+ObjectBalloons		.set $88	;$0088-$0090
+
+;Appearance
+ObjectDirection		.set $0448	;$0448-$0450 (0 = Left, 1 = Right)
+ObjectAnimFrame		.set $0436	;$0436-$043E
+ObjectAnimTimer		.set $043F	;$043F-$0447
+
+;Position
+ObjectXPosInt		.set $91	;$0091-$0099
+ObjectYPosInt		.set $9A	;$009A-$00A2
+ObjectXPosFrac		.set $0400	;$0400-$0408
+ObjectYPosFrac		.set $0409	;$0409-$0411
+
+;Velocity
+ObjectYVelFrac		.set $0412	;$0412-$041A
+ObjectYVelInt		.set $041B	;$041B-$0423
+ObjectXVelFrac		.set $0424	;$0424-$042C
+ObjectXVelInt		.set $042D	;$042D-$0435
+
+;Unknown Attributes
+ObjectUnknown1		.set $045A	;$045A-$0462
+ObjectUnknown2		.set $0463	;$0463-$046B
+ObjectUnknown3		.set $046C	;$046C-$0474
+ObjectUnknown4		.set $0475	;$0475-$047D
+ObjectUnknown5		.set $047E	;$047E-$0486
+
+;$0487 = ???
+BTPlatformX			.set $0488	;Balloon Trip Starting Platform X Position
+;$0489 = Fish Y Direction (0 = Up, 1 = Down)
 ; $048A = Fish Animation?
 ; $048B = Fish Target ID (Object ID)
 ; $048C = Fish Target Eaten Flag
@@ -214,16 +274,16 @@ PPUBuffer:	.res $FF
 ; $048E = Fish? Unused?
 ; $048F = Fish? Unused?
 
-; $0490-$04A3 = Lightning Bolt X Position (Int)
-; $04A4-$04B7 = Lightning Bolt Y Position (Int)
-; $04B8-$04CB = Lightning Bolt X Position (Frac)
-; $04CC-$04DF = Lightning Bolt Y Position (Frac)
-; $04E0-$04F3 = Lightning Bolt X Velocity (Int)
-; $04F4-$0507 = Lightning Bolt Y Velocity (Int)
-; $0508-$051B = Lightning Bolt X Velocity (Frac)
-; $051C-$052F = Lightning Bolt Y Velocity (Frac)
-; $0530-$0543 = Lightning Bolt Animation Frame?
-; $0544-$0557 = Lightning Bolt?
+SparkXPosInt		.set $0490	;$0490-$04A3
+SparkYPosInt		.set $04A4	;$04A4-$04B7
+SparkXPosFrac		.set $04B8	;$04B8-$04CB
+SparkYPosFrac		.set $04CC	;$04CC-$04DF
+SparkXVelInt		.set $04E0	;$04E0-$04F3
+SparkYVelInt		.set $04F4	;$04F4-$0507
+SparkXVelFrac		.set $0508	;$0508-$051B
+SparkYVelFrac		.set $051C	;$051C-$052F
+SparkAnim			.set $0530	;$0530-$0543
+SparkUnknown		.set $0544	;$0544-$0557
 
 ; $0558 = Bonus Phase Intensity Level
 ; $0559 = Bonus Phase / Balloon Trip x00 points per balloon
@@ -237,8 +297,9 @@ PPUBuffer:	.res $FF
 
 ; $05CB = ?
 ; $05CC = ?
-; $05CD-$05CE = Player 1/2 Touched Balloons Counter
-; $05CE = Balloon Trip Balloon Counter
+P1BonusBalloons		.set $05CD
+P2BonusBalloons		.set $05CE
+P1TripBalloons		.set $05CE
 
 ; $05D1 = Amount of Flippers
 ; $05D2-$05DB = Flipper X positions
@@ -255,8 +316,8 @@ PPUBuffer:	.res $FF
 ; $061E-$061F = Controller 1/2 Held Buttons
 ; $0620-$0628 = ???
 GameATopScore		.set $0629	;1-Player Game Top Score
-GameATopScore		.set $062E	;2-Player Game Top Score
-GameATopScore		.set $0633	;Balloon Trip Top Score
+GameBTopScore		.set $062E	;2-Player Game Top Score
+GameCTopScore		.set $0633	;Balloon Trip Top Score
 
 ; $0700-$07F9 = Balloon Trip Rank 01 to 50 Scores (5 bytes each)
 ;				 Rank 47 = Score 000000
@@ -269,9 +330,9 @@ HALStringMem		.set $07FA
 
 
 .IF REGION >= 1
-SoundPage	.set $0700
+	SoundPage	.set $0700
 .ELSE
-SoundPage	.set $0600
+	SoundPage	.set $0600
 .ENDIF
 
 SparkSFXTimer		.set $00E0 + SoundPage
@@ -291,15 +352,6 @@ SplashSFXTimer		.set $00FB + SoundPage
 ChompSFXTimer		.set $00FC + SoundPage
 FishChompPitchSq2	.set $00FD + SoundPage
 FishChompPitchSq1	.set $00FE + SoundPage
-
-.SEGMENT "PPUMEM"
-Nametable0:			.res $400
-Nametable1:			.res $400
-Nametable2:			.res $400
-Nametable3:			.res $400
-NametableMirror:	.res $F00
-Palette:			.res $20
-PaletteMirror:		.res $E0
 
 ;----------------------
 ; Registers:
@@ -346,3 +398,12 @@ APU_FRAME	.set $4017
 ;Controllers
 JOY1		.set $4016
 JOY2		.set $4017
+
+ABtn		.set %00000001
+BBtn		.set %00000010
+SelectBtn	.set %00000100
+StartBtn	.set %00001000
+UpDPad		.set %00010000
+DownDPad	.set %00100000
+LeftDPad	.set %01000000
+RightDPad	.set %10000000

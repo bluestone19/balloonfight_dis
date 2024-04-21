@@ -9,36 +9,30 @@ EndMusic:
 ;-----------------------
 
 ContinuePlayingMusic:
-	lda #0
-	tax
-	sta $fd
-	beq NextContinueMusic
+	lda #0				;\
+	tax					;| Clear A, X, and SoundAttrOffset
+	sta SoundAttrOffset	;/
+	beq NextContinueMusic	;Always taken
 NextChannelWLSRX:
-	txa
-	lsr
-	tax
+	lsrx
 NextChannel:
 	inx
 	txa
 	cmp #4
 	beq :-	;RTS
-	lda $fd
+	lda SoundAttrOffset
 	clc
 	adc #4
-	sta $fd
+	sta SoundAttrOffset
 NextContinueMusic:
-	txa
-	asl
-	tax
-	lda Sq1TrackPointer,x
-	sta $fe
-	lda $e1,x
-	sta $ff
-	lda $e1,x
+	aslx
+	lda Sq1TrackPointerLo,x	; \
+	sta CurTrackPointerLo	; | Copy Channel X's track pointer to CurTrackPointer
+	lda Sq1TrackPointerHi,x	; |
+	sta CurTrackPointerHi	; /
+	lda Sq1TrackPointerHi,x
 	beq NextChannelWLSRX
-	txa
-	lsr
-	tax
+	lsrx
 	dec $d0,x
 	bne NextChannel
 LoadTrackDataLoop:
@@ -96,13 +90,13 @@ NoteDataHas80Set:
 	cmp #1
 	beq Sq2BusyCheck
 ChannelIsFree:
-	ldx $fd
+	ldx SoundAttrOffset
 	lda lf601,y
 	beq lf599
-	sta $4002,x
+	sta SQ1_LO,x
 	lda lf600,y
 	ora #8
-	sta $4003,x
+	sta SQ1_HI,x
 lf599:
 	tay
 	pla
@@ -119,7 +113,7 @@ SetChannelVolumeToDC:
 	ldy $dc,x
 SetChannelVolumeContinue:
 	tya
-	ldy $fd
+	ldy SoundAttrOffset
 	sta SQ1_VOL,y
 SetCountdownThenContinue:
 	lda $d4,x
@@ -129,8 +123,7 @@ Sq2BusyCheck:
 	lda SFX2Cur
 	and #2
 	beq ChannelIsFree
-	pla
-	tax
+	plx
 	jmp SetCountdownThenContinue
 lf5c4:
 	tya
@@ -141,8 +134,7 @@ lf5c4:
 lf5ce:
 	clc
 	adc #$fe
-	asl
-	asl
+	aslr 2
 	cmp #$3c
 	bcc lf5d9
 	lda #$3c
@@ -180,27 +172,28 @@ NoteLengthOptions:
 .BYTE $03,$06,$0c,$18,$30,$12,$24,$09,$08,$04,$07,$01,$04,$08,$10
 .BYTE $20,$40,$18,$30,$0c,$01,$06,$0c,$18,$30,$60,$24,$48,$12,$10
 .BYTE $08,$0e,$02,$03,$04
-WriteSq1XY:
-	lda #0
-	beq WriteChannelDataA
-WriteTriXY:
-	lda #8
-	bne WriteChannelDataA
-WriteNoiseXY:
-	lda #$0c
-	bne WriteChannelDataA
-WriteSq2:
-	lda #4
+
+WriteSq1XY:					; \
+	lda #0					; |
+	beq WriteChannelDataA	; |
+WriteTriXY:					; | Different entry points for each channel
+	lda #8					; | Determines lower byte of SndDataTargetPtr
+	bne WriteChannelDataA	; |
+WriteNoiseXY:				; |
+	lda #$0c				; |
+	bne WriteChannelDataA	; |
+WriteSq2:					; |
+	lda #4					; /
 WriteChannelDataA:
-	sta $f9
+	sta SndDataTargetPtrLo
 	lda #$40
-	sta $fa
-	stx $fb
-	sty $fc
+	sta SndDataTargetPtrHi
+	stx SndDataSourcePtrLo
+	sty SndDataSourcePtrHi
 	ldy #0
 ChannelWriteLoop:
-	lda ($fb),y
-	sta ($f9),y
+	lda (SndDataSourcePtr),y
+	sta (SndDataTargetPtr),y
 	iny
 	tya
 	cmp #4
@@ -209,22 +202,22 @@ ChannelWriteLoop:
 ;-----------------------
 
 LoadSoundSequence:
-	tax				; \
-	jsr InitNeededChannels		; | Initialize Sound Channels
-	stx MusicCur	; / and Sound Variables
-	lda PopParachuteReq				; \
+	tax						; \
+	jsr InitNeededChannels	; | Initialize Sound Channels
+	stx MusicCur			; / and Sound Variables
+	lda PopParachuteReq		; \
 	beq LoadMusicTrackData	; | Check [PopParachuteReq] == $00 or $02
 	cmp #$02				; |
 	bne LoadMusicTrackData	; /
 	sta SFX1Req		; [$00F0] = [PopParachuteReq] (!= 00 or 02)
-	lda #0		; \
+	lda #0				; \
 	sta PopParachuteReq	; / Clear [PopParachuteReq]
 LoadMusicTrackData:
-	lda lfbca,y	; \ Load Sound Sequence Pointer to Y
-	tay			; /
+	lda MusicTrackInitData,y	; \ Load Sound Sequence Pointer to Y
+	tay							; /
 	ldx #0						; \
 LoadMusicTempoTrackLoop:
-	lda lfbca,y					; |
+	lda MusicTrackInitData,y	; |
 	sta TrackTempo,x			; | Load Sound Sequence Header
 	iny							; | (9 bytes)
 	inx							; |
@@ -232,7 +225,7 @@ LoadMusicTempoTrackLoop:
 	cmp #9						; |
 	bne LoadMusicTempoTrackLoop	; /
 
-	lda #$01				; \
+	lda #1					; \
 	sta $d0					; |
 	sta $d1					; |
 	sta $d2					; | Initialize Sequence stuff
@@ -250,15 +243,25 @@ FlapSFX:
 .BYTE $94,$ab,$fd,$58
 FootstepNoise:
 .BYTE $00,$7f,$04,$18
+lf6ed:
 .BYTE $3f,$7f,$00,$00
+lf6f1:
 .BYTE $06,$7f,$0a,$c0
+lf6f5:
 .BYTE $08,$7f,$05,$c0
+lf6f9:
 .BYTE $c1,$89,$02,$0f
+lf6fc:
 .BYTE $ff,$ff,$ff
 lf700:
     ;18 bytes
-.BYTE $10,$00,$18,$10,$01,$18,$00,$01,$88,$02,$02,$40,$03,$05,$40
+.BYTE $10,$00,$18
+.BYTE $10,$01,$18
+.BYTE $00,$01,$88
+.BYTE $02,$02,$40
+.BYTE $03,$05,$40
 .BYTE $04,$07,$40
+
 ClearSquareSweeps:
 	lda #$7f		; \ Set Pulse Channels:
 	sta SQ1_SWEEP	; | No Sweep
@@ -379,7 +382,7 @@ ResetSplashSFXPhase:
 ;-----------------------
 
 PlaySplashNoise2:
-	ldxy $f6f5
+	ldxy lf6f5
 	jmp WriteNoiseRTS
 CheckSplashCountdown:
 	inc SplashSFXTimer
@@ -396,7 +399,7 @@ PlaySplashNoise:
 	sta SplashSFXTimer
 	lda #$f0
 	sta SplashSFXPhase
-	ldxy $f6f1
+	ldxy lf6f1
 	jmp WriteNoiseRTS
 PlayPopNoise:
 	lda SFX1Cur
@@ -405,7 +408,7 @@ PlayPopNoise:
 	sta SFX1Cur
 	lda #0
 	sta PopSFXCountdown
-	ldxy $f6f1
+	ldxy lf6f1
 	jmp WriteNoiseRTS
 CheckPopCountdown:
 	inc PopSFXCountdown
@@ -435,16 +438,14 @@ ContinueSFX1ChangeCheck:
 	cmp #$f0
 	beq CheckSplashCountdown
 	lda SFX1Req
-	lsr
-	lsr
+	lsrr 2
 	bcs PlayPopNoise
 	lsr
 	bcs TryLightningStrikeSFX
 	lsr
 	bcs GotoTryFootstepNoise
 	lda SFX1Cur
-	lsr
-	lsr
+	lsrr 2
 	bcs CheckPopCountdown
 	lsr
 	bcs CheckLightningSFXCountdown
@@ -464,7 +465,7 @@ TryLightningStrikeSFX:
 	lda #0
 	sta LightningSFXTimer
 	sta LightningSFXPitch
-	ldxy $f6ed
+	ldxy lf6ed
 WriteNoiseRTS:
 	jsr WriteNoiseXY
 	rts
@@ -532,20 +533,17 @@ lf8dd:
 	lda #2
 	sta SFX1Req
 lf8e8:
-	ldx #$f9
-	ldy #$f6
+	ldxy lf6f9
 	jsr WriteSq1XY
 	lda $1b
 	and #$0f
-	sta $4002
-	ldx #$f9
-	ldy #$f6
+	sta SQ1_LO
+	ldxy lf6f9
 	jsr WriteSq2
 	lda $1b
-	lsr
-	lsr
+	lsrr 2
 	and #$0f
-	sta $4006
+	sta SQ2_LO
 	rts
 ;-----------------------
 
@@ -553,13 +551,13 @@ lf907:
 	jmp PlaySparkBounceSFX
 
 lf90a:
-	lda MusicCur		; \ Check if music is not playing
-	beq lf91b	; / If not playing then continue as normal
+	lda MusicCur	; \ Check if music is not playing
+	beq lf91b		; / If not playing then continue as normal
 	cmp #$df	; \ Songs #$DF?
 	beq lf91b	; / Wouldn't that be redundant?
-	lda SFX1Req		; \
+	lda SFX1Req	; \
 	and #$e0	; | Check for sound effects that stops the music
-	beq :+	; / if found, then return
+	beq :+		; / if found, then return
 	jsr InitAllSoundMemory
 lf91b:
 	lda SFX1Req
@@ -604,8 +602,7 @@ lf952:
 	and #$0f
 	ora #$40
 	sta SFX1Cur
-	ldx #$d1
-	ldy #$f9
+	ldxy lf9d1
 	bne lf98f
 lf965:
 	lda #2
@@ -614,7 +611,7 @@ lf965:
 	and #$0f
 	ora #$20
 	sta SFX1Cur
-	ldxy $f9cd
+	ldxy lf9cd
 	bne lf98f
 lf977:
 	lda #0
@@ -623,9 +620,9 @@ lf977:
 	and #0
 	ora #$40
 	sta SFX3Cur
-	ldxy $f9d5
+	ldxy lf9d5
 	jsr WriteSq2
-	ldxy $f9d9
+	ldxy lf9d9
 lf98f:
 	jsr WriteSq1XY
 	rts
@@ -652,17 +649,31 @@ lf9b1:
 	inc FishChompPitchSq1
 lf9bd:
 	lda FishChompPitchSq2
-	sta $4006
+	sta SQ2_LO
 	lda FishChompPitchSq1
-	sta $4002
+	sta SQ1_LO
 	rts
 ;-----------------------
 
 lf9ca:
 	jmp lf8ca
     ;28 bytes
-.BYTE $b8,$d5,$20,$00,$9f,$93,$80,$22,$3f,$ba,$e0,$06,$3f,$bb,$ce
-.BYTE $06,$b8,$93,$50,$02,$80,$7f,$60,$68,$80,$7f,$62,$68
+
+lf9cd:
+.BYTE $b8,$d5,$20,$00
+lf9d1:
+.BYTE $9f,$93,$80,$22
+lf9d5:
+.BYTE $3f,$ba,$e0,$06
+lf9d9:
+.BYTE $3f,$bb,$ce,$06
+lf9dd:
+.BYTE $b8,$93,$50,$02
+lf9e1:
+.BYTE $80,$7f,$60,$68
+lf9e5:
+.BYTE $80,$7f,$62,$68
+
 lf9e9:
 	lda SFX2Cur
 	and #2
@@ -679,8 +690,7 @@ lf9f9:
 	and #$e0
 	ora #2
 	sta SFX2Cur
-	ldx #$dd
-	ldy #$f9
+	ldxy lf9dd
 	bne lfa7f
 lfa0c:
 	inc BumpSFXTimer
@@ -688,7 +698,7 @@ lfa0c:
 	cmp #7
 	bne :+
 	lda #$7f
-	sta $4005
+	sta SQ2_SWEEP
 	lda #$10
 	sta SQ2_VOL
 	lda SFX2Cur
@@ -699,11 +709,9 @@ lfa0c:
 
 lfa27:
 	jsr InitAllSoundMemory
-	ldx #$e1
-	ldy #$f9
+	ldxy lf9e1
 	jsr WriteSq1XY
-	ldx #$e5
-	ldy #$f9
+	ldxy lf9e5
 	jmp lfa7f
 lfa38:
 	lda MusicCur
@@ -725,12 +733,10 @@ lfa42:
 	bcs lf9e9
 	lsr
 	bcs lfa83
-	lsr
-	lsr
+	lsrr 2
 	bcs lfa64
 	lda SFX2Cur
-	lsr
-	lsr
+	lsrr 2
 	bcs lfa0c
 :	rts
 ;-----------------------
@@ -741,13 +747,12 @@ lfa64:
 	lda SFX2Cur
 	and #2
 	bne :-
-	ldx #$8a
-	ldy #$fa
+	ldxy TweetSFXBase
 	jsr WriteSq2
 	lda $1b
 	and #$3f
 	ora #$10
-	sta $4006
+	sta SQ2_LO
 	rts
 ;-----------------------
 
@@ -796,8 +801,7 @@ ContinueSFX2Check:
 	asl
 	bcs EnemyLandingSFX
 	lda SFX2Cur
-	asl
-	asl
+	aslr 2
 	bcs lfa96
 	lda SFX2Req
 	and #$20
@@ -824,7 +828,7 @@ EnemyLandingSFX:
 	lda #$10
 	sta SQ2_VOL
 	sta NOISE_VOL
-	ldxy $fa8e
+	ldxy EnemyLandTri1
 WriteTriRTS:
 	jsr WriteTriXY
 	rts
@@ -902,8 +906,7 @@ lfb69:		; Music/Jingle: Bonus Game Perfect
 	lda #$10
 lfb6d:
 	jsr LoadSoundSequence
-	ldx #$fc
-	ldy #$fc
+	ldxy lfcfc
 	jsr ClearSquareSweeps
 	inc UnknownSoundFlag
 	bne lfb49
@@ -954,7 +957,7 @@ lfbc1:
 ; Music Data:
 ;----------------------
 
-lfbca: ;Music Track Init Data
+MusicTrackInitData: ;Music Track Init Data
 .BYTE $0b,$14,$1d,$26,$2f,$38,$41,$4a,$53,$5c,$65
 lfbd5: ;Phase Clear Music Init Data
 .BYTE $0c
@@ -1048,11 +1051,12 @@ lfca5:
 .BYTE $46,$80,$32,$32
 .BYTE $82,$46,$04,$81
 .BYTE $46,$2a,$ff,$c2
-.BYTE $81,$0c,$0c,$80
-.BYTE $04,$04,$81,$04
-.BYTE $80,$2e,$2e,$81
-.BYTE $2e,$82,$24,$ff
-.BYTE $00
+.BYTE $81,$0c,$0c
+lfcfc:
+.BYTE $80,$04,$04,$81
+.BYTE $04,$80,$2e,$2e
+.BYTE $81,$2e,$82,$24
+.BYTE $ff,$00
 lfd0a:
 .BYTE $81,$32,$02,$02
 .BYTE $06,$0c,$32,$02
