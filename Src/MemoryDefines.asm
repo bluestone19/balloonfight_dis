@@ -266,7 +266,8 @@ ObjectUnknown5		.set $047E	;$047E-$0486
 
 ;$0487 = ???
 BTPlatformX			.set $0488	;Balloon Trip Starting Platform X Position
-;$0489 = Fish Y Direction (0 = Up, 1 = Down)
+
+; $0489 = Fish Y Direction (0 = Up, 1 = Down)
 ; $048A = Fish Animation?
 ; $048B = Fish Target ID (Object ID)
 ; $048C = Fish Target Eaten Flag
@@ -312,8 +313,6 @@ P1TripBalloons		.set $05CE
 ; $0618-$0619 = ?
 ; $061A-$061B = ?
 
-; $061C-$061D = Controller 1/2 Pressed Buttons
-; $061E-$061F = Controller 1/2 Held Buttons
 ; $0620-$0628 = ???
 GameATopScore		.set $0629	;1-Player Game Top Score
 GameBTopScore		.set $062E	;2-Player Game Top Score
@@ -399,11 +398,16 @@ APU_FRAME	.set $4017
 JOY1		.set $4016
 JOY2		.set $4017
 
-ABtn		.set %00000001
-BBtn		.set %00000010
-SelectBtn	.set %00000100
-StartBtn	.set %00001000
-UpDPad		.set %00010000
-DownDPad	.set %00100000
-LeftDPad	.set %01000000
-RightDPad	.set %10000000
+Joy1Press	.set $061C
+Joy2Press	.set $061D
+Joy1Hold	.set $061E
+Joy2Hold	.set $061F
+
+ABtn		.set %10000000
+BBtn		.set %01000000
+SelectBtn	.set %00100000
+StartBtn	.set %00010000
+UpDPad		.set %00001000
+DownDPad	.set %00000100
+LeftDPad	.set %00000010
+RightDPad	.set %00000001

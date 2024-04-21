@@ -237,7 +237,6 @@ CopyPPUBlock:
 	stx PPUBufferSize		; Update PPU Buffer Size
 	plx
 	rts
-;-----------------------
 
 NewPPUBlock:
 	ldx PPUBufferSize		; X = PPU Buffer Size
@@ -261,7 +260,6 @@ NewPPUBlock:
 	sta PPUBuffer,x		; /
 	inx			; \ Return:
 	rts			; / X = Current PPU Buffer Address
-;-----------------------
 
 UploadPPUAndMaskBuffer:
 	phy			; \ Push Y & X
@@ -321,12 +319,12 @@ BalloonTripInit:
 	jsr lcd4a_initballoons
 	lda #0
 	sta P1Lives		; 0 Lives to Player 1
-	sta $c9		; Init Tile Scroll Counter
-	sta $ca		; Init Screen Scroll Counter
-	sta $ba		; Init 10 Screens Counter?
+	sta TileScrollCount		; Init Tile Scroll Counter
+	sta ScreenScrollCount	; Init Screen Scroll Counter
+	sta SparkIntensity		; Init SparkIntensity
 	sta ScrollLockTimer	; Init Scrolling Lock Time
 	sta PhaseType		; Phase Type = 0
-	jsr lf4a5_initfish
+	jsr InitializeFish
 	ldx #19					; \
 	@SparkResetLoop:
 		lda #$ff			; | Reset All 20 Sparks
@@ -355,7 +353,7 @@ lc227:
 	lda $17		; \ If the scrolling X position
 	bne lc231	; | is 0 then
 	lda $18		; | Toggle between
-	eor #$01	; | nametable 0 and 1
+	eor #1		; | nametable 0 and 1
 	sta $18		; /
 lc231:
 	dec $17		; Scroll 1 pixel from the left
@@ -614,7 +612,7 @@ BTRandomizeSpark:
 	sta Temp15				; | using BTSparkVelOptions value
 	jsr UpdateRNG			; | (depending on full loop)
 	and #$3f				; | + RNG value up to 63
-	ldx $ba					; |
+	ldx SparkIntensity		; |
 	adc BTSparkVelOptions,x	; |
 	sta Temp14				; |
 	jsr BTSpawnSpark		; /
@@ -638,7 +636,7 @@ BTRandWBubble:
 	lda #230	; \ Otherwise, make a new Bubble
 	sta $9b		; / First set Bubble Y to 230 (0xE6)
 	lda RNGOutput	; \
-	and #128		; | Bubble X Position is random
+	and #127		; | Bubble X Position is random
 	adc #64			; | between 64 and 191
 	sta $92			; /
 	lda #$80	; \ Set balloons to 0x80
@@ -1054,8 +1052,8 @@ lc726:
 	bcc lc72e	; | X = Current Phase OR X = 24
 	ldx #$18	; /
 lc72e:
-	lda lc748,x	; \ Change Lightning Bolt Intensity
-	sta $ba		; /
+	lda lc748,x			; \ Change Lightning Bolt Intensity
+	sta SparkIntensity	; /
 	lda lc761,x	; \ Change Lightning Bolt Countdown
 	sta $b8		; / depending on current phase
 	lda #$f0	; \
@@ -3796,8 +3794,8 @@ le6f8:
 	lda DemoFlag			; \ If Demo Play then
 	bne le705		; / do automatic inputs
 	jsr PollControllerX
-	lda $061c,x		; \ Read Pressed Buttons
-	sta ObjectAction,x		; / into Player Action
+	lda Joy1Press,x		; \ Read Pressed Buttons
+	sta ObjectAction,x	; / into Player Action
 :	rts
 le705:		; Demo Play
 	lda ObjectYPosInt,x	; \ If Player Y above #$A0
@@ -3858,30 +3856,29 @@ le762:
 ;----------------------
 
 PollController0:
-	ldx #$00	; Read Controller 0
+	ldx #0	; Read Controller 0
 PollControllerX:
-	lda #$01	; \
+	lda #1		; \
 	sta JOY1	; | Output Strobe to both controllers
-	lda #$00	; |
+	lda #0		; |
 	sta JOY1	; /
-	ldy #$07
-le776:
-	lda JOY1,x	; \
-	sta Temp12		; |
-	lsr			; | Poll Controller X
-	ora Temp12		; | to $061C + X
-	lsr			; |
-	rol $061c,x	; |
-	dey			; |
-	bpl le776	; /
-	ldy $061e,x	; \
-	lda $061c,x	; |
-	sta $061e,x	; | Check for pressed buttons
-	tya			; |
-	eor $061c,x	; |
-	and $061c,x	; /
+	ldy #7				; \
+	@ReadLoop:
+		lda JOY1,x		; |
+		sta Temp12		; |
+		lsr				; | Poll Controller X
+		ora Temp12		; | to Joy1Press + X
+		lsr				; |
+		rol Joy1Press,x	; | Bits are rotated in from right to left
+		dey				; |
+		bpl @ReadLoop	; /
+	ldy Joy1Hold,x	; \
+	lda Joy1Press,x	; |
+	sta Joy1Hold,x	; | Check for pressed buttons
+	tya				; |
+	eor Joy1Press,x	; |
+	and Joy1Press,x	; /
 	rts			; Returns pressed buttons in A
-;-----------------------
 
 le796:
 	lda $88,x	; \ If object has balloons
@@ -4506,7 +4503,7 @@ lec2f:
 lec38:
 	jsr le6e9_objectupdateaction
 	lda ObjectAction,x	; Limit action to valid inputs
-	and #ABtn + BBtn + LeftDPad + RightDPad
+	and #ABtn | BBtn | LeftDPad | RightDPad
 	beq lec49
 	cpx #2		; \ If Enemy
 	bcs lec49	; / Skip
@@ -5352,38 +5349,38 @@ lf221:
 	sta $c6
 	sta $c7
 lf238:
-	ldx #7					; \
-lf23a:
-	lda #0					; | Initialize variables for each object (except Fish?)
-	sta ObjectDirection,x	; | - Direction (0 = Left, 1 = Right)
-	sta ObjectUnknown4,x	; |
-	sta ObjectUnknown5,x	; |
-	sta ObjectXVelFrac,x	; | - X Velocity (Frac)
-	sta ObjectXVelInt,x		; | - X Velocity (Int)
-	sta ObjectYVelFrac,x	; | - Y Velocity (Frac)
-	sta ObjectYVelInt,x		; | - Y Velocity (Int)
-	sta ObjectUnknown2,x	; |
-	sta ObjectUnknown3,x	; |
-	sta ObjectXPosFrac,x	; | - X Positions (Frac)
-	sta ObjectYPosFrac,x	; | - Y Positions (Frac)
-	lda #1					; |
-	sta ObjectAnimTimer,x	; |
-	sta ObjectUnknown1,x	; |
-	lda #3					; |
-	sta ObjectAnimFrame,x	; | - Animation Frame
-	dex						; |
-	bpl lf23a				; /
-	ldx #5		; \
-lf26f:
-	lda #$ff	; | Initialize Enemies
-	sta $8a,x	; |
-	dex			; |
-	bpl lf26f	; /
-	ldx TwoPlayerFlag			; \
-lf278:
-	jsr lf386_initializeplayerx	; | Initialize Players
-	dex							; |
-	bpl lf278					; /
+	ldx #7						; \
+	@ClearLoop:
+		lda #0					; | Initialize variables for each object (except Fish?)
+		sta ObjectDirection,x	; | - Direction (0 = Left, 1 = Right)
+		sta ObjectUnknown4,x	; |
+		sta ObjectUnknown5,x	; |
+		sta ObjectXVelFrac,x	; | - X Velocity (Frac)
+		sta ObjectXVelInt,x		; | - X Velocity (Int)
+		sta ObjectYVelFrac,x	; | - Y Velocity (Frac)
+		sta ObjectYVelInt,x		; | - Y Velocity (Int)
+		sta ObjectUnknown2,x	; |
+		sta ObjectUnknown3,x	; |
+		sta ObjectXPosFrac,x	; | - X Positions (Frac)
+		sta ObjectYPosFrac,x	; | - Y Positions (Frac)
+		lda #1					; |
+		sta ObjectAnimTimer,x	; |
+		sta ObjectUnknown1,x	; |
+		lda #3					; |
+		sta ObjectAnimFrame,x	; | - Animation Frame
+		dex						; |
+		bpl @ClearLoop			; /
+	ldx #5						; \
+	@EnemyClearLoop:
+		lda #$ff				; | Initialize Enemies
+		sta ObjectBalloons+2,x	; |
+		dex						; |
+		bpl @EnemyClearLoop		; /
+	ldx TwoPlayerFlag				; \
+	@PlayerInitLoop:
+		jsr lf386_initializeplayerx	; | Initialize Players
+		dex							; |
+		bpl @PlayerInitLoop			; /
 	jsr ClearPPU
 	jsr ld293_initgamemode
 	lda $c6
@@ -5392,7 +5389,7 @@ lf278:
 	lda #$58
 	sta $c6
 lf28e:
-	jsr lf4a5_initfish
+	jsr InitializeFish
 	jsr ld8ff
 	lda GameMode
 	beq lf29b	; Balloon Fight Game Mode
@@ -5403,9 +5400,9 @@ lf29b:
 	jmp lcf13	; Bonus Phase Type
 lf2a2_balloonfight_load:
 	jsr lc716_initcloudbolt
-	lda $3b		; \ Level Header?
-	and #$03	; |
-	bne lf2b3	; /
+	lda CurrentPhaseHeader	; \ Level Header?
+	and #$03				; |
+	bne lf2b3				; /
 	lda #$08	; \
 	sta $f2		; / Play Stage Start jingle
 	ldx DemoFlag		; \
@@ -5416,9 +5413,9 @@ lf2b3:
 	inc $3c		; Increment Current Phase Number
 lf2b9_balloonfight_loop:	; Balloon Fight Game Loop
 	jsr Pause
-	lda PhaseDisplayTimer					; \
+	lda PhaseDisplayTimer	; \
 	beq lf2c5				; | Display Phase Number
-	dec PhaseDisplayTimer					; | if the time is not 0
+	dec PhaseDisplayTimer	; | if the time is not 0
 	jsr lf3cc_phasedisplay	; /
 lf2c5:
 	jsr UpdateRNG
@@ -5444,7 +5441,7 @@ lf2e4:
 	phx
 	jsr lc726
 	plx
-	ldy #$02
+	ldy #2
 	dec P1Lives,x	; Decrement Player X Lives
 	sty $46		; Update Status Bar
 	bmi lf30d	; If Player X has no more lives then don't respawn
@@ -5460,11 +5457,11 @@ lf30d:
 	lda P2Lives		; \ If Player 1 & 2 have 0 lives
 	bmi lf366	; / then game over
 lf318:
-	lda DemoFlag		; \ If Demo Play
-	beq lf327	; / then skip joypad read
+	lda DemoFlag	; \ If Demo Play
+	beq lf327		; / then skip joypad read
 	jsr PollController0
-	lda $061c	; \
-	and #$30	; | If START or SELECT is pressed
+	lda Joy1Press				; \
+	and #SelectBtn | StartBtn	; | If START or SELECT is pressed
 	beq lf2b9_balloonfight_loop	; / then loop
 :	rts
 lf327:
@@ -5657,13 +5654,13 @@ Pause:
 	lda DemoFlag	; \ If Demo Flag Set
 	bne :-			; / then don't do anything
 	jsr PollController0	; \
-	and #%00010000			; | If START is not pressed
-	beq :-					; / then don't do anything
+	and #%00010000		; | If START is not pressed
+	beq :-				; / then don't do anything
 	lda #4		; \ Play Pause jingle
 	sta $f2		; /
-	lda $01		; \
-	and #$ef	; | Hide Sprites
-	sta PPUMASK	; /
+	lda PPUMASKShadow	; \
+	and #%11101111		; | Hide Sprites
+	sta PPUMASK			; /
 lf489:
 	jsr FinishFrame	; \
 	jsr PollController0		; |
@@ -5681,7 +5678,7 @@ lf4a2:
 	rts
 ;-----------------------
 
-lf4a5_initfish:
+InitializeFish:
 	lda #1
 	sta $048e	; \ Set Unused Variables?
 	sta $048f	; /
@@ -5694,10 +5691,9 @@ lf4a5_initfish:
 	stx $90		; Fish Balloons = #$01
 	inx			; \ Update Status Bar
 	stx $46		; /
-	lda #$40	; \ Set Fish X position
-	sta $99		; / to #$40
+	lda #64		; \ Set Fish X position
+	sta $99		; / to 64px
 	rts
-;-----------------------
 
 .include "Sound.asm"
 
