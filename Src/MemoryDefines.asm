@@ -74,12 +74,9 @@ ScoreDigit5			.set $48
 ; $00B8 = Lightning Bolt Countdown
 ; $00B9 = Unused?
 SparkIntensity		.set $BA	;Speed of sparks
-; $00BB = Water Plonk Animation Frame
+SplashAnim			.set $BB	;Water Splash Animation Frame
 ; $00BC = ?
-; $00BD-$00BE = Player 1/2 Invincibility Flag
-; $00BF-$00C0 = Player 1/2 Invincibility Time
-; $00C1-$00C2 = Player 1/2 Freeze Flag
-; $00C3-$00C4 = Player 1/2 Respawn Delay
+
 ScrollLockTimer		.set $C5	;Balloon Trip Scroll Lock Timer
 ; $00C6 = ???
 ; $00C7 = ???
@@ -264,6 +261,11 @@ ObjectUnknown3		.set $046C	;$046C-$0474
 ObjectUnknown4		.set $0475	;$0475-$047D
 ObjectUnknown5		.set $047E	;$047E-$0486
 
+PlayerInvincible	.set $BD	; $00BD-$00BE
+PlayerInvTimer		.set $BF	; $00BF-$00C0
+PlayerFreeze		.set $C1	; $00C1-$00C2
+PlayerSpawnDelay	.set $C3	; $00C3-$00C4
+
 ;$0487 = ???
 BTPlatformX			.set $0488	;Balloon Trip Starting Platform X Position
 
@@ -302,12 +304,12 @@ P1BonusBalloons		.set $05CD
 P2BonusBalloons		.set $05CE
 P1TripBalloons		.set $05CE
 
-; $05D1 = Amount of Flippers
-; $05D2-$05DB = Flipper X positions
-; $05DC-$05E5 = Flipper Y positions
+; $05D1 = Amount of Propellers
+; $05D2-$05DB = Propeller X positions
+; $05DC-$05E5 = Propeller Y positions
 ; $05E6-$05EF = ?
 ; $05F0-$05F9 = ?
-; $05FA-$0603 = Flippers Type
+; $05FA-$0603 = Propellers Type
 
 
 ; $0618-$0619 = ?
