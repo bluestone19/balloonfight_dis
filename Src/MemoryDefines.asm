@@ -200,8 +200,9 @@ PPUBuffer			.set $0300
 ;					 Data, and repeat)
 
 ; PPU Upload Buffer:
-; $0050 = PPU Address High
-; $0051 = ???
+PPUAddressHi		.set $50
+PPUAddressLo		.set $51
+
 PPUBufferPosition	.set $52
 PPUBufferSize		.set $53
 

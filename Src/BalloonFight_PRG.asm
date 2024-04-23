@@ -272,7 +272,7 @@ UploadPPUAndMaskBuffer:
 		ldx PPUBufferPosition	; Get Current Position in PPU Upload Buffer
 		lda PPUBuffer,x	; \
 		inx				; |
-		sta $50			; |
+		sta PPUAddressHi			; |
 		sta PPUADDR		; | Get PPU Address
 		lda PPUBuffer,x	; | And Set PPUADDR
 		inx				; |
@@ -286,7 +286,7 @@ UploadPPUAndMaskBuffer:
 			dey				; |
 			bne @Loop		; /
 
-		lda $50		; \
+		lda PPUAddressHi		; \
 		cmp #$3f	; | If Upload Address != $3FXX (Palette Data)
 		bne @Skip	; / Then Skip this section
 		stppuaddr $3F00	; PPUADDR = $3F00
@@ -2062,7 +2062,7 @@ lcf13:
 lcf1f:
 	lda P1Lives,x
 	bmi lcf26
-	jsr lf3b0_initplayertype
+	jsr InitPlayerType
 lcf26:
 	dex
 	bpl lcf1f
@@ -2111,7 +2111,7 @@ lcf7e:
 	sta ObjectStatus,x
 	lda #1
 	sta ObjectDirection,x
-	jsr lf3b0_initplayertype
+	jsr InitPlayerType
 	jsr le3a4
 	dex
 	bpl lcf7e
@@ -2893,13 +2893,13 @@ ld5cb:
 	rts
 
 ld5d9:
-	ldx #$00
+	ldx #0
 ld5db:
 	jsr ld651
 	jsr ld5f1
-	lda $51
+	lda PPUAddressLo
 	ora #$04
-	sta $51
+	sta PPUAddressLo
 	jsr ld5f1
 	inxr 2
 	cpx #$80
@@ -2907,9 +2907,9 @@ ld5db:
 	rts
 
 ld5f1:
-	lda $51
+	lda PPUAddressLo
 	sta PPUADDR
-	lda $50
+	lda PPUAddressHi
 	sta PPUADDR
 	lda PPUDATA
 	lda PPUDATA
@@ -2927,29 +2927,29 @@ UpdateStarBG:
 	dec StarUpdateFlag
 	lda $4f		; \
 	clc			; |
-	adc #$02	; | Update and Get Current
+	adc #2		; | Update and Get Current
 	and #$3f	; | Star ID
 	sta $4f		; |
 	tax			; /
-	jsr ld651	; \
-	lda $51		; |
-	sta PPUADDR	; | Set PPU Address for Star Tile
-	lda $50		; |
-	sta PPUADDR	; /
-	lda PPUDATA	; \
-	lda PPUDATA	; |
-	ldy #$03	; | Check if Tile is part of
-ld632:
-	cmp StarAnimTiles,y	; | Star Animation tiles
-	beq ld63b	; | If not: Stop
-	dey			; |
-	bpl ld632	; /
+	jsr ld651			; \
+	lda PPUAddressLo	; |
+	sta PPUADDR			; | Set PPU Address for Star Tile
+	lda PPUAddressHi	; |
+	sta PPUADDR			; /
+	lda PPUDATA				; \
+	lda PPUDATA				; |
+	ldy #3					; | Check if Tile is part of
+	@Loop:
+		cmp StarAnimTiles,y	; | Star Animation tiles
+		beq ld63b			; | If not: Stop
+		dey					; |
+		bpl @Loop			; /
 :	rts
 
 ld63b:
-	lda $51					; \
+	lda PPUAddressLo		; \
 	sta PPUADDR				; |
-	lda $50					; | Write Next Star Tile
+	lda PPUAddressHi		; | Write Next Star Tile
 	sta PPUADDR				; |
 	lda StarAnimTiles+1,y	; |
 	sta PPUDATA				; /
@@ -2960,9 +2960,9 @@ StarAnimTiles:	;Star Tile Animation Frames
 
 ld651:
 	lda StarPositions,x
-	sta $50
+	sta PPUAddressHi
 	lda StarPositions+1,x
-	sta $51
+	sta PPUAddressLo
 	rts
 
 StarPositions:
@@ -3168,47 +3168,47 @@ ld805:
 	stppuaddr $2062	; PPUADDR = $2062 GAME OVER Player 1 Status Bar
 	lda P1Lives	; \ If Player 1 Lives is negative
 	jsr ld826	; / Then upload GAME OVER
-	lda TwoPlayerFlag		; \ If Single Player
-	beq :+	; / then return
+	lda TwoPlayerFlag	; \ If Single Player
+	beq :+				; / then return
 	stppuaddr $2075
-	lda P2Lives		; \ If Player 2 Lives is negative
+	lda P2Lives	; \ If Player 2 Lives is negative
 ld826:
 	bmi ld83b	; / Then upload GAME OVER
 ld828:
-	sta $50		; \
-	ldx #$06	; |
+	sta PPUAddressHi	; \
+	ldx #6				; |
 ld82c:
-	lda #$24	; | Upload amount of lives to PPU
-	cpx $50		; |
-	bcs ld834	; |
-	lda #$2a	; |
+	lda #$24			; | Upload amount of lives to PPU
+	cpx PPUAddressHi	; |
+	bcs ld834			; |
+	lda #$2a			; |
 ld834:
-	sta PPUDATA	; |
-	dex			; |
-	bpl ld82c	; /
+	sta PPUDATA			; |
+	dex					; |
+	bpl ld82c			; /
 :	rts
 
 ld83b:
-	lda TwoPlayerFlag		; \ If Single Player
-	beq ld828	; / then go back
-	ldx #$08			; \
-ld841:
-	lda GameOverText,x	; | Upload GAME OVER to PPU
-	sta PPUDATA			; |
-	dex					; |
-	bpl ld841			; /
+	lda TwoPlayerFlag	; \ If Single Player
+	beq ld828			; / then go back
+	ldx #8					; \
+	@Loop:
+		lda GameOverText,x	; | Upload GAME OVER to PPU
+		sta PPUDATA			; |
+		dex					; |
+		bpl @Loop			; /
 	rts
 
-GameOverText:	;GAME OVER
+GameOverText:	;GAME OVER (Reversed)
 .BYTE $1b,$0e,$1f,$18,$24,$0e,$16,$0a,$10
 
 ld854:
-	ldy #4		; \
+	ldy #4			; \
 ld856:
 	lda RankText,y	; | Upload RANK- to PPU
-	sta PPUDATA	; |
-	dey			; |
-	bpl ld856	; /
+	sta PPUDATA		; |
+	dey				; |
+	bpl ld856		; /
 	lda $4a		; \
 	sta PPUDATA	; | Upload Rank Number to PPU
 	lda $49		; |
@@ -3319,25 +3319,25 @@ GotoTitleScreen:	; Manage Title Screen
 	jsr DisplayTitleScreen
 	lda #0				; \ Reset Frame Counter
 	sta FrameCounter	; /
-ldacb:
+TitleScreenLoop:
 	jsr FinishFrame
 	lda FrameCounter	; \ Start demo if Frame Counter overflows
 	beq StartDemo		; / 
 	jsr ldb08	; Set Modes & Cursor
 	jsr PollController0
 	tax
-	and #%00010000	; \ If Start button is pressed
+	and #StartBtn	; \ If Start button is pressed
 	bne :+			; / then exit Title Screen loop
 	txa
-	and #$20	; \ If Select button is NOT pressed
-	beq ldaed	; / then loop again
-	lda #0		; \ Reset Frame Counter
-	sta FrameCounter		; /
-	ldx MainMenuCursor		; \
-	lda ldb05,x	; | Select Next Mode
-	sta MainMenuCursor		; /
+	and #SelectBtn	; \ If Select button is NOT pressed
+	beq ldaed		; / then loop again
+	lda #0				; \ Reset Frame Counter
+	sta FrameCounter	; /
+	ldx MainMenuCursor	; \
+	lda TSNextOption,x	; | Select Next Mode
+	sta MainMenuCursor	; /
 ldaed:
-	jmp ldacb	; Loop
+	jmp TitleScreenLoop	; Loop
 :	rts
 
 StartDemo:
@@ -3351,7 +3351,7 @@ StartDemo:
 	sta DemoFlag
 	beq GotoTitleScreen
 
-ldb05:	;Title Screen choices
+TSNextOption:	;Title Screen choices
 .BYTE 1,2,0
 
 ldb08:
@@ -3359,19 +3359,19 @@ ldb08:
 	lsr					; | Set Game Mode
 	sta GameMode		; / depending on selected mode
 	lda MainMenuCursor		; \
-	tax			; | Set Amount of players
-	and #$01	; | depending on selected mode
+	tax						; | Set Amount of players
+	and #1					; | depending on selected mode
 	sta TwoPlayerFlag		; /
 	lda MenuCursorYOptions,x	; \ Set Y position of menu cursor balloon
 	sta $057b					; /
-	lda #$2c	; \ Set X position of menu cursor balloon
+	lda #44		; \ Set X position of menu cursor balloon
 	sta $0567	; /
-	ldx #$00	; \ Set graphics of menu cursor balloon
+	ldx #0		; \ Set graphics of menu cursor balloon
 	stx $055d	; /
 	jmp lce2f_balloonxspritemanage
 
 MenuCursorYOptions:
-.BYTE $8c,$9c,$ac
+	.BYTE 140,156,172
 
 .include "PhaseData.asm"
 
@@ -3379,27 +3379,27 @@ MenuCursorYOptions:
 
 le3a4:
 	lda OAMObjectOrder1,x	; \ Set Pointer from the first table
-	sta $1f		; /
+	sta $1f					; /
 	lda FrameCounter		; \
-	lsr			; | Every 2 frames
-	bcc le3b3	; | Set Pointer from the second table
+	lsr						; | Every 2 frames
+	bcc le3b3				; | Set Pointer from the second table
 	lda OAMObjectOrder2,x	; |
-	sta $1f		; /
+	sta DataPointerLo		; /
 le3b3:
-	lda #$02	; \ Set Pointer to $02xx
-	sta $20		; / (OAM)
-	lda $88,x	; \ If Object X Balloons >= 0
-	bpl le3cf	; /
+	lda #$02			; \ Set Pointer to $02xx
+	sta DataPointerHi	; / (OAM)
+	lda ObjectBalloons,x	; \ If Object X Balloons >= 0
+	bpl le3cf				; /
 	cmp #$ff	; \ If Object X Balloons == -1
 	beq le3c2	; /
 	jmp le4d5
 le3c2:
-	ldy #$14	; \
-le3c4:
-	lda #$f0	; |
-	sta (DataPointer),y	; |
-	deyr 4		; |
-	bpl le3c4	; /
+	ldy #20					; \
+	@ClearLoop:
+		lda #$f0			; |
+		sta (DataPointer),y	; |
+		deyr 4				; |
+		bpl @ClearLoop		; /
 	rts
 le3cf:
 	cpx #$08	; \ If Object is Fish
@@ -3659,7 +3659,7 @@ le5ad:
 	deyr 4
 	bpl le5ad
 	lda FrameCounter
-	and #$03
+	and #3
 	bne :+
 	dec $bb		; Go to next water plonk animation frame
 :	rts
@@ -3670,20 +3670,38 @@ le5c5:
 le5ca:
 .HIBYTES SplashPointers
 
+; The splash sprite data is stored in this funny little format
+; The four sprites that make up the splash are all defined by one line
+; A single $f0 means that sprite is not used in this frame, otherwise it is copied to OAM
+; All the sprites use palette 3. X is offset by splash position.
 Splash1:
-.BYTE $d0,$ae,$03,$04,$f0,$f0,$f0
+	.BYTE $d0,$ae,$03,$04
+	.BYTE $f0	; Sprite 1: Empty
+	.BYTE $f0	; Sprite 2: Empty
+	.BYTE $f0	; Sprite 3: Empty
 Splash2:
-.BYTE $c8,$af,$03,$04,$d0,$b0,$03,$04,$f0,$f0
+	.BYTE $c8,$af,$03,$04
+	.BYTE $d0,$b0,$03,$04
+	.BYTE $f0	; Sprite 2: Empty
+	.BYTE $f0	; Sprite 3: Empty
 Splash3:
-.BYTE $c8,$b1,$03,$fc,$c8,$b2,$03,$04,$d0,$b3,$03,$04,$f0
+	.BYTE $c8,$b1,$03,$fc
+	.BYTE $c8,$b2,$03,$04
+	.BYTE $d0,$b3,$03,$04
+	.BYTE $f0	; Sprite 3: Empty
 Splash4:
-.BYTE $c8,$b4,$03,$00,$c8,$b4,$43,$08,$d0,$b5,$03,$00,$d0,$b5,$43,$08
+	.BYTE $c8,$b4,$03,$00
+	.BYTE $c8,$b4,$43,$08	; Horizontal flip
+	.BYTE $d0,$b5,$03,$00
+	.BYTE $d0,$b5,$43,$08	; Horizontal flip
 Splash5:
-.BYTE $f0,$f0,$f0,$f0
+	.BYTE $f0	; Sprite 0: Empty
+	.BYTE $f0	; Sprite 1: Empty
+	.BYTE $f0	; Sprite 2: Empty
+	.BYTE $f0	; Sprite 3: Empty
 
-le601:
-    ;12 bytes
-.BYTE $04,$04,$05,$06,$03,$03,$03,$06,$0a,$0a,$0a,$0a
+le601:	;YVelFrac by object type
+	.BYTE $04,$04,$05,$06,$03,$03,$03,$06,$0a,$0a,$0a,$0a
 le60d:
     ;12 bytes
 .BYTE $28,$32,$46,$78,$00,$00,$00,$64,$00,$00,$00,$00
@@ -5169,34 +5187,34 @@ lf143:
 	sta $2e		; | Init
 	sta $2f		; |
 	sta $30		; /
-	ldx #8		; \ -Loop 8 times
-@Loop:
-	asl $2e		; |
-	rol $2f		; |
-	rol $30		; |
-	asl $2d		; |
-	bcc @Next	; |
-	clc			; |
-	lda $2b		; | Old Velocity Frac
-	adc $2e		; |
-	sta $2e		; |
-	lda $2c		; | Old Velocity Int
-	adc $2f		; |
-	sta $2f		; |
-	lda #0		; |
-	adc $30		; |
-	sta $30		; |
-@Next:
-	dex			; |
-	bne @Loop	; /
+	ldx #8				; \ -Loop 8 times
+	@Loop:
+		asl $2e			; |
+		rol $2f			; |
+		rol $30			; |
+		asl $2d			; |
+		bcc @Next		; |
+		clc				; |
+		lda TempWordLo	; | Old Velocity Frac
+		adc $2e			; |
+		sta $2e			; |
+		lda TempWordHi	; | Old Velocity Int
+		adc $2f			; |
+		sta $2f			; |
+		lda #0			; |
+		adc $30			; |
+		sta $30			; |
+		@Next:
+		dex				; |
+		bne @Loop		; /
 	plx
 	rts
 
 lf172:
 	lda ObjectXVelFrac,x	; \ X Velocity Frac
-	sta $2b		; /
+	sta TempWordLo			; /
 	lda ObjectXVelInt,x	; \ X Velocity Int
-	sta $2c		; /
+	sta TempWordHi		; /
 	lda #$cd	; \ ?
 	jsr lf119	; /
 	lda $2f		; \ Update X Velocity Frac
@@ -5252,18 +5270,16 @@ UpdateRNG:
 
 StartGame:
 	jsr GotoTitleScreen
-
 	ldx #9				; \
 	@Loop:
 		lda #0			; | Player 1 Score to 000000
 		sta P1Score,x	; |
 		dex				; |
 		bpl @Loop		; /
-
 	sta TargetUpdateScore		; Update Player 1 Score
 	inc P1Lives		; +1 Life to Player 1
 	jsr AddScore	; Update Player Score
-	lda #$0f	; \ Enable Sound Channels
+	lda #%1111	; \ Enable Sound Channels
 	sta SND_CHN	; /
 	lda #1		; \ Stop All Sounds
 	sta SFX1Req	; /
@@ -5282,14 +5298,14 @@ lf1fa:
 	stx $0558	; Bonus Phase Level = 0
 	dex
 	stx $89		; Set Player 2 Balloons to -1
-	ldx TwoPlayerFlag			; \
+	ldx TwoPlayerFlag	; \
 lf20d:
-	jsr lf3b0_initplayertype	; | Set up both player types
-	dex							; |
-	bpl lf20d					; /
+	jsr InitPlayerType	; | Set up both player types
+	dex					; |
+	bpl lf20d			; /
 lf213:
-	lda #$00	; \ Set to Regular Phase
-	sta PhaseType		; /
+	lda #$00		; \ Set to Regular Phase
+	sta PhaseType	; /
 	lda $3c		; \
 	lsr			; |
 	lsr			; | (Current Phase >> 2) cannot
@@ -5406,7 +5422,7 @@ lf2e4:
 	sty $46		; Update Status Bar
 	bmi lf30d	; If Player X has no more lives then don't respawn
 	jsr lf386_initializeplayerx
-	jsr lf3b0_initplayertype
+	jsr InitPlayerType
 	lda #$80		; \ Play Respawn Jingle
 	sta MusicReq	; /
 lf30d:
@@ -5505,37 +5521,35 @@ lf3a1:
 :	rts
 
 PlayerStartingX:
-.BYTE $20,$d0
+	.BYTE $20,$d0
 
-lf3b0_initplayertype:
-	lda #3		; \ Set Player X type to 03 (2 Balloons)
+InitPlayerType:
+	lda #3				; \ Set Player X type to 03 (2 Balloons)
 	sta ObjectType,x	; /
-	lda #2		; \ Set Player X Balloons to 02
-	sta $88,x	; /
+	lda #2					; \ Set Player X Balloons to 02
+	sta ObjectBalloons,x	; /
 	rts
 
 lf3ba:
-    ;9 bytes
-.BYTE $58,$50,$58,$50,$50,$40,$38,$30,$28
+	.BYTE $58,$50,$58,$50,$50,$40,$38,$30,$28
 lf3c3:
-    ;9 bytes
-.BYTE $04,$04,$03,$03,$02,$02,$02,$02,$02
+	.BYTE $04,$04,$03,$03,$02,$02,$02,$02,$02
 
 lf3cc_phasedisplay:
-	lda PhaseDisplayTimer		; \ Toggle between "PHASE-??"
-	and #$20	; | and empty
-	beq lf3ee	; / every #$20 frames?
+	lda PhaseDisplayTimer	; \ Toggle between "PHASE-??"
+	and #$20				; | and empty
+	beq lf3ee				; / every #$20 frames?
 	ldx #$0a	; \
 lf3d4:
 	lda lf3f5,x	; | Copy "PHASE-  " PPU Block
 	sta $57,x	; |
 	dex			; |
 	bpl lf3d4	; /
-	ldy #$0a			; \
-	lda $3c				; | Add 1st digit of
-	sta $43				; | Phase Number
+	ldy #$0a		; \
+	lda $3c			; | Add 1st digit of
+	sta $43			; | Phase Number
 	jsr DivideByY	; | (Divide by 10)
-	sta $60				; /
+	sta $60			; /
 	lda $43				; \ Add 2nd digit of
 	sta $61				; / Phase Number
 	jmp CopyPPUTempBlock
@@ -5549,44 +5563,44 @@ lf400:	; $206C - $08 - "        "
 
 lf40b_uploadgameovertext:
 	jsr FinishFrame
-	ldx #$01				; \
+	ldx #$01			; \
 lf410:
-	lda lf43b,x				; | Prepare Game Over
-	ldy lf43b+2,x			; | PPU blocks
+	lda lf43b,x			; | Prepare Game Over
+	ldy lf43b+2,x		; | PPU blocks
 	jsr CopyPPUBlock	; | to upload
-	dex						; |
-	bpl lf410				; /
+	dex					; |
+	bpl lf410			; /
 	ldx #$0f	; \
 lf41e:
 	lda #$24	; | Prepare 16 empty tiles
 	sta $5a,x	; | to upload
 	dex			; |
 	bpl lf41e	; /
-	lda #$10	; \ Size: 16 bytes
-	sta $59		; /
+	lda #16	; \ Size: 16 bytes
+	sta $59	; /
 	lda #$21	; \ PPUADDR = $21xx
 	sta $57		; /
-	ldx #$02					; \
+	ldx #$02				; \
 lf42f:
-	lda lf43f,x					; | Prepare uploading
-	sta $58						; | empty tiles to nametable
+	lda lf43f,x				; | Prepare uploading
+	sta $58					; | empty tiles to nametable
 	jsr CopyPPUTempBlock	; | ($2188, $21A8, $21E8)
-	dex							; | to PPU Buffer
-	bpl lf42f					; /
+	dex						; | to PPU Buffer
+	bpl lf42f				; /
 	rts
 
 .define PPUBlockPointers lf442, lf455
 lf43b:	; Pointers to PPU Blocks
-.LOBYTES PPUBlockPointers
+	.LOBYTES PPUBlockPointers
 lf43d:
-.HIBYTES PPUBlockPointers
+	.HIBYTES PPUBlockPointers
 
 lf43f:	; Empty tiles lower PPUADDR
-.BYTE $88,$a8,$e8
+	.BYTE $88,$a8,$e8
 lf442:	; "   GAME  OVER   "
-.BYTE $21,$c8,$10,$24,$24,$24,$10,$0a,$16,$0e,$24,$24,$18,$1f,$0e,$1b,$24,$24,$24
+	.BYTE $21,$c8,$10,$24,$24,$24,$10,$0a,$16,$0e,$24,$24,$18,$1f,$0e,$1b,$24,$24,$24
 lf455:	; Tile Attributes?
-.BYTE $23,$da,$04,$aa,$aa,$aa,$aa
+	.BYTE $23,$da,$04,$aa,$aa,$aa,$aa
 
 Wait20Frames:
 	ldx #20
@@ -5610,27 +5624,27 @@ Pause:
 	lda DemoFlag	; \ If Demo Flag Set
 	bne :-			; / then don't do anything
 	jsr PollController0	; \
-	and #%00010000		; | If START is not pressed
+	and #StartBtn		; | If START is not pressed
 	beq :-				; / then don't do anything
 	lda #4			; \ Play Pause jingle
 	sta MusicReq	; /
 	lda PPUMASKShadow	; \
 	and #%11101111		; | Hide Sprites
 	sta PPUMASK			; /
-lf489:
-	jsr FinishFrame	; \
-	jsr PollController0		; |
-	and #$10					; | If START is not pressed
-	beq lf489					; / then loop
-	lda $01		; \
-	sta PPUMASK	; / Show Sprites
-	ldy #$04	; \
-	lda PhaseType		; | Play Pause jingle if
-	ora GameMode		; | it's a Normal Phase in Balloon Fight Game Mode
-	beq lf4a2	; | Else play Balloon Trip / Bonus Phase music
-	ldy #$20	; |
-lf4a2:
-	sty $f2		; /
+	@PauseLoop:
+		jsr FinishFrame		; \
+		jsr PollController0	; |
+		and #StartBtn		; | If START is not pressed
+		beq @PauseLoop		; / then loop
+	lda PPUMASKShadow	; \
+	sta PPUMASK			; / Show Sprites
+	ldy #$04		; \
+	lda PhaseType	; | Play Pause jingle if
+	ora GameMode	; | it's a Normal Phase in Balloon Fight Game Mode
+	beq @PauseSnd	; | Else play Balloon Trip / Bonus Phase music
+	ldy #$20		; |
+	@PauseSnd:
+	sty MusicReq	; /
 	rts
 
 InitializeFish:
