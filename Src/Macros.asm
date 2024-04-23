@@ -56,10 +56,17 @@
 		.endrep
 	.endmacro
 
-.macro aslr rep
-	.repeat rep
-		asl
-		.endrep
+.macro aslr rep, var
+	.ifblank	var
+		.repeat rep
+			asl
+			.endrep
+		.endif
+	.ifnblank	var
+		.repeat rep
+			asl var
+			.endrep
+		.endif
 	.endmacro
 
 .macro rolr rep

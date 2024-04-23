@@ -346,16 +346,16 @@ BalloonTripGameLoop:
 	jmp lc2d0
 lc21e:
 	lda ScrollLockTimer	; \ ...unless the scrolling
-	beq lc227			; | is locked
+	beq @SkipLockTimer	; | is locked
 	dec ScrollLockTimer	; /
 	jmp lc2d0
-lc227:
+	@SkipLockTimer:
 	lda BTXScroll		; \ If the scrolling X position
-	bne lc231			; | is 0 then
+	bne @SkipPPUCTRL	; | is 0 then
 	lda PPUCTRLShadowBT	; | Toggle between
 	eor #1				; | nametable 0 and 1
 	sta PPUCTRLShadowBT	; /
-lc231:
+	@SkipPPUCTRL:
 	dec BTXScroll	; Scroll 1 pixel from the left
 	lda BTPlatformX	; \ Skip if starting platform
 	beq lc24d		; / does not exist
@@ -371,24 +371,24 @@ lc247:
 	inc ObjectXPosInt		; / then scroll 1px to the right
 lc24d:
 	ldx #7
-lc24f:
-	lda $055d,x	; \ If balloon doesn't exist
-	bmi lc26d	; / skip to the next one
-	inc $0567,x	; Scroll balloon 1px to the right
-	lda $0567,x			; \
-	cmp #$f8			; | If balloon's X position
-	bne lc26d			; | reaches #$F8
-	lda #$ff			; | then make it disappear
-	sta $055d,x			; |
-	lda #$f0			; |
-	sta $057b,x			; | And reset the balloon counter
-	lda #$00			; |
-	sta P1TripBalloons	; /
-lc26d:
-	dex			; \ Check next balloon
-	bpl lc24f	; /
+	@BalloonLoop:
+		lda $055d,x	; \ If balloon doesn't exist
+		bmi @Skip	; / skip to the next one
+		inc $0567,x	; Scroll balloon 1px to the right
+		lda $0567,x			; \
+		cmp #$f8			; | If balloon's X position
+		bne @Skip			; | reaches #$F8
+		lda #$ff			; | then make it disappear
+		sta $055d,x			; |
+		lda #$f0			; |
+		sta $057b,x			; | And reset the balloon counter
+		lda #0				; |
+		sta P1TripBalloons	; /
+		@Skip:
+		dex					; \ Check next balloon
+		bpl @BalloonLoop	; /
 
-	ldx #$13
+	ldx #19
 lc272:
 	lda $0530,x	; \ If Lightning Bolt doesn't exist
 	bmi lc289	; / then skip to next one
@@ -403,9 +403,9 @@ lc289:
 	dex			; \ Check next bolt
 	bpl lc272	; /
 
-	lda $17		; \ Every 8 pixel scrolled
-	and #7	; |
-	bne lc2d0	; /
+	lda BTXScroll	; \ Every 8 pixel scrolled
+	and #7			; |
+	bne lc2d0		; /
 	ldx $88		; \ If Player still has balloons
 	dex			; |
 	bmi lc2d0	; /
@@ -439,33 +439,33 @@ lc2bc:
 	sta RightPointerHi			; |
 	jsr lc3b2					; /
 lc2d0:
-	ldx #$07
-lc2d2:
-	lda $055d,x	; \ If Balloon X does not exist
-	bmi lc2ef	; / then skip collision check
-	jsr lcece_ballooncollision
-	lda P1BonusBalloons	; \
-	beq lc2ef			; | Every balloon touched
-	dec P1BonusBalloons	; | counts towards the
-	inc $05ce			; / main counter
-	phx
-	lda $0559			; \ Add Score
-	jsr AddScore	; /
-	plx
-lc2ef:
-	jsr lce2f_balloonxspritemanage
-	dex			; \ Check next balloon
-	bpl lc2d2	; /
+	ldx #7
+	@BalloonLoop:
+		lda $055d,x	; \ If Balloon X does not exist
+		bmi @Skip	; / then skip collision check
+		jsr lcece_ballooncollision
+		lda P1BonusBalloons	; \
+		beq @Skip			; | Every balloon touched
+		dec P1BonusBalloons	; | counts towards the
+		inc $05ce			; / main counter
+		phx
+		lda $0559			; \ Add Score
+		jsr AddScore	; /
+		plx
+		@Skip:
+		jsr lce2f_balloonxspritemanage
+		dex					; \ Check next balloon
+		bpl @BalloonLoop	; /
 
-	ldx #$13
+	ldx #19
 lc2f7:
 	lda $0530,x	; \ If Lightning Bolt exists?
 	bmi lc317	; /
-	lda $c5		; \ If Scrolling is locked
-	bne lc314	; /
+	lda ScrollLockTimer	; \ If Scrolling is locked
+	bne lc314			; /
 	jsr lc9b6_boltupdate	; Update Lightning Bolt Position
 	lda $04a4,x	; \
-	cmp #$02	; | If Y pos < #$02
+	cmp #2		; | If Y pos < #$02
 	bcs lc30d	; | then
 	jsr lca4f	; / Bounce Lightning Bolt Vertically
 lc30d:
@@ -475,30 +475,30 @@ lc30d:
 lc314:
 	jsr lcb1c_bolt_playercollision
 lc317:
-	lda FrameCounter		; \
-	and #$07	; | Get Lightning Bolt
-	lsr			; | Animation Frame Tile
-	tay			; |
-	lda lc9dd,y	; | (Unused Note: Animation is 8 frames
-	pha			; / but only half of them are used.)
-	lda FrameCounter		; \
-	lsr			; | Every 2 frames...
-	txa			; |
-	bcc lc32d	; /
+	lda FrameCounter	; \
+	and #7				; | Get Lightning Bolt
+	lsr					; | Animation Frame Tile
+	tay					; |
+	lda lc9dd,y			; | (Unused Note: Animation is 8 frames
+	pha					; / but only half of them are used.)
+	lda FrameCounter	; \
+	lsr					; | Every 2 frames...
+	txa					; |
+	bcc lc32d			; /
 	sta Temp12	; \
-	lda #$13	; | ...count from the end
+	lda #19		; | ...count from the end
 	sbc Temp12	; /
 lc32d:
-	aslr 2		; \ Get OAM Sprite Address
-	tay			; /
-	pla			; \ Update Lightning Bolt Sprite
-	sta $02b1,y	; / Tile ID
-	lda $04a4,x	; \
-	sta $02b0,y	; / Y position
-	lda $0490,x	; \
-	sta $02b3,y	; / X position
-	lda #0		; \
-	sta $02b2,y	; / Use Sprite Palette 0
+	aslr 2	; \ Get OAM Sprite Address
+	tay		; /
+	pla				; \ Update Lightning Bolt Sprite
+	sta OAM+$b1,y	; / Tile ID
+	lda SparkYPosInt,x	; \
+	sta OAM+$b0,y		; / Y position
+	lda SparkXPosInt,x	; \
+	sta OAM+$b3,y		; / X position
+	lda #0			; \
+	sta OAM+$b2,y	; / Use Sprite Palette 0
 	dex			; \ Loop to next bolt
 	bpl lc2f7	; /
 
@@ -506,7 +506,7 @@ lc32d:
 	cmp #20				; | 20 balloons in a row...
 	bcc lc36f			; /
 	inc ScoreDigit4		; \ Add 10000
-	lda #$00			; | to score
+	lda #0				; | to score
 	jsr AddScore		; /
 	dec ScoreDigit4		; Reset score to add
 	lda #$10		; \ Play Bonus Phase Perfect jingle
@@ -515,7 +515,7 @@ lc32d:
 	jsr ld3ed_setpalette	; Update Balloon Palette
 	jsr lc527_setbonuspts10
 	dec PhaseType		; Reset to Normal Phase
-	ldx #$64				; \ Wait for 100 frames
+	ldx #100				; \ Wait for 100 frames
 	jsr lf45e_waityframes	; /
 	lda #$20		; \ Play Balloon Trip Music
 	sta MusicReq	; /
@@ -1952,8 +1952,7 @@ lce2f_balloonxspritemanage:
 	sta Temp12
 	asl
 	adc Temp12
-	asl
-	asl
+	aslr 2
 	tay
 	lda $057b,x
 	sta $0250,y
@@ -1980,10 +1979,7 @@ lce2f_balloonxspritemanage:
 	lda #$a9
 	sta $0255,y
 	lda FrameCounter
-	lsr
-	lsr
-	lsr
-	lsr
+	lsrr 4
 	and #7
 	stx Temp13
 	tax
@@ -2287,17 +2283,17 @@ ld0e2_setbonusphase:
 	sta $055b	; |
 	lda ld11c,x	; |
 	sta $055c	; /
-	cpx #$04	; \ Increment Bonus Phase Intensity
+	cpx #4		; \ Increment Bonus Phase Intensity
 	bcs ld104	; | until maximum (4)
 	inc $0558	; /
 ld104:
-	lda #$00	; \
+	lda #0				; \
 	sta P1BonusBalloons	; | Initialize Balloon Counters
 	sta P2BonusBalloons	; /
 	rts
 
 ld10d:	; Points per balloon
-.BYTE $03,$05,$07,$07,$07
+.BYTE 3,5,7,7,7
 ld112:	; Rising Speed
 .BYTE $80,$90,$98,$a0,$a8
 ld117:	; Super Bonus x0000 Points
@@ -2313,7 +2309,12 @@ ld121:
 	rts
 
 ld12b:
-.BYTE $3f,$00,$10,$0f,$30,$30,$30,$0f,$30,$27,$15,$0f,$30,$02,$21,$0f,$16,$16,$16
+.BYTE $3f,$00,$10
+.BYTE $0f,$30,$30,$30
+.BYTE $0f,$30,$27,$15
+.BYTE $0f,$30,$02,$21
+.BYTE $0f,$16,$16,$16
+
 ld13e:
 .BYTE $21,$73,$0b,$29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26
 ld14c:
@@ -2468,42 +2469,42 @@ ClearNametable:
 		bne @ClearLoop2	; /
 	rts			; Total: $400 bytes
 
-ld293_initgamemode:
+InitGameMode:
 	jsr ClearPPUMask
 	jsr DisableNMI
 	lda GameMode		; Check Game Mode for Initialization
-	beq ld2a0
-	jmp ld572
-ld2a0:			; Initialize Balloon Fight Game Mode
-	ldy $3b						; \
+	beq @Skip
+	jmp InitBalloonTrip
+	@Skip:	; Initialize Balloon Fight Game Mode
+	ldy CurrentPhaseHeader		; \
 	lda PhasePointersLow,y		; |
-	sta $1d						; | Load Phase Graphics
+	sta LoadPointerLo			; | Load Phase Graphics
 	lda PhasePointersHigh,y		; |
-	sta $1e						; |
+	sta LoadPointerHi			; |
 	jsr ld497_uploadbackground	; /
-	ldx #$00							; \
+	ldx #0						; \
 ld2b1:
-	jsr ld4e5_getbytefromloadpointer	; |
-	cmp #$ff							; | Load Clouds (XX YY)
-	beq ld322							; | until one has $FF as
-	sta $54								; | X coordinate
-	jsr ld4e5_getbytefromloadpointer	; |
-	sta $55								; /
-	ldy #3						; \
-ld2c1:
-	jsr ld4fb_setppuaddr_render	; |
-	lda #4						; |
-	sta Temp12					; | Render Cloud
-	lda ld493,y					; | to the screen
-ld2cb:
-	sta PPUDATA					; |
-	clc							; |
-	adc #4						; |
-	dec Temp12					; |
-	bne ld2cb					; |
-	inc $55						; |
-	dey							; |
-	bpl ld2c1					; /
+	jsr GetByteFromLoadPointer	; |
+	cmp #$ff					; | Load Clouds (XX YY)
+	beq ld322					; | until one has $FF as
+	sta $54						; | X coordinate
+	jsr GetByteFromLoadPointer	; |
+	sta $55						; /
+	ldy #3							; \
+	@Loop1:
+		jsr ld4fb_setppuaddr_render	; |
+		lda #4						; |
+		sta Temp12					; | Render Cloud
+		lda CloudTiles,y			; | to the screen
+		@Loop2:
+			sta PPUDATA				; |
+			clc						; |
+			adc #4					; |
+			dec Temp12				; |
+			bne @Loop2				; |
+		inc $55						; |
+		dey							; |
+		bpl @Loop1					; /
 	lda $55
 	sec
 	sbc #$04
@@ -2542,13 +2543,13 @@ ld322:
 	stx $a3	; /
 	ldx #$00							; \
 ld327:
-	jsr ld4e5_getbytefromloadpointer	; |
+	jsr GetByteFromLoadPointer	; |
 	cmp #$ff							; | Load Propellers (XX YY TT)
 	beq ld37e							; | until one has $FF as
 	sta $54								; | X coordinate
-	jsr ld4e5_getbytefromloadpointer	; |
+	jsr GetByteFromLoadPointer	; |
 	sta $55								; |
-	jsr ld4e5_getbytefromloadpointer	; |
+	jsr GetByteFromLoadPointer	; |
 	sta $05fa,x							; /
 	lda $54
 	aslr 3
@@ -2580,9 +2581,9 @@ ld327:
 ld37e:
 	dex			; \ Write amount of propellers to RAM
 	stx $05d1	; /
-	jsr ld4e5_getbytefromloadpointer	; \
+	jsr GetByteFromLoadPointer	; \
 	sta DataPointerLo					; | Load Enemy Data Pointer
-	jsr ld4e5_getbytefromloadpointer	; |
+	jsr GetByteFromLoadPointer	; |
 	sta DataPointerHi					; /
 	ldy #0				; \
 	lda (DataPointer),y	; | Load Enemy Amount
@@ -2612,11 +2613,11 @@ LoadEnemy:
 		dex
 		bpl @LoadLoop	; Load another enemy data
 LoadCollision:
-	jsr ld4e5_getbytefromloadpointer	; \ Load Amount of Platforms
+	jsr GetByteFromLoadPointer	; \ Load Amount of Platforms
 	sta PlatformCount					; /
-	jsr ld4e5_getbytefromloadpointer	; \
+	jsr GetByteFromLoadPointer	; \
 	sta LeftPointerLo					; | Load Platform Collision Pointer
-	jsr ld4e5_getbytefromloadpointer	; | Left Side
+	jsr GetByteFromLoadPointer	; | Left Side
 	tay									; |
 	sta LeftPointerHi					; /
 	lda LeftPointerLo			; \
@@ -2636,71 +2637,81 @@ ld3e1:
 	jmp UploadPPUAndMask
 
 ld3ed_setpalette:
-	ldx #$22	; \
-ld3ef:
-	lda ld437,x	; | Copy ld437 (Palette)
-	sta $57,x	; | to PPU Temp Block
-	dex			; |
-	bpl ld3ef	; /
-	lda PhaseType		; \ Check Phase Type...
-	bne ld410	; /
-	lda $3b		; \ ...If Normal Phase
-	and #$0c	; | Select Palette based
-	ora #$03	; | on current level header
-	tay			; /
-	ldx #$03	; \
-ld404:
-	lda ld45a,y	; | Copy Single Palette Data
-	sta $5a,x	; | to Background Palette 1
-	dey			; | to PPU Temp Block
-	dex			; |
-	bpl ld404	; /
-ld40d:
+	ldx #34					; \
+	@PaletteLoop:
+		lda BasePalette,x	; | Copy Base Palette
+		sta $57,x			; | to PPU Temp Block
+		dex					; |
+		bpl @PaletteLoop	; /
+	lda PhaseType			; \ Check Phase Type...
+	bne @LoadBonusPalette	; /
+	lda CurrentPhaseHeader	; \ ...If Normal Phase
+	and #%1100				; | Select Palette based
+	ora #%0011				; | on current level header
+	tay						; /
+	ldx #3					; \
+	@GrassLoop:
+		lda GrassPalettes,y	; | Copy Single Palette Data
+		sta $5a,x			; | to Background Palette 1
+		dey					; | to PPU Temp Block
+		dex					; |
+		bpl @GrassLoop		; /
+	@Next:
 	jmp CopyPPUTempBlock
-ld410:
-	ldx $0558	; ...If Bonus Phase
-	lda BalloonPalPointerLower,x	; \
-	sta LoadPointerLo				; | Select Balloon Palette
-	lda BalloonPalPointerUpper,x	; | based on Intensity Level
-	sta LoadPointerHi				; /
-	ldx #3		; \
-	ldy #7		; |
-ld421:
-	lda ($1d),y	; | Copy Second Palette Data
-	sta $72,x	; | to Sprite Palette 2
-	dey			; | to PPU Temp Block
-	dex			; |
-	bpl ld421	; /
-	lda GameMode		; \ If Balloon Trip mode
-	bne ld40d	; / then stop and copy PPU Temp Block as is
-ld42d:
-	lda ($1d),y	; \ Copy First Palette Data
-	sta $005a,y	; | to Background Palette 1
-	dey			; | to PPU Temp Block
-	bpl ld42d	; /
-	bmi ld40d
-ld437:
-    ;35 bytes
-.BYTE $3f,$00,$20,$0f,$2a,$09,$07,$0f,$30,$27,$15,$0f,$30,$02,$21
-.BYTE $0f,$30,$00,$10,$0f,$16,$12,$37,$0f,$12,$16,$37,$0f,$17,$11
-.BYTE $35,$0f,$17,$11,$2b
-ld45a:
-    ;16 bytes
-.BYTE $0f,$2a,$09,$07,$0f,$26,$06,$07,$0f,$1b,$0c,$07,$0f,$2c,$01
-.BYTE $06
+	@LoadBonusPalette:
+		ldx $0558	; ...If Bonus Phase
+		lda BalloonPalPointerLower,x	; \
+		sta LoadPointerLo				; | Select Balloon Palette
+		lda BalloonPalPointerUpper,x	; | based on Intensity Level
+		sta LoadPointerHi				; /
+		ldx #3					; \
+		ldy #7					; |
+		@CopyLoop1:
+			lda (LoadPointer),y	; | Copy Second Palette Data
+			sta $72,x			; | to Sprite Palette 2
+			dey					; | to PPU Temp Block
+			dex					; |
+			bpl @CopyLoop1		; /
+		lda GameMode	; \ If Balloon Trip mode
+		bne @Next		; / then stop and copy PPU Temp Block as is
+		@CopyLoop2:
+			lda (LoadPointer),y	; \ Copy First Palette Data
+			sta $005a,y			; | to Background Palette 1
+			dey					; | to PPU Temp Block
+			bpl @CopyLoop2		; /
+		bmi @Next
+
+BasePalette:
+	.BYTE $3f,$00,$20	; 32 bytes, put at $3F00 (Palettes)
+	.BYTE $0f,$2a,$09,$07	; Black (BG), Lime Green, 	Dark Green, Brown
+	.BYTE $0f,$30,$27,$15	; Black (BG), White,		Orange, 	Magenta
+	.BYTE $0f,$30,$02,$21	; Black (BG), White,		Blue,		Cyan
+	.BYTE $0f,$30,$00,$10	; Black (BG), White,		Dark Gray,	Light Gray
+	.BYTE $0f,$16,$12,$37	; Black (BG), Red,			Blue,		Beige
+	.BYTE $0f,$12,$16,$37	; Black (BG), Blue,			Red,		Beige
+	.BYTE $0f,$17,$11,$35	; Black (BG), Dark Orange,	Blue,		Pink
+	.BYTE $0f,$17,$11,$2b	; Black (BG), Dark Orange,	Blue,		Light Green
+GrassPalettes:
+	.BYTE $0f,$2a,$09,$07	; Black (BG), Lime Green,	Dark Green,	Brown
+	.BYTE $0f,$26,$06,$07	; Black (BG), Light Orange,	Dark Red,	Brown
+	.BYTE $0f,$1b,$0c,$07	; Black (BG), Blue Green,	Dark Blue,	Brown
+	.BYTE $0f,$2c,$01,$06	; Black (BG), Cyan,			Dark Blue,	Dark Red
 
 .define BonusBalloonPalettes GreenBalloonPalette, OrangeBalloonPalette, RedBalloonPalette, RedBalloonPalette, RedBalloonPalette
 BalloonPalPointerLower:
-.LOBYTES BonusBalloonPalettes
+	.LOBYTES BonusBalloonPalettes
 BalloonPalPointerUpper:
-.HIBYTES BonusBalloonPalettes
+	.HIBYTES BonusBalloonPalettes
 
 GreenBalloonPalette:
-.BYTE $0f,$02,$08,$06,$0f,$2b,$30,$12
+	.BYTE $0f,$02,$08,$06	; Black (BG), Dark Blue,	Dark Green,	Dark Red
+	.BYTE $0f,$2b,$30,$12	; Black (BG), Light Green,	White,		Blue
 OrangeBalloonPalette:
-.BYTE $0f,$07,$0a,$19,$0f,$26,$30,$2b
+	.BYTE $0f,$07,$0a,$19	; Black (BG), Brown,		Dark Green,	Green
+	.BYTE $0f,$26,$30,$2b	; Black (BG), Light Orange,	White,		Light Green
 RedBalloonPalette:
-.BYTE $0f,$07,$0c,$1c,$0f,$15,$30,$26
+	.BYTE $0f,$07,$0c,$1c	; Black (BG), Brown,		Dark Blue,	Dark Cyan
+	.BYTE $0f,$15,$30,$26	; Black (BG), Red,			White,		Light Orange
 
 ld48c_nextplatformptr:
 	sec
@@ -2709,42 +2720,42 @@ ld48c_nextplatformptr:
 	iny
 :	rts
 
-ld493:
-.BYTE $7f,$7e,$7d,$7c
+CloudTiles:
+	.BYTE $7f,$7e,$7d,$7c
 
 ld497_uploadbackground:	;Argument: $001D = Pointer to pointers to screen data
-	jsr ld4e5_getbytefromloadpointer
-	sta $1f
-	jsr ld4e5_getbytefromloadpointer
-	sta $20
+	jsr GetByteFromLoadPointer
+	sta DataPointerLo
+	jsr GetByteFromLoadPointer
+	sta DataPointerHi
 	tax
 	beq :+
 ld4a4:
-	jsr ld4f0_getbytefromgfxpointer
+	jsr GetByteFromDataPointer
 	tax
 	beq ld497_uploadbackground
-	and #$7f
+	and #%01111111
 	sta PPUADDR
-	jsr ld4f0_getbytefromgfxpointer
+	jsr GetByteFromDataPointer
 	sta PPUADDR
-	jsr ld4f0_getbytefromgfxpointer
+	jsr GetByteFromDataPointer
 	sta Temp12
 	txa
-	and #$80
+	and #%10000000
 	lsrr 5
-	ora $00
+	ora PPUCTRLShadow
 	sta PPUCTRL
 	txa
-	and #$40
+	and #%01000000
 	bne ld4d8
 ld4cc:
-	jsr ld4f0_getbytefromgfxpointer
+	jsr GetByteFromDataPointer
 	sta PPUDATA
 	dec Temp12
 	bne ld4cc
 	beq ld4a4
 ld4d8:
-	jsr ld4f0_getbytefromgfxpointer
+	jsr GetByteFromDataPointer
 ld4db:
 	sta PPUDATA
 	dec Temp12
@@ -2752,34 +2763,31 @@ ld4db:
 	beq ld4a4
 :	rts
 
-ld4e5_getbytefromloadpointer:
+GetByteFromLoadPointer:
 	ldy #0
-	lda ($1d),y
-	inc $1d
+	lda (LoadPointer),y
+	inc LoadPointerLo
 	bne :+
-	inc $1e
+	inc LoadPointerHi
 :	rts
 
-ld4f0_getbytefromgfxpointer:
+GetByteFromDataPointer:
 	ldy #0
-	lda ($1f),y
-	inc $1f
+	lda (DataPointer),y
+	inc DataPointerLo
 	bne :+
-	inc $20
+	inc DataPointerHi
 :	rts
 
 ld4fb_setppuaddr_render:
 	lda $55
 	sta Temp12
-	lda #$00
-	asl Temp12
-	asl Temp12
-	asl Temp12
-	asl Temp12
+	lda #0
+	aslr 4, Temp12
 	rol
 	asl Temp12
 	rol
-	ora #$20
+	ora #%00100000
 	sta PPUADDR
 	sta Temp13
 	lda Temp12
@@ -2833,7 +2841,8 @@ ld568:
 ld56c:
 	jsr lcccb
 	jmp UploadPPUAndMaskBuffer
-ld572:			; Initialize Balloon Trip Game Mode
+
+InitBalloonTrip:	; Initialize Balloon Trip Game Mode
 	lday $23C0
 	jsr ld593
 	lday $27C0
@@ -5333,7 +5342,7 @@ lf238:
 		dex							; |
 		bpl @PlayerInitLoop			; /
 	jsr ClearPPU
-	jsr ld293_initgamemode
+	jsr InitGameMode
 	lda $c6
 	cmp #$10
 	bcs lf28e
