@@ -262,21 +262,21 @@ NewPPUBlock:
 	rts			; / X = Current PPU Buffer Address
 
 UploadPPUAndMaskBuffer:
-	phy			; \ Push Y & X
-	phx			; /
+	phy	; \ Push Y & X
+	phx	; /
 	jsr ContinueBufferUpload 
-	plx			; \ Pull X & Y
-	ply			; /
+	plx	; \ Pull X & Y
+	ply	; /
 	rts
 	ContinueBufferUpload:
 		ldx PPUBufferPosition	; Get Current Position in PPU Upload Buffer
-		lda PPUBuffer,x	; \
-		inx				; |
-		sta PPUAddressHi			; |
-		sta PPUADDR		; | Get PPU Address
-		lda PPUBuffer,x	; | And Set PPUADDR
-		inx				; |
-		sta PPUADDR		; /
+		lda PPUBuffer,x		; \
+		inx					; |
+		sta PPUAddressHi	; |
+		sta PPUADDR			; | Get PPU Address
+		lda PPUBuffer,x		; | And Set PPUADDR
+		inx					; |
+		sta PPUADDR			; /
 		ldy PPUBuffer,x	; Get Upload Size to Y
 		inx
 		@Loop:
@@ -285,15 +285,13 @@ UploadPPUAndMaskBuffer:
 			sta PPUDATA		; | Upload Y bytes to PPU
 			dey				; |
 			bne @Loop		; /
-
-		lda PPUAddressHi		; \
-		cmp #$3f	; | If Upload Address != $3FXX (Palette Data)
-		bne @Skip	; / Then Skip this section
+		lda PPUAddressHi	; \
+		cmp #$3f			; | If Upload Address != $3FXX (Palette Data)
+		bne @Skip			; / Then Skip this section
 		stppuaddr $3F00	; PPUADDR = $3F00
 		sta PPUADDR	; Write $00 to PPUADDR twice
 		sta PPUADDR
 		@Skip:
-
 		stx PPUBufferPosition		; \
 		cpx PPUBufferSize			; | If PPU Buffer Position != PPU Buffer Size
 		bne ContinueBufferUpload	; / Then Upload more data
@@ -762,43 +760,42 @@ lc527_setbonuspts10:
 	rts
 
 lc539_rankupdate:
-	lda #$00	; \ Set Balloon Trip Rank 01 (00 + 1)
-	sta Temp12		; /
+	lda #0		; \ Set Balloon Trip Rank 01 (00 + 1)
+	sta Temp12	; /
 lc53d:
-	lda Temp12		; \
-	asl			; | 
-	asl			; | Setup Pointer to
-	adc Temp12		; | 0700 + (Rank)*5
-	sta $1d		; |
-	lda #$07	; |
-	sta $1e		; /
-	ldy #$04	; \
-lc54b:
-	lda ($1d),y	; | Check each digit
-	cmp $0003,y	; | If P1 Score Digit < Rank Score
-	bcc lc563	; | then stop
-	bne lc559	; | If >= then check next Rank Score
-	dey			; |
-	bpl lc54b	; / Else check next digit
+	lda Temp12			; \
+	aslr 2				; | Setup Pointer to
+	adc Temp12			; | 0700 + (Rank)*5
+	sta LoadPointerLo	; |
+	lda #7				; |
+	sta LoadPointerHi	; /
+	ldy #4					; \
+	@Loop:
+		lda (LoadPointer),y	; | Check each digit
+		cmp P1Score,y		; | If P1 Score Digit < Rank Score
+		bcc lc563			; | then stop
+		bne lc559			; | If >= then check next Rank Score
+		dey					; |
+		bpl @Loop			; / Else check next digit
 	bmi lc563	; When done, update current Rank
 lc559:
-	inc Temp12		; \
-	lda Temp12		; | If (Rank+1) != 50 (!)
-	cmp #$32	; | then check the next rank
+	inc Temp12	; \
+	lda Temp12	; | If (Rank+1) != 50 (!)
+	cmp #50		; | then check the next rank
 	bne lc53d	; | else update current rank
-	dec Temp12		; /
+	dec Temp12	; /
 lc563:
-	inc Temp12				; \
-	lda Temp12				; |
-	pha					; | Update Current Rank variable
-	sta $43				; |
-	ldy #$0a			; |
+	inc Temp12		; \
+	lda Temp12		; |
+	pha				; | Update Current Rank variable
+	sta $43			; |
+	ldy #10			; |
 	jsr DivideByY	; | (Rank+1) / 10
-	sta $4a				; | Write second digit
-	lda $43				; |
-	sta $49				; | Write first digit (modulo)
-	pla					; |
-	sta Temp12				; /
+	sta $4a			; | Write second digit
+	lda $43			; |
+	sta $49			; | Write first digit (modulo)
+	pla				; |
+	sta Temp12		; /
 	rts
 
 RankScoreUpdate:
@@ -811,44 +808,43 @@ RankScoreUpdate:
 	aslr 2		; | Y = A * 5
 	adc Temp13	; |
 	tay			; /
-	lda Temp12	; \
-	aslr 2		; | [$1D] = Pointer to Score Rank
-	adc Temp12	; |
-	sta $1d		; |
-	clc			; |
-	adc #$05	; |
-	sta $1f		; | [$1F] = Pointer to Score Rank+1
-	lda #$07	; |
-	sta $1e		; |
-	sta $20		; /
+	lda Temp12			; \
+	aslr 2				; | [$1D] = Pointer to Score Rank
+	adc Temp12			; |
+	sta LoadPointerLo	; |
+	clc					; |
+	adc #5				; |
+	sta DataPointerLo	; | [$1F] = Pointer to Score Rank+1
+	lda #7				; |
+	sta LoadPointerHi	; |
+	sta DataPointerHi	; /
 	tya			; \ If Rank == 49 then
-	beq lc5ac	; / only update one rank score.
-	dey					; \
-lc5a1:
-	lda (LoadPointer),y	; | Shift Balloon Trip
-	sta (DataPointer),y	; | Score Ranking
-	dey					; | by one rank above
-	bne lc5a1			; |
-	lda (LoadPointer),y	; |
-	sta (DataPointer),y	; /
-lc5ac:
+	beq @Skip	; / only update one rank score.
+	dey						; \
+	@CopyLoop1:
+		lda (LoadPointer),y	; | Shift Balloon Trip
+		sta (DataPointer),y	; | Score Ranking
+		dey					; | by one rank above
+		bne @CopyLoop1		; |
+	lda (LoadPointer),y		; |
+	sta (DataPointer),y		; /
+	@Skip:
 	ldy #4					; \
-	@CopyLoop:
+	@CopyLoop2:
 		lda P1Score,y		; | Copy current score
 		sta (LoadPointer),y	; | to current Score Rank
 		dey					; |
-		bpl @CopyLoop		; /
+		bpl @CopyLoop2		; /
 	rts
-
 
 ;----------------------
 ; Fish code
 ;----------------------
 
 lc5b7:	; Fish Animation 0
-.BYTE $01,$02,$03,$03
+	.BYTE $01,$02,$03,$03
 lc5bb:	; Fish Animation 1
-.BYTE $02,$01,$ff,$03,$04,$05,$06,$ff
+	.BYTE $02,$01,$ff,$03,$04,$05,$06,$ff
 
 lc5c3:
 	lda $048d
@@ -862,34 +858,34 @@ lc5d5:
 	lda lc5bb,x	; If Fish Animation? != 0
 lc5d8:
 	sta $87		; Update Fish Status
-	ldx #$08
+	ldx #8
 	jsr le3a4
 	lda $048c	; \ If Fish Target Eaten Flag
 	beq :+	; / is set
 	ldx $048b	; X = Fish Target
 	lda $048d	; \
-	cmp #$20	; |
+	cmp #32		; |
 	bne lc5f4	; | If Fish Frame Time == $20
 	lda #$ff	; | then target is eaten
 	sta $88,x	; | (Balloons = -1)
 	bmi lc610	; /
 lc5f4:
 	bcs :+	; If Fish Frame Time < $20
-	lda $0450	; \ Depending on Fish Direction
-	bne lc602	; /
+	lda $0450		; \ Depending on Fish Direction
+	bne @MoveLeft	; /
 	lda $99		; \
 	clc			; | Move Fish 4 pixels to the right
-	adc #$04	; /
-	bne lc607
-lc602:
+	adc #4		; /
+	bne @FinishMove
+	@MoveLeft:
 	lda $99		; \ or
 	sec			; | Move Fish 4 pixels to the left
-	sbc #$04	; /
-lc607:
+	sbc #4		; /
+	@FinishMove:
 	sta ObjectXPosInt,x
 	lda $a2		; \
 	sec			; | Fish Target's Y position =
-	sbc #$0a	; | (Fish Y - $0A)
+	sbc #10		; | (Fish Y - $0A)
 	sta ObjectYPosInt,x	; /
 lc610:
 	jsr le3a4
@@ -957,12 +953,12 @@ lc671:
 	lda $88,x	; | If Target exists...
 	bmi lc6a3	; / (has balloons)
 	lda ObjectYPosInt,x	; \
-	clc			; | If the target is above
-	adc #$10	; | the fish by 10 pixel
-	cmp $a2		; |
-	bcc lc6a3	; /
+	clc					; | If the target is above
+	adc #$10			; | the fish by 10 pixel
+	cmp $a2				; |
+	bcc lc6a3			; /
 	ldy ObjectType,x	; \
-	lda lc6b8,y	; | Change Target Object Type
+	lda lc6b8,y			; | Change Target Object Type
 	sta ObjectType,x	; /
 	lda #0		; \ Insta Kill
 	sta ObjectStatus,x	; | Target Object Status = 00
@@ -1038,7 +1034,7 @@ lc70d:
 ;----------------------
 
 lc716_initcloudbolt:
-	ldx #$01	; \
+	ldx #1		; \
 lc718:
 	lda #$ff	; | Reset 2 Lightning Bolts
 	sta $0530,x	; |
@@ -1087,7 +1083,7 @@ lc784:
 	sbc $a3		; | the amount of clouds
 	jmp lc784	; / until the condition is right
 
-lc790_cloudbolt:
+ManageCloudBolt:
 	lda FrameCounter		; \
 	and #$7f	; | Every 128 frames...
 	beq lc797	; /
@@ -1164,10 +1160,10 @@ lc821:
 	sta SFX1Req
 	jmp lc77a_cloudboltselect
 
-lc831_cloudblink:
+ManageCloudBlink:
 	lda $b8		; \ If Lightning Bolt Countdown != 1
 	cmp #$01	; | then return
-	bne :+	; /
+	bne :+		; /
 	lda $0530	; \ If Lightning Bolt 0 doesn't exist
 	bmi lc846	; / then prepare for one
 	lda $0531	; \ If Lightning Bolt 1 doesn't exist
@@ -1176,11 +1172,11 @@ lc831_cloudblink:
 	sta $b8		; /
 	rts
 lc846:
-	lda FrameCounter		; \
-	and #$7f	; | If Frame Counter < 64
-	cmp #$40	; | then don't do anything
-	bcc :+	; | If not equal to 64
-	bne lc856	; / then don't play SFX
+	lda FrameCounter	; \
+	and #$7f			; | If Frame Counter < 64
+	cmp #$40			; | then don't do anything
+	bcc :+				; | If not equal to 64
+	bne lc856			; / then don't play SFX
 	lda $f1		; \
 	ora #$08	; | Play Sound Effect
 	sta $f1		; /
@@ -1189,7 +1185,7 @@ lc856:
 	tax
 	lda lc88b,x
 	sta $5a
-	ldx $a4		; \ Blink the selected cloud
+	ldx $a4	; \ Blink the selected cloud
 	bmi :+	; /
 	lda #$23	; \
 	sta $57		; | Set Tile Attribute Palette
@@ -1207,37 +1203,37 @@ lc856:
 	lda $af,x
 	sta $58
 lc883:			; Set 16x16 Tile Attribute 4
-	lda #$57				; \
-	ldy #$00				; | Copy Temp PPU Block
+	lda #$57			; \
+	ldy #$00			; | Copy Temp PPU Block
 	jmp CopyPPUBlock	; / [$0057]
 :	rts
 
 lc88b:
-.BYTE $55,$ff,$00,$ff
+	.BYTE $55,$ff,$00,$ff
 lc88f:
-.BYTE $00,$00,$ff,$ff
+	.BYTE $00,$00,$ff,$ff
 lc893:
-.BYTE $ff,$00,$00,$ff
+	.BYTE $ff,$00,$00,$ff
 lc897:
-.BYTE $10,$10,$f0,$f0
+	.BYTE $10,$10,$f0,$f0
 lc89b:
-.BYTE $de,$22,$22,$de
+	.BYTE $de,$22,$22,$de
 lc89f:
-.BYTE $60,$70,$80,$90,$a0,$b0
+	.BYTE $60,$70,$80,$90,$a0,$b0
 lc8a5:
-.BYTE $00,$00,$00,$00,$00,$00
+	.BYTE $00,$00,$00,$00,$00,$00
 lc8ab:
-.BYTE $c0,$f0,$20,$50,$80,$b0
+	.BYTE $c0,$f0,$20,$50,$80,$b0
 lc8b1:
-.BYTE $00,$00,$01,$01,$01,$01
+	.BYTE $00,$00,$01,$01,$01,$01
 
-lc8b7:
-	ldx #$01
+ManageSparks:
+	ldx #1
 lc8b9:
-	lda $0530,x
-	bpl lc8c1
-	jmp lc9af
-lc8c1:
+	lda SparkAnim,x
+	bpl @Continue
+	jmp ManageNextSpark
+	@Continue:
 	lda $0544,x
 	bmi lc941
 	tay
@@ -1298,7 +1294,7 @@ lc937:
 	lda $0544,x
 	cmp #$10
 	bcs lc941
-	jmp lc9af
+	jmp ManageNextSpark
 lc941:
 	jsr lc9b6_boltupdate
 	lda $0490,x
@@ -1323,7 +1319,7 @@ lc962:
 	sta $0530,x
 	lda #$f0
 	sta $04a4,x
-	jmp lc9af
+	jmp ManageNextSpark
 lc976:
 	jsr lca67
 	jsr lcb1c_bolt_playercollision
@@ -1352,10 +1348,10 @@ lc976:
 	lda #$20
 lc9ac:
 	sta $0202,y
-lc9af:
-	dex
-	bmi :+
-	jmp lc8b9
+	ManageNextSpark:
+		dex
+		bmi :+
+		jmp lc8b9
 :	rts
 
 lc9b6_boltupdate:
@@ -1376,30 +1372,33 @@ lc9b6_boltupdate:
 	rts
 
 lc9dd:
-.BYTE $9d,$9e,$9f,$9e,$9d,$a0,$a1,$a0
+	.BYTE $9d,$9e,$9f,$9e,$9d,$a0,$a1,$a0
 lc9e5:
-    ;16 bytes
-.BYTE $08,$08,$f0,$f0,$08,$08,$f0,$f0,$08,$08,$f0,$f0,$08,$08,$f0
-.BYTE $f0
+	.BYTE $08,$08,$f0,$f0
+	.BYTE $08,$08,$f0,$f0
+	.BYTE $08,$08,$f0,$f0
+	.BYTE $08,$08,$f0,$f0
 lc9f5:
-    ;16 bytes
-.BYTE $ee,$0a,$0a,$ee,$ee,$0a,$0a,$ee,$ee,$0a,$0a,$ee,$ee,$0a,$0a
-.BYTE $ee
+	.BYTE $ee,$0a,$0a,$ee
+	.BYTE $ee,$0a,$0a,$ee
+	.BYTE $ee,$0a,$0a,$ee
+	.BYTE $ee,$0a,$0a,$ee
 lca05:
-    ;16 bytes
-.BYTE $f8,$08,$08,$f8,$f8,$08,$08,$f8,$f8,$08,$08,$f8,$f8,$08,$08
-.BYTE $f8
+	.BYTE $f8,$08,$08,$f8
+	.BYTE $f8,$08,$08,$f8
+	.BYTE $f8,$08,$08,$f8
+	.BYTE $f8,$08,$08,$f8
 lca15:
-    ;10 bytes
-.BYTE $91,$93,$97,$97,$fc,$92,$95,$9a,$9a,$fc
+	.BYTE $91,$93,$97,$97,$fc
+	.BYTE $92,$95,$9a,$9a,$fc
 lca1f:
-    ;10 bytes
-.BYTE $fc,$94,$98,$98,$fc,$fc,$96,$9b,$9b,$fc
+	.BYTE $fc,$94,$98,$98,$fc
+	.BYTE $fc,$96,$9b,$9b,$fc
 lca29:
-    ;10 bytes
-.BYTE $fc,$fc,$99,$99,$fc,$fc,$fc,$9c,$9c,$fc
+	.BYTE $fc,$fc,$99,$99,$fc
+	.BYTE $fc,$fc,$9c,$9c,$fc
 lca33:
-.BYTE $c0,$40,$00,$80
+	.BYTE $c0,$40,$00,$80
 
 lca37:
 	lda $f3		; \
@@ -2074,7 +2073,7 @@ lcf26:
 lcf34:
 	jsr Pause
 	inc StarUpdateFlag
-	jsr ld8dd
+	jsr ManageScorePopup
 	jsr ObjectManage
 	lda $05cb
 	beq lcf47
@@ -2481,7 +2480,7 @@ InitGameMode:
 	sta LoadPointerLo			; | Load Phase Graphics
 	lda PhasePointersHigh,y		; |
 	sta LoadPointerHi			; |
-	jsr ld497_uploadbackground	; /
+	jsr UploadBackground	; /
 	ldx #0						; \
 ld2b1:
 	jsr GetByteFromLoadPointer	; |
@@ -2723,7 +2722,7 @@ ld48c_nextplatformptr:
 CloudTiles:
 	.BYTE $7f,$7e,$7d,$7c
 
-ld497_uploadbackground:	;Argument: $001D = Pointer to pointers to screen data
+UploadBackground:	;Argument: $001D = Pointer to pointers to screen data
 	jsr GetByteFromLoadPointer
 	sta DataPointerLo
 	jsr GetByteFromLoadPointer
@@ -2733,7 +2732,7 @@ ld497_uploadbackground:	;Argument: $001D = Pointer to pointers to screen data
 ld4a4:
 	jsr GetByteFromDataPointer
 	tax
-	beq ld497_uploadbackground
+	beq UploadBackground
 	and #%01111111
 	sta PPUADDR
 	jsr GetByteFromDataPointer
@@ -2922,8 +2921,8 @@ ld5f1:
 :	rts
 
 UpdateStarBG:
-	lda StarUpdateFlag		; \ If [$4C] == 0
-	beq :+	; / Then Do Nothing
+	lda StarUpdateFlag	; \ If [$4C] == 0
+	beq :+				; / Then Do Nothing
 	dec StarUpdateFlag
 	lda $4f		; \
 	clc			; |
@@ -2956,7 +2955,7 @@ ld63b:
 	rts
 
 StarAnimTiles:	;Star Tile Animation Frames
-.BYTE $24,$ed,$ee,$ef,$24	;Empty, Low, middle, high, empty
+	.BYTE $24,$ed,$ee,$ef,$24	;Empty, Low, middle, high, empty
 
 ld651:
 	lda StarPositions,x
@@ -2965,16 +2964,15 @@ ld651:
 	sta PPUAddressLo
 	rts
 
-StarPositions:
-    ;128 bytes
-.WORD $2163,$21A5,$20CB,$20B7,$217D,$229B,$20F2,$2249
-.WORD $216D,$220B,$2292,$2195,$211C,$2148,$20E0,$230B
-.WORD $20CE,$21D0,$2106,$2119,$2230,$228A,$2288,$20A4
-.WORD $2242,$2168,$223C,$2136,$21CA,$20BC,$2196,$214C
-.WORD $2235,$20EF,$2268,$20A6,$21BB,$217A,$20EA,$21F1
-.WORD $20C2,$2177,$2154,$20BA,$22C5,$20BE,$20FA,$21AE
-.WORD $2146,$219A,$20D2,$213D,$222B,$20B0,$21B6,$20AC
-.WORD $20B3,$20DB,$20F6,$212C,$20E7,$2162,$21E4,$214E
+StarPositions:	;PPU Addresses of each BG star
+	.WORD $2163,$21A5,$20CB,$20B7,$217D,$229B,$20F2,$2249
+	.WORD $216D,$220B,$2292,$2195,$211C,$2148,$20E0,$230B
+	.WORD $20CE,$21D0,$2106,$2119,$2230,$228A,$2288,$20A4
+	.WORD $2242,$2168,$223C,$2136,$21CA,$20BC,$2196,$214C
+	.WORD $2235,$20EF,$2268,$20A6,$21BB,$217A,$20EA,$21F1
+	.WORD $20C2,$2177,$2154,$20BA,$22C5,$20BE,$20FA,$21AE
+	.WORD $2146,$219A,$20D2,$213D,$222B,$20B0,$21B6,$20AC
+	.WORD $20B3,$20DB,$20F6,$212C,$20E7,$2162,$21E4,$214E
 
 UpdateScore:
 	lda #0	; Only Update Score
@@ -3074,8 +3072,8 @@ ld765:
 	jsr lc539_rankupdate	; / Ranking Update
 :	rts
 
-TopScoreAddrLo:
-.BYTE <GameATopScore,<GameBTopScore,<GameCTopScore
+TopScoreAddrLo:	;Lower byte for each of the static top score memory locations
+	.BYTE <GameATopScore,<GameBTopScore,<GameCTopScore
 
 DivideByY:	; Divide [$43] by Y
 	sty Temp12
@@ -3102,25 +3100,25 @@ ld78f:
 		rts
 
 UpdateStatusBar:
-	ldy $46		; \
-	dey			; | 
-	beq ld7a0	; |
-	bpl ld805	; /
-	rts
+	ldy StatusUpdateFlag	; \ Check status bar update flag
+	dey						; | (Do operation to update registers)
+	beq DrawStatusBar		; | If flag was 1, redraw status bar
+	bpl ld805				; | If flag was >1, 
+	rts						; / If flag was empty, do nothing
 
-ld7a0:
+DrawStatusBar:
 	stppuaddr $2043	; PPUADDR = $2043
 	lda #$8e	; \ Upload I- to PPU
 	sta PPUDATA	; /
 
-	ldx #$04	; \
-ld7b1:
-	lda P1Score,x	; | Upload Player 1 Score to PPU
-	sta PPUDATA	; |
-	dex			; |
-	bpl ld7b1	; |
-	lda #$00	; |
-	sta PPUDATA	; /
+	ldx #4				; \
+	@Loop1:
+		lda P1Score,x	; | Upload Player 1 Score to PPU
+		sta PPUDATA		; |
+		dex				; |
+		bpl @Loop1		; |
+	lda #0				; |
+	sta PPUDATA			; /
 
 	lda #$24	; \
 	sta PPUDATA	; | Upload 2 empty spaces to PPU
@@ -3130,67 +3128,67 @@ ld7b1:
 	inx			; |
 	stx PPUDATA	; /
 
-	ldx #$04	; \
-ld7d1:
-	lda $0d,x	; | Upload Top Score to PPU
-	sta PPUDATA	; |
-	dex			; |
-	bpl ld7d1	; |
-	lda #0		; |
-	sta PPUDATA	; /
+	ldx #4				; \
+	@LoopTop:
+		lda TopScore,x	; | Upload Top Score to PPU
+		sta PPUDATA		; |
+		dex				; |
+		bpl @LoopTop	; |
+	lda #0				; |
+	sta PPUDATA			; /
 
 	lda #$24	; \
 	sta PPUDATA	; | Upload 2 empty spaces to PPU
 	sta PPUDATA	; /
 
 	lda GameMode		; \ If Game Mode is Balloon Trip Mode
-	bne ld854	; / then render RANK 
-	lda TwoPlayerFlag		; \ If Single Player
-	beq ld802	; / then don't render Player 2 Score
+	bne DrawRankText	; / then render RANK 
+	lda TwoPlayerFlag	; \ If Single Player
+	beq @Finish			; / then don't render Player 2 Score
 
 	lda #$8f	; \ Upload II- to PPU
 	sta PPUDATA	; /
 
-	ldx #$04	; \
-ld7f5:
-	lda $08,x	; | Upload Player 2 Score to PPU
-	sta PPUDATA	; |
-	dex			; |
-	bpl ld7f5	; |
-	lda #0		; |
-	sta PPUDATA	; /
-ld802:
-	dec $46
+	ldx #4				; \
+	@Loop2:
+		lda P2Score,x	; | Upload Player 2 Score to PPU
+		sta PPUDATA		; |
+		dex				; |
+		bpl @Loop2		; |
+	lda #0				; |
+	sta PPUDATA			; /
+	@Finish:
+	dec StatusUpdateFlag	;Reset status update flag when done
 	rts
 
 ld805:
-	dec $46
+	dec StatusUpdateFlag
 	stppuaddr $2062	; PPUADDR = $2062 GAME OVER Player 1 Status Bar
 	lda P1Lives	; \ If Player 1 Lives is negative
 	jsr ld826	; / Then upload GAME OVER
 	lda TwoPlayerFlag	; \ If Single Player
 	beq :+				; / then return
 	stppuaddr $2075
-	lda P2Lives	; \ If Player 2 Lives is negative
+	lda P2Lives			; \ If Player 2 Lives is negative
 ld826:
-	bmi ld83b	; / Then upload GAME OVER
-ld828:
-	sta PPUAddressHi	; \
-	ldx #6				; |
-ld82c:
-	lda #$24			; | Upload amount of lives to PPU
-	cpx PPUAddressHi	; |
-	bcs ld834			; |
-	lda #$2a			; |
-ld834:
-	sta PPUDATA			; |
-	dex					; |
-	bpl ld82c			; /
+	bmi DrawGameOverB	; / Then upload GAME OVER
+	ReturnFromDGOB:
+	sta PPUAddressHi		; \
+	ldx #6					; | Draw up to 7 life icons
+	@Loop:
+		lda #$24			; | Upload amount of lives to PPU
+		cpx PPUAddressHi	; |
+		bcs @Skip			; |
+		lda #$2a			; | 0x2A = Life icon
+		@Skip:
+		sta PPUDATA			; |
+		dex					; |
+		bpl @Loop			; /
 :	rts
 
-ld83b:
+DrawGameOverB:	;Draw "GAME OVER" text for individual player if in game B
 	lda TwoPlayerFlag	; \ If Single Player
-	beq ld828			; / then go back
+	beq ReturnFromDGOB	; / then go back
 	ldx #8					; \
 	@Loop:
 		lda GameOverText,x	; | Upload GAME OVER to PPU
@@ -3200,24 +3198,24 @@ ld83b:
 	rts
 
 GameOverText:	;GAME OVER (Reversed)
-.BYTE $1b,$0e,$1f,$18,$24,$0e,$16,$0a,$10
+	.BYTE $1b,$0e,$1f,$18,$24,$0e,$16,$0a,$10
 
-ld854:
-	ldy #4			; \
-ld856:
-	lda RankText,y	; | Upload RANK- to PPU
-	sta PPUDATA		; |
-	dey				; |
-	bpl ld856		; /
+DrawRankText:
+	ldy #4				; \
+	@Loop:
+		lda RankText,y	; | Upload RANK- to PPU
+		sta PPUDATA		; |
+		dey				; |
+		bpl @Loop		; /
 	lda $4a		; \
 	sta PPUDATA	; | Upload Rank Number to PPU
 	lda $49		; |
 	sta PPUDATA	; /
-	dec $46
+	dec StatusUpdateFlag
 	rts
 
 RankText:	;RANK-
-.BYTE $fb,$fa,$f9,$f8,$f7
+	.BYTE $fb,$fa,$f9,$f8,$f7
 
 ld871:
 	sta Temp12
@@ -3266,29 +3264,32 @@ ld88c:
 	lda Temp12
 	rts
 
+; Score popup options: 300, 500, 750, 1000, 1500, 2000
 ScorePopupLeft:
-.BYTE $f4,$f5,$f6,$f7,$f8,$f9
+	; Spr:  3,  5,  7, 10, 15, 20
+	.BYTE $f4,$f5,$f6,$f7,$f8,$f9
 ScorePopupRight:
-.BYTE $fb,$fb,$fa,$fb,$fb,$fb
+	; Spr: 00, 00, 50, 00, 00, 00
+	.BYTE $fb,$fb,$fa,$fb,$fb,$fb
 
-ld8dd:
-	ldx #$01
-ld8df:
-	lda $061a,x
-	bmi ld8fb
-	dec $0618,x
-	bne ld8fb
-	lda #$ff
-	sta $061a,x
-	txa
-	aslr 3
-	tay
-	lda #$f0
-	sta $02f0,y
-	sta $02f4,y
-ld8fb:
-	dex
-	bpl ld8df
+ManageScorePopup:
+	ldx #1
+	@Loop:
+		lda $061a,x
+		bmi @Next
+		dec $0618,x
+		bne @Next
+		lda #$ff
+		sta $061a,x
+		txa
+		aslr 3
+		tay
+		lda #$f0
+		sta $02f0,y
+		sta $02f4,y
+		@Next:
+		dex
+		bpl @Loop
 	rts
 
 ld8ff:
@@ -3308,7 +3309,7 @@ DisplayTitleScreen:
 	jsr FinishFrame
 	jsr DisableNMI
 	tpa TitleScreenHeader, LoadPointer
-	jsr ld497_uploadbackground
+	jsr UploadBackground
 	jsr EnableNMI
 	jmp UploadPPUAndMask
 
@@ -3379,13 +3380,13 @@ MenuCursorYOptions:
 
 le3a4:
 	lda OAMObjectOrder1,x	; \ Set Pointer from the first table
-	sta $1f					; /
+	sta DataPointerLo		; /
 	lda FrameCounter		; \
 	lsr						; | Every 2 frames
-	bcc le3b3				; | Set Pointer from the second table
+	bcc @Skip				; | Set Pointer from the second table
 	lda OAMObjectOrder2,x	; |
 	sta DataPointerLo		; /
-le3b3:
+	@Skip:
 	lda #$02			; \ Set Pointer to $02xx
 	sta DataPointerHi	; / (OAM)
 	lda ObjectBalloons,x	; \ If Object X Balloons >= 0
@@ -3423,9 +3424,9 @@ le3cf:
 	adc ObjectAnimFrame,x		; | Y = [le34c+3+Balloons+Frame]
 	tay				; /
 	lda PlayerFlashAnimLower,y	; \
-	sta $1d						; | Set pointer
+	sta LoadPointerLo			; | Set pointer
 	lda PlayerFlashAnimUpper,y	; |
-	sta $1e						; /
+	sta LoadPointerHi			; /
 	jmp le429
 le408:
 	ldy $88,x
@@ -3433,17 +3434,17 @@ le408:
 	adc le352,y
 	tay
 	lda EnemyAnimLower,y
-	sta $1d
+	sta LoadPointerLo
 	lda EnemyAnimUpper,y
-	sta $1e
+	sta LoadPointerHi
 	bne le429
 le41b:
 	ldy ObjectStatus,x
 	bmi le3c2
 	lda FishSprPointersLower,y
-	sta $1d
+	sta LoadPointerLo
 	lda FishSprPointersUpper,y
-	sta $1e
+	sta LoadPointerHi
 le429:
 	lda ObjectXPosInt,x
 	sta Temp15
@@ -3482,28 +3483,27 @@ le463:
 	ora #$20
 le465:
 	sta Temp14
-	tpa le043, $21
+	tpa le043, ScorePointer
 	lda ObjectDirection,x
 	beq le47c
-	tpa le079, $21
+	tpa le079, ScorePointer
 le47c:
 	ldy #0
 	lda (LoadPointer),y
-	inc $1d
+	inc LoadPointerLo
 	bne le486
-	inc $1e
+	inc LoadPointerHi
 le486:
 	asl
 	sta Temp13
 	asl
 	adc Temp13
-	adc $21
-	sta $21
+	adc ScorePointerLo
+	sta ScorePointerLo
 	bcc le494
-	inc $22
+	inc ScorePointerHi
 le494:
-	txa
-	pha
+	phx
 	ldx #5
 	ldy #0
 le49a:
@@ -3516,9 +3516,9 @@ le49a:
 	sty Temp13
 	ldy #0
 	lda (LoadPointer),y
-	inc $1d
+	inc LoadPointerLo
 	bne le4b1
-	inc $1e
+	inc LoadPointerHi
 le4b1:
 	ldy Temp13
 	sta (DataPointer),y
@@ -3531,61 +3531,59 @@ le4b1:
 	lda Temp15
 	clc
 	adc (ScorePointer),y
-	inc $21
+	inc ScorePointerLo
 	bne le4ca
-	inc $22
+	inc ScorePointerHi
 le4ca:
 	ldy Temp13
 	sta (DataPointer),y
 	iny
 	dex
 	bpl le49a
-	pla
-	tax
+	plx
 	rts
 
 le4d5:
-	txa
-	pha
-	ldy $1f
+	phx
+	ldy DataPointerLo
 	lda ObjectYPosInt,x
-	sta $0200,y
-	sta $0204,y
+	sta OAM+0,y
+	sta OAM+4,y
 	clc
 	adc #8
-	sta $0208,y
-	sta $020c,y
+	sta OAM+8,y
+	sta OAM+12,y
 	lda #$f0
-	sta $0210,y
-	sta $0214,y
+	sta OAM+16,y
+	sta OAM+20,y
 	lda ObjectXPosInt,x
-	sta $0203,y
-	sta $020b,y
+	sta OAM+3,y
+	sta OAM+11,y
 	clc
 	adc #8
-	sta $0207,y
-	sta $020f,y
+	sta OAM+7,y
+	sta OAM+15,y
 	lda ObjectYPosInt,x
 	cmp #$d0
 	lda #3
 	bcc le50d
 	lda #$23
 le50d:
-	sta $0202,y
+	sta OAM+2,y
 	lda ObjectStatus,x
 	bne le553
-	lda $0202,y
-	sta $0206,y
-	sta $020a,y
-	sta $020e,y
+	lda OAM+2,y
+	sta OAM+6,y
+	sta OAM+10,y
+	sta OAM+14,y
 	lda #$da
-	sta $0201,y
+	sta OAM+1,y
 	lda #$db
-	sta $0205,y
+	sta OAM+5,y
 	lda #$dc
-	sta $0209,y
+	sta OAM+9,y
 	lda #$dd
-	sta $020d,y
+	sta OAM+13,y
 	ldx $1f
 	lda FrameCounter
 	and #$20
@@ -3593,30 +3591,29 @@ le50d:
 	lda FrameCounter
 	and #$40
 	bne le54a
-	inc $0200,x
-	inc $0204,x
+	inc OAM+0,x
+	inc OAM+4,x
 	bne le550
 le54a:
-	inc $0203,x
-	inc $020b,x
+	inc OAM+3,x
+	inc OAM+11,x
 le550:
-	pla
-	tax
+	plx
 	rts
 
 le553:
-	lda $0202,y
+	lda OAM+2,y
 	ora #$40
-	sta $0206,y
+	sta OAM+6,y
 	ora #$80
-	sta $020e,y
+	sta OAM+14,y
 	and #$bf
-	sta $020a,y
+	sta OAM+10,y
 	lda #$de
-	sta $0201,y
-	sta $0205,y
-	sta $0209,y
-	sta $020d,y
+	sta OAM+1,y
+	sta OAM+5,y
+	sta OAM+9,y
+	sta OAM+13,y
 	dec ObjectUnknown1,x
 	bpl le584
 	lda #$ff
@@ -3626,17 +3623,16 @@ le553:
 	lda #4
 	sta $f1
 le584:
-	pla
-	tax
+	plx
 	rts
 
 le587:
 	ldx $bb
 	bmi :+
 	lda le5c5,x
-	sta $1d
+	sta LoadPointerLo
 	lda le5ca,x
-	sta $1e
+	sta LoadPointerHi
 	ldy #0
 	ldx #0
 le599:
@@ -5397,10 +5393,10 @@ lf2c5:
 	jsr UpdateRNG
 	jsr ObjectManage
 	jsr FishManage
-	jsr lc790_cloudbolt
-	jsr lc831_cloudblink
-	jsr lc8b7
-	jsr ld8dd
+	jsr ManageCloudBolt
+	jsr ManageCloudBlink
+	jsr ManageSparks
+	jsr ManageScorePopup
 	jsr le587
 	jsr lcb74_propellermanage
 	inc StarUpdateFlag
@@ -5598,7 +5594,8 @@ lf43d:
 lf43f:	; Empty tiles lower PPUADDR
 	.BYTE $88,$a8,$e8
 lf442:	; "   GAME  OVER   "
-	.BYTE $21,$c8,$10,$24,$24,$24,$10,$0a,$16,$0e,$24,$24,$18,$1f,$0e,$1b,$24,$24,$24
+	.BYTE $21,$c8,$10	;16 bytes to $21C8
+	.BYTE $24,$24,$24,$10,$0a,$16,$0e,$24,$24,$18,$1f,$0e,$1b,$24,$24,$24
 lf455:	; Tile Attributes?
 	.BYTE $23,$da,$04,$aa,$aa,$aa,$aa
 
