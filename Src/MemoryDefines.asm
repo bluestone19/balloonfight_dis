@@ -62,7 +62,7 @@ ScoreDigit5			.set $48
 ; $004A = Balloon Trip Rank x0
 ; $004B = ?
 
-; $00A3 = Amount of Clouds (zero-based) (-1 if none)
+CloudCount			.set $A3	; Amount of Clouds (zero-based) (-1 if none)
 ; $00A4 = Selected Cloud ID? (Blink?)
 ; $00A5 = Selected Cloud ID?? (Lightning?)
 ; $00A6-$00A8 = Cloud 16x16 Tile Attribute $23xx (Top?)
@@ -71,7 +71,7 @@ ScoreDigit5			.set $48
 ; $00AF-$00B1 = Cloud 16x16 Tile Attribute $23xx
 ; $00B2-$00B4 = Cloud related
 ; $00B5-$00B7 = Cloud related
-; $00B8 = Lightning Bolt Countdown
+SparkCountdown		.set $B8
 ; $00B9 = Unused?
 SparkIntensity		.set $BA	;Speed of sparks
 SplashAnim			.set $BB	;Water Splash Animation Frame
@@ -206,7 +206,7 @@ PPUAddressLo		.set $51
 PPUBufferPosition	.set $52
 PPUBufferSize		.set $53
 
-PPUBlockAddrLow		.set $54
+PPUBlockAddrLo		.set $54
 PPUBlockAddrHi		.set $55
 
 TempBlockSize		.set $56

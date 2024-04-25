@@ -32,9 +32,9 @@
 	ldy #>addr
 	.endmacro
 
-.macro inyr rep
+.macro incr rep, var
 	.repeat rep
-		iny
+		inc	var
 		.endrep
 	.endmacro
 
@@ -44,15 +44,27 @@
 		.endrep
 	.endmacro
 
-.macro deyr rep
+.macro inyr rep
 	.repeat rep
-		dey
+		iny
+		.endrep
+	.endmacro
+
+.macro decr rep, var
+	.repeat rep
+		dec var
 		.endrep
 	.endmacro
 
 .macro dexr rep
 	.repeat rep
 		dex
+		.endrep
+	.endmacro
+
+.macro deyr rep
+	.repeat rep
+		dey
 		.endrep
 	.endmacro
 

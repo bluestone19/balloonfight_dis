@@ -543,7 +543,7 @@ lc378:
 BalloonTripGameOver:
 	jsr RankScoreUpdate
 	lda #$01	; \ Play SFX
-	sta SFX1Req		; /
+	sta SFX1Req	; /
 	jsr FinishFrame
 	lda #$02		; \ Play Stage Clear jingle
 	sta MusicReq	; /
@@ -1034,41 +1034,46 @@ lc70d:
 ;----------------------
 
 lc716_initcloudbolt:
-	ldx #1		; \
-lc718:
-	lda #$ff	; | Reset 2 Lightning Bolts
-	sta $0530,x	; |
-	sta $0544,x	; |
-	dex			; |
-	bpl lc718	; /
+	ldx #1				; \
+	@InitLoop:
+		lda #$ff		; | Reset 2 Lightning Bolts
+		sta $0530,x		; |
+		sta $0544,x		; |
+		dex				; |
+		bpl @InitLoop	; /
 	jsr lc77a_cloudboltselect	; Select Cloud that sends the bolt?
 lc726:
-	ldx $3c		; \
-	cpx #$18	; | There are only 25 (#$18) phases
-	bcc lc72e	; | X = Current Phase OR X = 24
-	ldx #$18	; /
-lc72e:
-	lda lc748,x			; \ Change Lightning Bolt Intensity
-	sta SparkIntensity	; /
-	lda lc761,x	; \ Change Lightning Bolt Countdown
-	sta $b8		; / depending on current phase
+	ldx CurrentPhaseNum	; \
+	cpx 24				; | There are only 25 (#$18) levels of spark intensity
+	bcc @Continue		; | X = Current Phase OR X = 24
+	ldx 24				; /
+	@Continue:
+	lda SparkIntensityData,x	; \ Change Lightning Bolt Intensity
+	sta SparkIntensity			; /
+	lda SparkCountdownData,x	; \ Change Lightning Bolt Countdown
+	sta $b8						; / depending on current phase
 	lda #$f0	; \
 	sta $02e0	; | Hide last 3 sprites
 	sta $02e4	; |
 	sta $02e8	; /
-	lda #$03
+	lda #3
 	jmp lc856	; Blink selected cloud
-lc748:
-    ;25 bytes
-.BYTE $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01,$01,$01,$01,$01
-.BYTE $01,$02,$01,$01,$01,$01,$01,$01,$01,$01
-lc761:
-    ;25 bytes
-.BYTE $0f,$0f,$0c,$0c,$0c,$0c,$0a,$0a,$0a,$0a,$0c,$0c,$0a,$0a,$0a
-.BYTE $08,$0a,$0a,$08,$08,$08,$08,$08,$08,$05
+
+SparkIntensityData:
+	.BYTE 0,0,0,0,0
+	.BYTE 0,0,0,0,0
+	.BYTE 1,1,1,1,1
+	.BYTE 1,2,1,1,1
+	.BYTE 1,1,1,1,1
+SparkCountdownData:
+	.BYTE 15,15,12,12,12
+	.BYTE 12,10,10,10,10
+	.BYTE 12,12,10,10,10
+	.BYTE 08,10,10,08,08
+	.BYTE 08,08,08,08,05
 
 lc77a_cloudboltselect:	; Randomly select a cloud to send bolts?
-	lda $a3		; \ If there are clouds then select one
+	lda CloudCount		; \ If there are clouds then select one
 	bpl lc781	; / else don't do anything
 lc77e:
 	sta $a4		; Select Cloud
@@ -1076,11 +1081,11 @@ lc77e:
 lc781:
 	jsr UpdateRNG
 lc784:
-	cmp $a3		; \ If RNG value <= amount of Clouds
+	cmp CloudCount		; \ If RNG value <= amount of Clouds
 	bcc lc77e	; | then select cloud based on value
 	beq lc77e	; /
 	clc			; \ Subtract to the RNG
-	sbc $a3		; | the amount of clouds
+	sbc CloudCount		; | the amount of clouds
 	jmp lc784	; / until the condition is right
 
 ManageCloudBolt:
@@ -2438,7 +2443,7 @@ ClearPPU:	;Clear PPU?
 	jsr ClearNametable	; / Clear Nametable 1
 	jsr EnableNMI
 	jsr UploadPPUAndMask
-	ldx #$3F
+	ldx #63
 	ldy #0
 	sty StarUpdateFlag
 	@ClearLoop:
@@ -2475,109 +2480,103 @@ InitGameMode:
 	beq @Skip
 	jmp InitBalloonTrip
 	@Skip:	; Initialize Balloon Fight Game Mode
-	ldy CurrentPhaseHeader		; \
-	lda PhasePointersLow,y		; |
-	sta LoadPointerLo			; | Load Phase Graphics
-	lda PhasePointersHigh,y		; |
-	sta LoadPointerHi			; |
+	ldy CurrentPhaseHeader	; \
+	lda PhasePointersLow,y	; |
+	sta LoadPointerLo		; | Load Phase Graphics
+	lda PhasePointersHigh,y	; |
+	sta LoadPointerHi		; |
 	jsr UploadBackground	; /
+	ldx #0							; \
+	@CloudLoop:
+		jsr GetByteFromLoadPointer	; |
+		cmp #$ff					; | Load Clouds (XX YY)
+		beq @FinishClouds			; | until one has $FF as
+		sta PPUBlockAddrLo			; | X coordinate
+		jsr GetByteFromLoadPointer	; |
+		sta PPUBlockAddrHi			; /
+		ldy #3							; \
+		@Loop1:
+			jsr ld4fb_setppuaddr_render	; |
+			lda #4						; |
+			sta Temp12					; | Render Cloud
+			lda CloudTiles,y			; | to the screen
+			@Loop2:
+				sta PPUDATA				; |
+				clc						; |
+				adc #4					; |
+				dec Temp12				; |
+				bne @Loop2				; |
+			inc PPUBlockAddrHi			; |
+			dey							; |
+			bpl @Loop1					; /
+		lda PPUBlockAddrHi
+		sec
+		sbc #4
+		sta PPUBlockAddrHi
+		jsr ld51c
+		sta $a6,x
+		incr 2, PPUBlockAddrLo
+		jsr ld51c
+		sta $a9,x
+		incr 2, PPUBlockAddrHi
+		jsr ld51c
+		sta $af,x
+		decr 2, PPUBlockAddrLo
+		jsr ld51c
+		sta $ac,x
+		stx $a4
+		lda #3
+		jsr lc856
+		jsr UploadPPUAndMaskBuffer
+		ldx $a4
+		lda PPUBlockAddrLo
+		aslr 3
+		clc
+		adc #$10
+		sta $b2,x
+		lda PPUBlockAddrHi
+		aslr 3
+		sta $b5,x
+		inx
+		jmp @CloudLoop	; Load another cloud data
+	@FinishClouds:
+	dex				; \ Write amount of clouds to RAM
+	stx CloudCount	; /
 	ldx #0						; \
-ld2b1:
-	jsr GetByteFromLoadPointer	; |
-	cmp #$ff					; | Load Clouds (XX YY)
-	beq ld322					; | until one has $FF as
-	sta $54						; | X coordinate
-	jsr GetByteFromLoadPointer	; |
-	sta $55						; /
-	ldy #3							; \
-	@Loop1:
-		jsr ld4fb_setppuaddr_render	; |
-		lda #4						; |
-		sta Temp12					; | Render Cloud
-		lda CloudTiles,y			; | to the screen
-		@Loop2:
-			sta PPUDATA				; |
-			clc						; |
-			adc #4					; |
-			dec Temp12				; |
-			bne @Loop2				; |
-		inc $55						; |
-		dey							; |
-		bpl @Loop1					; /
-	lda $55
-	sec
-	sbc #$04
-	sta $55
-	jsr ld51c
-	sta $a6,x
-	inc $54
-	inc $54
-	jsr ld51c
-	sta $a9,x
-	inc $55
-	inc $55
-	jsr ld51c
-	sta $af,x
-	dec $54
-	dec $54
-	jsr ld51c
-	sta $ac,x
-	stx $a4
-	lda #$03
-	jsr lc856
-	jsr UploadPPUAndMaskBuffer
-	ldx $a4
-	lda $54
-	aslr 3
-	clc
-	adc #$10
-	sta $b2,x
-	lda $55
-	aslr 3
-	sta $b5,x
-	inx
-	jmp ld2b1	; Load another cloud data
-ld322:
-	dex		; \ Write amount of clouds to RAM
-	stx $a3	; /
-	ldx #$00							; \
-ld327:
-	jsr GetByteFromLoadPointer	; |
-	cmp #$ff							; | Load Propellers (XX YY TT)
-	beq ld37e							; | until one has $FF as
-	sta $54								; | X coordinate
-	jsr GetByteFromLoadPointer	; |
-	sta $55								; |
-	jsr GetByteFromLoadPointer	; |
-	sta $05fa,x							; /
-	lda $54
-	aslr 3
-	adc #$0c
-	sta $05d2,x
-	lda $55
-	aslr 3
-	adc #$0c
-	sta $05dc,x
-	lda #$00
-	sta $0604,x
-	jsr ld4fb_setppuaddr_render
-	sta $05e6,x
-	lda Temp13
-	sta $05f0,x
-	jsr ld56c
-	jsr ld53c
-	inc $54
-	inc $54
-	jsr ld53c
-	inc $55
-	inc $55
-	jsr ld53c
-	dec $54
-	dec $54
-	jsr ld53c
-	inx
-	jmp ld327	; Load another propeller data
-ld37e:
+	@PropellerLoop:
+		jsr GetByteFromLoadPointer	; |
+		cmp #$ff					; | Load Propellers (XX YY TT)
+		beq @FinishPropellers		; | until one has $FF as
+		sta PPUBlockAddrLo			; | X coordinate
+		jsr GetByteFromLoadPointer	; |
+		sta PPUBlockAddrHi			; |
+		jsr GetByteFromLoadPointer	; |
+		sta $05fa,x					; /
+		lda PPUBlockAddrLo
+		aslr 3
+		adc #12
+		sta $05d2,x
+		lda PPUBlockAddrHi
+		aslr 3
+		adc #12
+		sta $05dc,x
+		lda #0
+		sta $0604,x
+		jsr ld4fb_setppuaddr_render
+		sta $05e6,x
+		lda Temp13
+		sta $05f0,x
+		jsr ld56c
+		jsr ld53c
+		incr 2, PPUBlockAddrLo
+		jsr ld53c
+		incr 2, PPUBlockAddrHi
+		jsr ld53c
+		decr 2, PPUBlockAddrLo
+		jsr ld53c
+		inx
+		jmp @PropellerLoop	; Load another propeller data
+	@FinishPropellers:
 	dex			; \ Write amount of propellers to RAM
 	stx $05d1	; /
 	jsr GetByteFromLoadPointer	; \
@@ -2613,20 +2612,20 @@ LoadEnemy:
 		bpl @LoadLoop	; Load another enemy data
 LoadCollision:
 	jsr GetByteFromLoadPointer	; \ Load Amount of Platforms
-	sta PlatformCount					; /
+	sta PlatformCount			; /
 	jsr GetByteFromLoadPointer	; \
-	sta LeftPointerLo					; | Load Platform Collision Pointer
+	sta LeftPointerLo			; | Load Platform Collision Pointer
 	jsr GetByteFromLoadPointer	; | Left Side
-	tay									; |
-	sta LeftPointerHi					; /
+	tay							; |
+	sta LeftPointerHi			; /
 	lda LeftPointerLo			; \
-	jsr ld48c_nextplatformptr	; | Load Right Side Platform Collision Pointer
+	jsr NextPlatformPointer	; | Load Right Side Platform Collision Pointer
 	sta RightPointerLo			; |
 	sty RightPointerHi			; /
-	jsr ld48c_nextplatformptr	; \
+	jsr NextPlatformPointer	; \
 	sta TopPointerLo			; | Load Top Side Platform Collision Pointer
 	sty TopPointerHi			; /
-	jsr ld48c_nextplatformptr	; \
+	jsr NextPlatformPointer	; \
 	sta BottomPointerLo			; | Load Bottom Side Platform Collision Pointer
 	sty BottomPointerHi			; /
 ld3e1:
@@ -2712,7 +2711,7 @@ RedBalloonPalette:
 	.BYTE $0f,$07,$0c,$1c	; Black (BG), Brown,		Dark Blue,	Dark Cyan
 	.BYTE $0f,$15,$30,$26	; Black (BG), Red,			White,		Light Orange
 
-ld48c_nextplatformptr:
+NextPlatformPointer:
 	sec
 	adc PlatformCount
 	bcc :+
@@ -5479,11 +5478,11 @@ lf366:		; Manage Game Over
 	lda #$01		; \ Play Game Over jingle
 	sta MusicReq	; /
 lf36a:
-	lda #$00
+	lda #0
 	sta BTXScroll		; Reset PPUSCROLL Shadow
 	sta PPUCTRLShadowBT	; Reset PPUCTRL Shadow
 	sta Temp15		; Set time
-	jsr lf40b_uploadgameovertext
+	jsr DrawGameOverText
 lf375:
 	jsr FinishFrame
 	jsr PollController0	; \ Press START or SELECT
@@ -5537,35 +5536,38 @@ lf3cc_phasedisplay:
 	beq lf3ee				; / every #$20 frames?
 	ldx #$0a	; \
 lf3d4:
-	lda lf3f5,x	; | Copy "PHASE-  " PPU Block
+	lda PhaseText,x	; | Copy "PHASE-  " PPU Block
 	sta $57,x	; |
 	dex			; |
 	bpl lf3d4	; /
-	ldy #$0a		; \
+	ldy #10			; \
 	lda $3c			; | Add 1st digit of
 	sta $43			; | Phase Number
 	jsr DivideByY	; | (Divide by 10)
 	sta $60			; /
-	lda $43				; \ Add 2nd digit of
-	sta $61				; / Phase Number
+	lda $43		; \ Add 2nd digit of
+	sta $61		; / Phase Number
 	jmp CopyPPUTempBlock
 lf3ee:
-	lday lf400				; \ Copy Empty PPU Block
+	lday PhaseTextEmpty	; \ Copy Empty PPU Block
 	jmp CopyPPUBlock	; /
-lf3f5:	; $206C - $08 - "PHASE-  "
-.BYTE $20,$6c,$08,$19,$11,$0a,$1c,$0e,$25,$00,$00
-lf400:	; $206C - $08 - "        "
-.BYTE $20,$6c,$08,$24,$24,$24,$24,$24,$24,$24,$24
 
-lf40b_uploadgameovertext:
+PhaseText:	
+	.BYTE $20,$6c,$08	; $206C - 8 tiles
+	.BYTE $19,$11,$0a,$1c,$0e,$25,$00,$00	; "PHASE-  "
+PhaseTextEmpty:	
+	.BYTE $20,$6c,$08	; $206C - 8 tiles
+	.BYTE $24,$24,$24,$24,$24,$24,$24,$24	; "        "
+
+DrawGameOverText:
 	jsr FinishFrame
-	ldx #$01			; \
-lf410:
-	lda lf43b,x			; | Prepare Game Over
-	ldy lf43b+2,x		; | PPU blocks
-	jsr CopyPPUBlock	; | to upload
-	dex					; |
-	bpl lf410			; /
+	ldx #1				; \
+	@Loop:
+		lda lf43b,x			; | Prepare Game Over
+		ldy lf43b+2,x		; | PPU blocks
+		jsr CopyPPUBlock	; | to upload
+		dex					; |
+		bpl @Loop			; /
 	ldx #$0f	; \
 lf41e:
 	lda #$24	; | Prepare 16 empty tiles
