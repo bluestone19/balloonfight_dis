@@ -84,9 +84,8 @@ PhaseType			.set $C8	;0 = Regular, 1 = Bonus
 TileScrollCount		.set $C9	;For Balloon Trip
 ScreenScrollCount	.set $CA	;For Balloon Trip
 ; $00CB = ???
-; $00CC = Collision related
+CollisionFlags		.set $CC
 PlatformCount		.set $CD
-; $00CD = Amount of Platforms
 ; $00CE = Unused
 ; $00CF = Unused
 
