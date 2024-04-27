@@ -75,7 +75,7 @@ SparkCountdown		.set $B8
 ; $00B9 = Unused?
 SparkIntensity		.set $BA	;Speed of sparks
 SplashAnim			.set $BB	;Water Splash Animation Frame
-; $00BC = ?
+SplashXOffset		.set $BC	;The X position of the splash sprite
 
 ScrollLockTimer		.set $C5	;Balloon Trip Scroll Lock Timer
 ; $00C6 = ???
@@ -288,11 +288,12 @@ SparkYVelFrac		.set $051C	;$051C-$052F
 SparkAnim			.set $0530	;$0530-$0543
 SparkUnknown		.set $0544	;$0544-$0557
 
-; $0558 = Bonus Phase Intensity Level
-; $0559 = Bonus Phase / Balloon Trip x00 points per balloon
-; $055A = Balloon Rising Speed
-; $055B = Bonus Phase Super Bonus x0000 points
-; $055C = Bonus Phase Super Bonus 0x000 points
+BonusPhaseIntensity	.set $0558
+BalloonPts			.set $0559	; In hundreds of points
+BalloonRiseSpeed	.set $055A
+SuperBonusPtsUpper	.set $055B
+SuperBonusPtsUpper	.set $055C
+
 ; $055D-$0566 = Balloon GFX (Type? Status?)
 ; $0567-$0570 = Balloon X positions
 ; $0571-$057A = Balloon?
@@ -304,12 +305,12 @@ P1BonusBalloons		.set $05CD
 P2BonusBalloons		.set $05CE
 P1TripBalloons		.set $05CE
 
-; $05D1 = Amount of Propellers
-; $05D2-$05DB = Propeller X positions
-; $05DC-$05E5 = Propeller Y positions
+PropellerCount		.set $05D1
+PropellerXPos		.set $05D2	; $05D2-$05DB
+PropellerYPos		.set $05DC	; $05DC-$05E5
 ; $05E6-$05EF = ?
 ; $05F0-$05F9 = ?
-; $05FA-$0603 = Propellers Type
+PropellerType		.set $05FA	; $05FA-$0603
 
 
 ; $0618-$0619 = ?

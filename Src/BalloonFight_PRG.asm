@@ -424,7 +424,7 @@ lc289:
 	ldy SparkIntensity	; \
 	iny					; | Increment
 	tya					; | Lightning Bolt Intensity Level
-	and #$03			; |
+	and #3				; |
 	sta SparkIntensity	; /
 lc2bc:
 	ldx ScreenScrollCount		; \
@@ -461,7 +461,7 @@ lc2f7:
 	bmi lc317	; /
 	lda ScrollLockTimer	; \ If Scrolling is locked
 	bne lc314			; /
-	jsr lc9b6_boltupdate	; Update Lightning Bolt Position
+	jsr UpdateSparkPos	; Update Lightning Bolt Position
 	lda $04a4,x	; \
 	cmp #2		; | If Y pos < #$02
 	bcs lc30d	; | then
@@ -750,7 +750,7 @@ BTStartLayout:	; Screen Premade Layout Data
 	.BYTE $00
 
 lc527_setbonuspts10:
-	jsr ld0e2_setbonusphase	; Set up Balloon Points
+	jsr SetBonusPhase	; Set up Balloon Points
 	asl $0559	; \
 	lda $0559	; | ([$0559] * 2) * 5
 	asl			; | Multiply Balloon Points
@@ -1232,123 +1232,118 @@ lc8ab:
 lc8b1:
 	.BYTE $00,$00,$01,$01,$01,$01
 
-ManageSparks:
+ManageSparks:	; Only for Games A & B. Balloon Trip not included
 	ldx #1
 lc8b9:
 	lda SparkAnim,x
 	bpl @Continue
 	jmp ManageNextSpark
 	@Continue:
-	lda $0544,x
+	lda SparkUnknown,x
 	bmi lc941
 	tay
-	txa
-	pha
+	phx
 	ldx $a5
 	lda $b2,x
 	adc lc9e5,y
-	sta $02e3
-	sta $02e7
-	sta $02eb
+	sta OAM+$e3
+	sta OAM+$e7
+	sta OAM+$eb
 	lda $b5,x
 	adc lc9f5,y
-	sta $02e0
+	sta OAM+$e0
 	adc lca05,y
-	sta $02e4
+	sta OAM+$e4
 	adc lca05,y
-	sta $02e8
+	sta OAM+$e8
+	tya		; \
+	and #3	; |	X = Y AND 3
+	tax		; /
 	tya
-	and #$03
-	tax
-	tya
-	lsr
-	lsr
+	lsrr 2
 	tay
 	lda FrameCounter
-	lsr
-	lsr
+	lsrr 2
 	bcs lc8ff
-	tya
-	adc #$05
-	tay
+	tya		; \
+	adc #5	; | Add 5 to Y
+	tay		; /
 lc8ff:
 	lda lca15,y
-	sta $02e1
+	sta OAM+$e1
 	lda lca1f,y
-	sta $02e5
+	sta OAM+$e5
 	lda lca29,y
-	sta $02e9
+	sta OAM+$e9
 	lda lca33,x
-	sta $02e2
-	sta $02e6
-	sta $02ea
-	pla
-	tax
+	sta OAM+$e2
+	sta OAM+$e6
+	sta OAM+$ea
+	plx
 	lda FrameCounter
-	and #$07
+	and #7
 	bne lc937
-	lda $0544,x
+	lda SparkUnknown,x
 	clc
-	adc #$04
-	sta $0544,x
+	adc #4
+	sta SparkUnknown,x
 	cmp #$14
 	bcc lc937
 	lda #$ff
-	sta $0544,x
+	sta SparkUnknown,x
 lc937:
-	lda $0544,x
+	lda SparkUnknown,x
 	cmp #$10
 	bcs lc941
 	jmp ManageNextSpark
 lc941:
-	jsr lc9b6_boltupdate
-	lda $0490,x
+	jsr UpdateSparkPos
+	lda SparkXPosInt,x
 	cmp #$02
 	bcs lc94e
 	jsr SparkBounceXSFX
 lc94e:
-	lda $0490,x
+	lda SparkXPosInt,x
 	cmp #$f7
 	bcc lc958
 	jsr SparkBounceXSFX
 lc958:
-	lda $04a4,x
+	lda SparkYPosInt,x
 	cmp #$02
 	bcs lc962
 	jsr SparkBounceYSFX
 lc962:
-	lda $04a4,x
+	lda SparkYPosInt,x
 	cmp #$e0
 	bcc lc976
 	lda #$ff
-	sta $0530,x
+	sta SparkAnim,x
 	lda #$f0
-	sta $04a4,x
+	sta SparkYPosInt,x
 	jmp ManageNextSpark
 lc976:
 	jsr SparkPlatformCollision
 	jsr lcb1c_bolt_playercollision
-	ldy $0530,x
+	ldy SparkAnim,x
 	iny
 	tya
 	and #$07
-	sta $0530,x
-	ldy $0530,x
+	sta SparkAnim,x
+	ldy SparkAnim,x
 	lda lc9dd,y
 	sta Temp12
 	txa
-	asl
-	asl
+	aslr 2
 	clc
 	tay
-	lda $04a4,x
+	lda SparkYPosInt,x
 	cmp #$d0
-	sta $0200,y
-	lda $0490,x
-	sta $0203,y
+	sta OAM,y
+	lda SparkXPosInt,x
+	sta OAM+3,y
 	lda Temp12
-	sta $0201,y
-	lda #$00
+	sta OAM+1,y
+	lda #0
 	bcc lc9ac
 	lda #$20
 lc9ac:
@@ -1359,21 +1354,21 @@ lc9ac:
 		jmp lc8b9
 	:rts
 
-lc9b6_boltupdate:
-	lda $0508,x	; \
-	clc			; | Update X Position (Frac)
-	adc $04b8,x	; |
-	sta $04b8,x	; /
-	lda $04e0,x	; \
-	adc $0490,x	; | Update X Position (Int)
-	sta $0490,x	; /
-	lda $051c,x	; \
-	clc			; | Update Y Position (Frac)
-	adc $04cc,x	; |
-	sta $04cc,x	; /
-	lda $04f4,x	; \
-	adc $04a4,x	; | Update Y Position (Int)
-	sta $04a4,x	; /
+UpdateSparkPos:
+	lda SparkXVelFrac,x	; \
+	clc					; | Update X Position (Frac)
+	adc SparkXPosFrac,x	; |	X = X + XVel
+	sta SparkXPosFrac,x	; /
+	lda SparkXVelInt,x	; \
+	adc SparkXPosInt,x	; | Update X Position (Int)
+	sta SparkXPosInt,x	; /
+	lda SparkYVelFrac,x	; \
+	clc					; | Update Y Position (Frac)
+	adc SparkYPosFrac,x	; | Y = Y + YVel
+	sta SparkYPosFrac,x	; /
+	lda SparkYVelInt,x	; \
+	adc SparkYPosInt,x	; | Update Y Position (Int)
+	sta SparkYPosInt,x	; /
 	rts
 
 lc9dd:
@@ -1454,7 +1449,7 @@ SparkPlatformCollision:
 			bcc @NoCollision	; Platform(y).BottomY < Spark(x).Y (Spark too far below)
 			sbc #3
 			cmp SparkYPosInt,x
-			bcs @lcaad	; Platform(y).BottomY-3 >= Spark(x).Y
+			bcs @CheckLeft	; Platform(y).BottomY-3 >= Spark(x).Y
 			lda #2		; If Spark X's Y Pos is 0-2px above bottom of Platform Y, set bit 2 of Collision Flags
 		@SetVerticalFlag:
 			sta CollisionFlags
@@ -1468,11 +1463,11 @@ SparkPlatformCollision:
 		@LeftEdgeValid:
 		lda (RightPointer),y	; Get right bound of platform Y
 		cmp SparkXPosInt,x
-		bcs @lcaad	; Platform(y).RightX >= Spark(x).X
+		bcs @CheckLeft	; Platform(y).RightX >= Spark(x).X
 		@ResetFlags:
 			lda #0				; \
 			sta CollisionFlags	; / Reset Collision Flags
-		@lcaad:
+		@CheckLeft:
 		lda (LeftPointer),y	; Get left bound of platform Y
 		cmp #16
 		beq @LeftEdgeValid2	; If the left edge is 16 (Up against edge of screen)
@@ -1485,7 +1480,7 @@ SparkPlatformCollision:
 		bcc @LeftEdgeValid2
 		lda CollisionFlags
 		ora #4
-		bne @lcadb
+		bne @SetHorizontalFlag
 		@LeftEdgeValid2:
 		lda (RightPointer),y	; Get right bound of platform Y
 		cmp #$FF
@@ -1496,7 +1491,7 @@ SparkPlatformCollision:
 		bcs @NoCollision
 		lda CollisionFlags
 		ora #8
-		@lcadb:
+		@SetHorizontalFlag:
 		sta CollisionFlags
 		@NoCollision:
 		lda CollisionFlags
@@ -1508,29 +1503,29 @@ SparkPlatformCollision:
 	:rts
 	@CheckFlags:
 		lsr CollisionFlags
-		bcc @lcaf4
+		bcc @SkipTopBounce
 		lda SparkYVelInt,x
-		bmi @lcaf4
+		bmi @SkipTopBounce
 		jsr SparkBounceYSFX
-	@lcaf4:
+	@SkipTopBounce:
 		lsr CollisionFlags
-		bcc @lcb00
+		bcc @SkipBottomBounce
 		lda SparkYVelInt,x
-		bpl @lcb00
+		bpl @SkipBottomBounce
 		jsr SparkBounceYSFX
-	@lcb00:
+	@SkipBottomBounce:
 		lsr CollisionFlags
-		bcc @lcb0c
+		bcc @SkipLeftBounce
 		lda SparkXVelInt,x
-		bmi @lcb0c
+		bmi @SkipLeftBounce
 		jsr SparkBounceXSFX
-	@lcb0c:
+	@SkipLeftBounce:
 		lsr CollisionFlags
-		bcc @lcb18
+		bcc @SkipRightBounce
 		lda SparkXVelInt,x
-		bpl @lcb18
+		bpl @SkipRightBounce
 		jsr SparkBounceXSFX
-	@lcb18:
+	@SkipRightBounce:
 	jmp @CheckNext
 	rts
 
@@ -1582,8 +1577,8 @@ lcb1c_bolt_playercollision:		; Lightning Bolt Player Collision
 ; Propeller code
 ;----------------------
 
-lcb74_propellermanage:
-	ldx $05d1
+PropellerManage:
+	ldx PropellerCount
 	bmi :+
 lcb79:
 	jsr lcba8
@@ -1628,7 +1623,7 @@ lcbc1:
 	clc
 	adc #8
 	sec
-	sbc $05d2,x
+	sbc PropellerXPos,x
 	sta Temp12
 	jsr GetAbsoluteValue
 	cmp #$12
@@ -1637,7 +1632,7 @@ lcbc1:
 	clc
 	adc #$0c
 	sec
-	sbc $05dc,x
+	sbc PropellerYPos,x
 	sta Temp13
 	jsr GetAbsoluteValue
 	cmp #$12
@@ -1754,14 +1749,12 @@ lccb8:
 	:rts
 
 lccbf:
-	txa
-	pha
+	phx
 	tya
 	tax
 	inc $cb
 	jsr le983
-	pla
-	tax
+	plx
 	rts
 
 lcccb:
@@ -1793,13 +1786,11 @@ lcccb:
 	lda PropellerTileLR,y
 	sta $5c
 lcd0f:
-	tya
-	pha
+	phy
 	lda #$57
 	ldy #0
 	jsr CopyPPUBlock
-	pla
-	tay
+	ply
 	lda $58
 	clc
 	adc #$20
@@ -1809,23 +1800,23 @@ lcd0f:
 	:rts
 
 PropellerTileUL:
-.BYTE $a1,$24,$24,$24
+	.BYTE $a1,$24,$24,$24
 PropellerTileUM:
-.BYTE $a2,$9e,$ab,$24
+	.BYTE $a2,$9e,$ab,$24
 PropellerTileUR:
-.BYTE $24,$24,$ac,$24
+	.BYTE $24,$24,$ac,$24
 PropellerTileML:
-.BYTE $a3,$24,$ad,$a8
+	.BYTE $a3,$24,$ad,$a8
 PropellerTileMM:
-.BYTE $a4,$9f,$ae,$a9
+	.BYTE $a4,$9f,$ae,$a9
 PropellerTileMR:
-.BYTE $a5,$24,$af,$aa
+	.BYTE $a5,$24,$af,$aa
 PropellerTileLL:
-.BYTE $24,$24,$b0,$24
+	.BYTE $24,$24,$b0,$24
 PropellerTileLM:
-.BYTE $a6,$a0,$b1,$24
+	.BYTE $a6,$a0,$b1,$24
 PropellerTileLR:
-.BYTE $a7,$24,$24,$24
+	.BYTE $a7,$24,$24,$24
 
 
 ;----------------------
@@ -1848,7 +1839,7 @@ lcd5a:
 	beq lcd60
 	rts
 lcd60:
-	lda $1b
+	lda RNGOutput
 	and #$3f
 	adc #$28
 	sta $05cc
@@ -1875,7 +1866,7 @@ lcd74:
 	lda lceae,y
 	sta $0567,x
 	ldy #0
-	lda $1b
+	lda RNGOutput
 	sta $05b7,x
 	bpl lcda2
 	dey
@@ -1923,7 +1914,7 @@ lcdac:
 lcdfc:
 	lda $0585,x
 	sec
-	sbc $055a
+	sbc BalloonRiseSpeed
 	sta $0585,x
 	bcs lce0b
 	dec $057b,x
@@ -2060,7 +2051,7 @@ lcf0f:
 lcf13:
 	lda #$20
 	sta MusicReq
-	jsr ld0e2_setbonusphase
+	jsr SetBonusPhase
 	jsr InitBalloons
 	ldx TwoPlayerFlag
 lcf1f:
@@ -2099,7 +2090,7 @@ lcf51:
 	ldx #2
 	stx $46
 	jsr lf45e_waityframes
-	lday ld12b
+	lday BonusEndScreenPalette
 	jsr CopyPPUBlock
 	lday ld15a
 	jsr CopyPPUBlock
@@ -2196,7 +2187,7 @@ ld02e:
 	jsr Wait20Frames
 	lda #1
 	sta SFX1Req
-	jsr ld121
+	jsr CheckTotalBonusBalloons
 	bne ld068
 	lday ld170
 	jsr CopyPPUBlock
@@ -2207,9 +2198,9 @@ ld04f:
 	sta $57,x
 	dex
 	bpl ld04f
-	lda $055b
+	lda SuperBonusPtsUpper
 	sta $68
-	lda $055c
+	lda SuperBonusPtsLower
 	sta $69
 	jsr CopyPPUTempBlock
 	lda #$10
@@ -2248,11 +2239,11 @@ ld08e:
 ld0a8:
 	ldx #$0a
 	jsr lf45e_waityframes
-	jsr ld121
+	jsr CheckTotalBonusBalloons
 	bne ld0ce
-	lda $055b
+	lda SuperBonusPtsUpper
 	sta ScoreDigit4
-	lda $055c
+	lda SuperBonusPtsLower
 	sta ScoreDigit5
 	lda TwoPlayerFlag
 	sta TargetUpdateScore
@@ -2277,47 +2268,47 @@ ld0dc:
 	bpl ld0d6
 	jmp lf353
 
-ld0e2_setbonusphase:
-	ldx $0558	; \ Set up Bonus Phase
-	lda ld10d,x	; | according to Intensity (max 4)
-	sta $0559	; | 
-	lda ld112,x	; | Set points per balloon
-	sta $055a	; | Set rising speed
-	lda ld117,x	; | Set super bonus points
-	sta $055b	; |
-	lda ld11c,x	; |
-	sta $055c	; /
-	cpx #4		; \ Increment Bonus Phase Intensity
-	bcs ld104	; | until maximum (4)
-	inc $0558	; /
-ld104:
+SetBonusPhase:
+	ldx BonusPhaseIntensity			; \ Set up Bonus Phase
+	lda BalloonPtsData,x			; | according to Intensity (max 4)
+	sta BalloonPts					; | 
+	lda BalloonRiseSpeedData,x		; | Set points per balloon
+	sta BalloonRiseSpeed			; | Set rising speed
+	lda SuperBonusPtsUpperData,x	; | Set super bonus points
+	sta SuperBonusPtsUpper			; |
+	lda SuperBonusPtsLowerData,x	; |
+	sta SuperBonusPtsLower			; /
+	cpx #4					; \ Increment Bonus Phase Intensity
+	bcs @SkipIncrease		; | until maximum (4)
+	inc BonusPhaseIntensity	; /
+	@SkipIncrease:
 	lda #0				; \
 	sta P1BonusBalloons	; | Initialize Balloon Counters
 	sta P2BonusBalloons	; /
 	rts
 
-ld10d:	; Points per balloon
-.BYTE 3,5,7,7,7
-ld112:	; Rising Speed
-.BYTE $80,$90,$98,$a0,$a8
-ld117:	; Super Bonus x0000 Points
-.BYTE 1,1,2,2,3
-ld11c:	; Super Bonus 0x000 Points
-.BYTE 0,5,0,5,0
+BalloonPtsData:	; Points per balloon
+	.BYTE 3,5,7,7,7
+BalloonRiseSpeedData:	; Rising Speed
+	.BYTE $80,$90,$98,$a0,$a8
+SuperBonusPtsUpperData:	; Super Bonus x0000 Points
+	.BYTE 1,1,2,2,3
+SuperBonusPtsLowerData:	; Super Bonus 0x000 Points
+	.BYTE 0,5,0,5,0
 
-ld121:
+CheckTotalBonusBalloons:
 	lda P1BonusBalloons
 	clc
 	adc P2BonusBalloons
-	cmp #$14
+	cmp #20
 	rts
 
-ld12b:
-.BYTE $3f,$00,$10
-.BYTE $0f,$30,$30,$30
-.BYTE $0f,$30,$27,$15
-.BYTE $0f,$30,$02,$21
-.BYTE $0f,$16,$16,$16
+BonusEndScreenPalette:
+	.BYTE $3f,$00,$10	;$3F00, 16 bytes
+	.BYTE $0f,$30,$30,$30	;White, 	White, 		White
+	.BYTE $0f,$30,$27,$15	;White, 	Orange, 	Magenta
+	.BYTE $0f,$30,$02,$21	;White,		Blue,		Cyan
+	.BYTE $0f,$16,$16,$16	;Red,		Red,		Red
 
 ld13e:
 .BYTE $21,$73,$0b,$29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26
@@ -2336,7 +2327,7 @@ ld19e:
 .BYTE $50,$70
 
 ld1a0:
-	ldx #$1c
+	ldx #28
 ld1a2:
 	lda ld13e,x
 	sta $57,x
@@ -2345,7 +2336,7 @@ ld1a2:
 	ldx #4
 	ldy P1BonusBalloons
 	jsr ld1dc
-	ldx #$12
+	ldx #18
 	ldy P2BonusBalloons
 	jsr ld1dc
 	jsr CopyPPUTempBlock
@@ -2354,16 +2345,16 @@ ld1a2:
 	rts
 
 ld1c2:
-	lda #$65
+	lda #101
 	ldy #0
 	jmp CopyPPUBlock
 ld1c9:
 	ldy #0
 ld1cb:
-	cmp #$0a
+	cmp #10
 	bcc ld1d5
 	iny
-	sbc #$0a
+	sbc #10
 	jmp ld1cb
 ld1d5:
 	sty $5a
@@ -2375,16 +2366,16 @@ ld1dc:
 	lda $0559
 	clc
 	adc $59,x
-	cmp #$0a
+	cmp #10
 	bcc ld1ed
-	sbc #$0a
+	sbc #10
 	inc $58,x
 ld1ed:
 	sta $59,x
 	lda $58,x
-	cmp #$0a
+	cmp #10
 	bcc ld1fb
-	sbc #$0a
+	sbc #10
 	inc $57,x
 	sta $58,x
 ld1fb:
@@ -2394,10 +2385,10 @@ ld1fe:
 ld200:
 	lda $57,x
 	beq ld208
-	cmp #$24
+	cmp #36
 	bne :+
 ld208:
-	lda #$24
+	lda #36
 	sta $57,x
 	inx
 	iny
@@ -2657,7 +2648,7 @@ ld3ed_setpalette:
 	@Next:
 	jmp CopyPPUTempBlock
 	@LoadBonusPalette:
-		ldx $0558	; ...If Bonus Phase
+		ldx BonusPhaseIntensity	; ...If Bonus Phase
 		lda BalloonPalPointerLower,x	; \
 		sta LoadPointerLo				; | Select Balloon Palette
 		lda BalloonPalPointerUpper,x	; | based on Intensity Level
@@ -3625,45 +3616,45 @@ le584:
 	plx
 	rts
 
-le587:
-	ldx $bb
+SplashManage:
+	ldx SplashAnim
 	bmi :+
-	lda le5c5,x
+	lda SplashAnimLo,x
 	sta LoadPointerLo
-	lda le5ca,x
+	lda SplashAnimHi,x
 	sta LoadPointerHi
 	ldy #0
 	ldx #0
-le599:
-	lda (LoadPointer),y
-	sta $02e0,x
-	iny
-	inx
-	cmp #$f0
-	bne le5a7
-	inxr 3
-le5a7:
-	cpx #$10
-	bne le599
-	ldy #$0f
-le5ad:
-	lda $02e0,y
-	clc
-	adc $bc
-	sta $02e0,y
-	deyr 4
-	bpl le5ad
+	@Loop1:
+		lda (LoadPointer),y
+		sta OAM+$e0,x
+		iny
+		inx
+		cmp #$f0
+		bne @Skip
+		inxr 3
+		@Skip:
+		cpx #16
+		bne @Loop1
+	ldy #15
+	@Loop2:
+		lda OAM+$e0,y		; \
+		clc					; | Offset the splash sprites by the Splash X Offset
+		adc SplashXOffset	; |
+		sta OAM+$e0,y		; /
+		deyr 4
+		bpl @Loop2
 	lda FrameCounter
 	and #3
 	bne :+
-	dec $bb		; Go to next water plonk animation frame
+	dec SplashAnim	; Go to next water plonk animation frame
 	:rts
 
 .define SplashPointers Splash5, Splash4, Splash3, Splash2, Splash1
-le5c5:
-.LOBYTES SplashPointers
-le5ca:
-.HIBYTES SplashPointers
+SplashAnimLo:
+	.LOBYTES SplashPointers
+SplashAnimHi:
+	.HIBYTES SplashPointers
 
 ; The splash sprite data is stored in this funny little format
 ; The four sprites that make up the splash are all defined by one line
@@ -4313,7 +4304,7 @@ leadc:
 	lda #$04	; \ Do Water Plonk
 	sta $bb		; / Animation
 	lda ObjectXPosInt,x
-	sta $bc
+	sta SplashXOffset
 	cpx #2
 	bcc leb05
 	lda #$80
@@ -5278,7 +5269,7 @@ lf1fa:
 	stx BTPlatformX
 	stx $3b		; Current Level Header = 0
 	stx $3c		; Current Phase = 0
-	stx $0558	; Bonus Phase Level = 0
+	stx BonusPhaseIntensity	; Bonus Phase Level = 0
 	dex
 	stx $89		; Set Player 2 Balloons to -1
 	ldx TwoPlayerFlag	; \
@@ -5287,14 +5278,13 @@ lf20d:
 	dex					; |
 	bpl lf20d			; /
 lf213:
-	lda #$00		; \ Set to Regular Phase
+	lda #0			; \ Set to Regular Phase
 	sta PhaseType	; /
 	lda $3c		; \
-	lsr			; |
-	lsr			; | (Current Phase >> 2) cannot
-	cmp #$08	; | be higher than 8
+	lsrr 2		; | (Current Phase >> 2) cannot
+	cmp #8		; | be higher than 8
 	bcc lf221	; |
-	lda #$08	; /
+	lda #8		; /
 lf221:
 	tax
 	lda lf3ba,x
@@ -5302,7 +5292,7 @@ lf221:
 	lda lf3c3,x
 	sta $c7
 	lda $3c		; \
-	cmp #$02	; | If Current Phase >= 2
+	cmp #2		; | If Current Phase >= 2
 	bcs lf238	; / then
 	lda #$03
 	sta $c6
@@ -5384,8 +5374,8 @@ lf2c5:
 	jsr ManageCloudBlink
 	jsr ManageSparks
 	jsr ManageScorePopup
-	jsr le587
-	jsr lcb74_propellermanage
+	jsr SplashManage
+	jsr PropellerManage
 	inc StarUpdateFlag
 	ldx TwoPlayerFlag		; X = 2 Player Flag
 lf2e4:
@@ -5458,7 +5448,7 @@ lf353:
 	inx			; | Get to next level
 	cpx #16		; | if past level ID #16
 	bne lf361	; |
-	ldx #$04	; | then loop back to level ID #$04
+	ldx #4		; | then loop back to level ID 4
 lf361:
 	stx $3b		; /
 	jmp lf213	; Load Next Level
