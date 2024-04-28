@@ -308,15 +308,17 @@ P1TripBalloons		.set $05CE
 PropellerCount		.set $05D1
 PropellerXPos		.set $05D2	; $05D2-$05DB
 PropellerYPos		.set $05DC	; $05DC-$05E5
-; $05E6-$05EF = ?
-; $05F0-$05F9 = ?
+; $05E6-$05EF
+; $05F0-$05F9
 PropellerType		.set $05FA	; $05FA-$0603
-
+; $0604-$060D
+; $060E-$0617
 
 ; $0618-$0619 = ?
 ; $061A-$061B = ?
 
 ; $0620-$0628 = ???
+ABtnCooldown		.set $0620
 GameATopScore		.set $0629	;1-Player Game Top Score
 GameBTopScore		.set $062E	;2-Player Game Top Score
 GameCTopScore		.set $0633	;Balloon Trip Top Score

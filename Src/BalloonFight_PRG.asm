@@ -471,7 +471,7 @@ lc30d:
 	bcc lc314	; | then
 	jsr SparkBounceYSFX	; / Bounce Lightning Bolt Vertically
 lc314:
-	jsr lcb1c_bolt_playercollision
+	jsr SparkPlayerCollision
 lc317:
 	lda FrameCounter	; \
 	and #7				; | Get Lightning Bolt
@@ -1030,548 +1030,547 @@ lc70d:
 
 
 ;----------------------
-; Lightning Bolts Code
-;----------------------
+; Spark Code
 
-lc716_initcloudbolt:
-	ldx #1					; \
-	@InitLoop:
-		lda #$ff			; | Reset 2 Lightning Bolts
-		sta SparkAnim,x		; |
-		sta SparkUnknown,x	; |
-		dex					; |
-		bpl @InitLoop		; /
-	jsr lc77a_cloudboltselect	; Select Cloud that sends the bolt?
-lc726:
-	ldx CurrentPhaseNum	; \
-	cpx #24				; | There are only 25 (#$18) levels of spark intensity
-	bcc @Continue		; | X = Current Phase OR X = 24
-	ldx #24				; /
-	@Continue:
-	lda SparkIntensityData,x	; \ Change Lightning Bolt Intensity
-	sta SparkIntensity			; /
-	lda SparkCountdownData,x	; \ Change Lightning Bolt Countdown
-	sta $b8						; / depending on current phase
-	lda #$f0	; \
-	sta $02e0	; | Hide last 3 sprites
-	sta $02e4	; |
-	sta $02e8	; /
-	lda #3
-	jmp lc856	; Blink selected cloud
+	InitializeSparks:
+		ldx #1					; \
+		@InitLoop:
+			lda #$ff			; | Reset 2 Sparks
+			sta SparkAnim,x		; |
+			sta SparkLightning,x	; |
+			dex					; |
+			bpl @InitLoop		; /
+		jsr lc77a_cloudboltselect	; Select Cloud that sends the bolt?
+	lc726:
+		ldx CurrentPhaseNum	; \
+		cpx #24				; | There are only 25 (#$18) levels of spark intensity
+		bcc @Continue		; | X = Current Phase OR X = 24
+		ldx #24				; /
+		@Continue:
+		lda SparkIntensityData,x	; \ Change Spark Intensity
+		sta SparkIntensity			; /
+		lda SparkCountdownData,x	; \ Change Spark Countdown
+		sta SparkCountdown			; / depending on current phase
+		lda #$f0	; \
+		sta OAM+$e0	; | Hide last 3 sprites
+		sta OAM+$e4	; |
+		sta OAM+$e8	; /
+		lda #3
+		jmp lc856	; Blink selected cloud
 
-SparkIntensityData:
-	.BYTE 0,0,0,0,0
-	.BYTE 0,0,0,0,0
-	.BYTE 1,1,1,1,1
-	.BYTE 1,2,1,1,1
-	.BYTE 1,1,1,1,1
-SparkCountdownData:
-	.BYTE 15,15,12,12,12
-	.BYTE 12,10,10,10,10
-	.BYTE 12,12,10,10,10
-	.BYTE 08,10,10,08,08
-	.BYTE 08,08,08,08,05
+	SparkIntensityData:
+		.BYTE 0,0,0,0,0
+		.BYTE 0,0,0,0,0
+		.BYTE 1,1,1,1,1
+		.BYTE 1,2,1,1,1
+		.BYTE 1,1,1,1,1
+	SparkCountdownData:
+		.BYTE 15,15,12,12,12
+		.BYTE 12,10,10,10,10
+		.BYTE 12,12,10,10,10
+		.BYTE 08,10,10,08,08
+		.BYTE 08,08,08,08,05
 
-lc77a_cloudboltselect:	; Randomly select a cloud to send bolts?
-	lda CloudCount		; \ If there are clouds then select one
-	bpl lc781	; / else don't do anything
-lc77e:
-	sta $a4		; Select Cloud
-	rts
-lc781:
-	jsr UpdateRNG
-lc784:
-	cmp CloudCount		; \ If RNG value <= amount of Clouds
-	bcc lc77e	; | then select cloud based on value
-	beq lc77e	; /
-	clc			; \ Subtract to the RNG
-	sbc CloudCount		; | the amount of clouds
-	jmp lc784	; / until the condition is right
+	lc77a_cloudboltselect:	; Randomly select a cloud to send bolts?
+		lda CloudCount		; \ If there are clouds then select one
+		bpl lc781	; / else don't do anything
+	lc77e:
+		sta $a4		; Select Cloud
+		rts
+	lc781:
+		jsr UpdateRNG
+	lc784:
+		cmp CloudCount		; \ If RNG value <= amount of Clouds
+		bcc lc77e	; | then select cloud based on value
+		beq lc77e	; /
+		clc			; \ Subtract to the RNG
+		sbc CloudCount		; | the amount of clouds
+		jmp lc784	; / until the condition is right
 
-ManageCloudBolt:
-	lda FrameCounter		; \
-	and #$7f	; | Every 128 frames...
-	beq lc797	; /
-	:rts
-lc797:
-	dec $b8		; \ Do Lightning Bolt Countdown
-	bne :-	; / ...once it reaches zero...
-	ldx #$00
-	lda $0530,x
-	bmi lc7ad
-	inx
-	lda $0530,x
-	bmi lc7ad
-	lda #$01
-	sta $b8
-	rts
-lc7ad:
-	ldy $a4
-	sty $a5
-	bpl lc7b4
-	rts
-lc7b4:
-	lda #$80
-	sta $04b8,x
-	sta $04cc,x
-	lda #$00
-	sta $0530,x
-	lda $00b2,y
-	sta $0490,x
-	lda $00b5,y
-	sta $04a4,x
-	ldy $ba
-	jsr UpdateRNG
-	and #$1f
-	adc lc89f,y
-	sta $0508,x
-	lda lc8ab,y
-	sta $051c,x
-	lda lc8a5,y
-	sta $04e0,x
-	lda lc8b1,y
-	sta $04f4,x
-	jsr UpdateRNG
-	and #$03
-	sta $0544,x
-	tay
-	lda lc897,y
-	clc
-	adc $0490,x
-	sta $0490,x
-	lda lc89b,y
-	clc
-	adc $04a4,x
-	sta $04a4,x
-	lda lc88f,y
-	beq lc811
-	jsr SparkBounceX
-lc811:
-	lda lc893,y
-	beq lc819
-	jsr SparkBounceY
-lc819:
-	lda $ba
-	cmp #$05
-	bcs lc821
-	inc $ba
-lc821:
-	lda #$06
-	sec
-	sbc $ba
-	sta $b8
-	lda SFX1Req
-	ora #$04
-	sta SFX1Req
-	jmp lc77a_cloudboltselect
-
-ManageCloudBlink:
-	lda $b8		; \ If Lightning Bolt Countdown != 1
-	cmp #$01	; | then return
-	bne :+		; /
-	lda $0530	; \ If Lightning Bolt 0 doesn't exist
-	bmi lc846	; / then prepare for one
-	lda $0531	; \ If Lightning Bolt 1 doesn't exist
-	bmi lc846	; / then prepare for one
-	lda #$02	; \ Else up the countdown to 2
-	sta $b8		; /
-	rts
-lc846:
-	lda FrameCounter	; \
-	and #$7f			; | If Frame Counter < 64
-	cmp #$40			; | then don't do anything
-	bcc :+				; | If not equal to 64
-	bne lc856			; / then don't play SFX
-	lda $f1		; \
-	ora #$08	; | Play Sound Effect
-	sta $f1		; /
-lc856:
-	and #$03
-	tax
-	lda lc88b,x
-	sta $5a
-	ldx $a4	; \ Blink the selected cloud
-	bmi :+	; /
-	lda #$23	; \
-	sta $57		; | Set Tile Attribute Palette
-	lda $a6,x	; | at PPUADDR[$23xx], Size = 1
-	sta $58		; | 
-	lda #$01	; |
-	sta $59		; /
-	jsr lc883	; Set 16x16 Tile Attribute 1
-	lda $a9,x
-	sta $58
-	jsr lc883	; Set 16x16 Tile Attribute 2
-	lda $ac,x
-	sta $58
-	jsr lc883	; Set 16x16 Tile Attribute 3
-	lda $af,x
-	sta $58
-lc883:			; Set 16x16 Tile Attribute 4
-	lda #$57			; \
-	ldy #$00			; | Copy Temp PPU Block
-	jmp CopyPPUBlock	; / [$0057]
-	:rts
-
-lc88b:
-	.BYTE $55,$ff,$00,$ff
-lc88f:
-	.BYTE $00,$00,$ff,$ff
-lc893:
-	.BYTE $ff,$00,$00,$ff
-lc897:
-	.BYTE $10,$10,$f0,$f0
-lc89b:
-	.BYTE $de,$22,$22,$de
-lc89f:
-	.BYTE $60,$70,$80,$90,$a0,$b0
-lc8a5:
-	.BYTE $00,$00,$00,$00,$00,$00
-lc8ab:
-	.BYTE $c0,$f0,$20,$50,$80,$b0
-lc8b1:
-	.BYTE $00,$00,$01,$01,$01,$01
-
-ManageSparks:	; Only for Games A & B. Balloon Trip not included
-	ldx #1
-lc8b9:
-	lda SparkAnim,x
-	bpl @Continue
-	jmp ManageNextSpark
-	@Continue:
-	lda SparkUnknown,x
-	bmi lc941
-	tay
-	phx
-	ldx $a5
-	lda $b2,x
-	adc lc9e5,y
-	sta OAM+$e3
-	sta OAM+$e7
-	sta OAM+$eb
-	lda $b5,x
-	adc lc9f5,y
-	sta OAM+$e0
-	adc lca05,y
-	sta OAM+$e4
-	adc lca05,y
-	sta OAM+$e8
-	tya		; \
-	and #3	; |	X = Y AND 3
-	tax		; /
-	tya
-	lsrr 2
-	tay
-	lda FrameCounter
-	lsrr 2
-	bcs lc8ff
-	tya		; \
-	adc #5	; | Add 5 to Y
-	tay		; /
-lc8ff:
-	lda lca15,y
-	sta OAM+$e1
-	lda lca1f,y
-	sta OAM+$e5
-	lda lca29,y
-	sta OAM+$e9
-	lda lca33,x
-	sta OAM+$e2
-	sta OAM+$e6
-	sta OAM+$ea
-	plx
-	lda FrameCounter
-	and #7
-	bne lc937
-	lda SparkUnknown,x
-	clc
-	adc #4
-	sta SparkUnknown,x
-	cmp #$14
-	bcc lc937
-	lda #$ff
-	sta SparkUnknown,x
-lc937:
-	lda SparkUnknown,x
-	cmp #$10
-	bcs lc941
-	jmp ManageNextSpark
-lc941:
-	jsr UpdateSparkPos
-	lda SparkXPosInt,x
-	cmp #$02
-	bcs lc94e
-	jsr SparkBounceXSFX
-lc94e:
-	lda SparkXPosInt,x
-	cmp #$f7
-	bcc lc958
-	jsr SparkBounceXSFX
-lc958:
-	lda SparkYPosInt,x
-	cmp #$02
-	bcs lc962
-	jsr SparkBounceYSFX
-lc962:
-	lda SparkYPosInt,x
-	cmp #$e0
-	bcc lc976
-	lda #$ff
-	sta SparkAnim,x
-	lda #$f0
-	sta SparkYPosInt,x
-	jmp ManageNextSpark
-lc976:
-	jsr SparkPlatformCollision
-	jsr lcb1c_bolt_playercollision
-	ldy SparkAnim,x
-	iny
-	tya
-	and #$07
-	sta SparkAnim,x
-	ldy SparkAnim,x
-	lda lc9dd,y
-	sta Temp12
-	txa
-	aslr 2
-	clc
-	tay
-	lda SparkYPosInt,x
-	cmp #$d0
-	sta OAM,y
-	lda SparkXPosInt,x
-	sta OAM+3,y
-	lda Temp12
-	sta OAM+1,y
-	lda #0
-	bcc lc9ac
-	lda #$20
-lc9ac:
-	sta $0202,y
-	ManageNextSpark:
-		dex
-		bmi :+
-		jmp lc8b9
-	:rts
-
-UpdateSparkPos:
-	lda SparkXVelFrac,x	; \
-	clc					; | Update X Position (Frac)
-	adc SparkXPosFrac,x	; |	X = X + XVel
-	sta SparkXPosFrac,x	; /
-	lda SparkXVelInt,x	; \
-	adc SparkXPosInt,x	; | Update X Position (Int)
-	sta SparkXPosInt,x	; /
-	lda SparkYVelFrac,x	; \
-	clc					; | Update Y Position (Frac)
-	adc SparkYPosFrac,x	; | Y = Y + YVel
-	sta SparkYPosFrac,x	; /
-	lda SparkYVelInt,x	; \
-	adc SparkYPosInt,x	; | Update Y Position (Int)
-	sta SparkYPosInt,x	; /
-	rts
-
-lc9dd:
-	.BYTE $9d,$9e,$9f,$9e,$9d,$a0,$a1,$a0
-lc9e5:
-	.BYTE $08,$08,$f0,$f0
-	.BYTE $08,$08,$f0,$f0
-	.BYTE $08,$08,$f0,$f0
-	.BYTE $08,$08,$f0,$f0
-lc9f5:
-	.BYTE $ee,$0a,$0a,$ee
-	.BYTE $ee,$0a,$0a,$ee
-	.BYTE $ee,$0a,$0a,$ee
-	.BYTE $ee,$0a,$0a,$ee
-lca05:
-	.BYTE $f8,$08,$08,$f8
-	.BYTE $f8,$08,$08,$f8
-	.BYTE $f8,$08,$08,$f8
-	.BYTE $f8,$08,$08,$f8
-lca15:
-	.BYTE $91,$93,$97,$97,$fc
-	.BYTE $92,$95,$9a,$9a,$fc
-lca1f:
-	.BYTE $fc,$94,$98,$98,$fc
-	.BYTE $fc,$96,$9b,$9b,$fc
-lca29:
-	.BYTE $fc,$fc,$99,$99,$fc
-	.BYTE $fc,$fc,$9c,$9c,$fc
-lca33:
-	.BYTE $c0,$40,$00,$80
-
-SparkBounceXSFX:
-	lda $f3		; \
-	ora #$80	; | Play SFX
-	sta $f3		; /
-SparkBounceX:
-	lda #0				; \
-	sec					; |
-	sbc SparkXVelFrac,x	; | Lightning Bolt
-	sta SparkXVelFrac,x	; | Reverse X Velocity
-	lda #0				; |
-	sbc SparkXVelInt,x	; |
-	sta SparkXVelInt,x	; /
-	rts
-
-SparkBounceYSFX:
-	lda $f3		; \
-	ora #$80	; | Play SFX
-	sta $f3		; /
-SparkBounceY:
-	lda #0				; \
-	sec					; |
-	sbc SparkYVelFrac,x	; | Lightning Bolt
-	sta SparkYVelFrac,x	; | Reverse Y Velocity
-	lda #0				; |
-	sbc SparkYVelInt,x	; |
-	sta SparkYVelInt,x	; /
-	rts
-
-SparkPlatformCollision:
-	ldy PlatformCount
-	@Loop:
-		lda #0				; \
-		sta CollisionFlags	; / Reset Collision Flags
-		lda (TopPointer),y	; Get upper bound of platform Y
-		sec		; \
-		sbc #8	; / Offset upward by 8px for sprite size
-		cmp SparkYPosInt,x	; Compare Platform(y).TopY against Spark(x).Y
-		bcs @NoCollision	; Platform(y).TopY-8 >= Spark(x).Y (Spark too far above)
-		adc #3
-		cmp SparkYPosInt,x
-		bcc @CheckBottom	; Platform(y).TopY-5 < Spark(x).Y
-		lda #1					; If Spark X's Y Pos is 5-7 px above top of Platform Y
-		bne @SetVerticalFlag	; Set bit 1 of the Collision Flags
-		@CheckBottom:
-			lda (BottomPointer),y	; Lower bound of Platform Y
-			cmp SparkYPosInt,x	; Compare Platform(y).BottomY against Spark(x).Y
-			bcc @NoCollision	; Platform(y).BottomY < Spark(x).Y (Spark too far below)
-			sbc #3
-			cmp SparkYPosInt,x
-			bcs @CheckLeft	; Platform(y).BottomY-3 >= Spark(x).Y
-			lda #2		; If Spark X's Y Pos is 0-2px above bottom of Platform Y, set bit 2 of Collision Flags
-		@SetVerticalFlag:
-			sta CollisionFlags
-		lda (LeftPointer),y	; Get left bound of platform Y
-		cmp #16
-		beq @LeftEdgeValid	; If the left edge is 16 (Up against edge of screen)
+	ManageCloudBolt:
+		lda FrameCounter	; \
+		and #$7f			; | Every 128 frames...
+		beq lc797			; /
+		:rts
+	lc797:
+		dec SparkCountdown	; \ Do Lightning Bolt Countdown
+		bne :-	; / ...once it reaches zero...
+		ldx #0
+		lda SparkAnim,x
+		bmi lc7ad
+		inx
+		lda SparkAnim,x
+		bmi lc7ad
+		lda #1
+		sta SparkCountdown
+		rts
+	lc7ad:
+		ldy $a4
+		sty $a5
+		bpl lc7b4
+		rts
+	lc7b4:
+		lda #$80
+		sta SparkXPosFrac,x
+		sta SparkYPosFrac,x
+		lda #0
+		sta SparkAnim,x
+		lda $00b2,y
+		sta SparkXPosInt,x
+		lda $00b5,y
+		sta SparkYPosInt,x
+		ldy SparkIntensity
+		jsr UpdateRNG
+		and #$1f
+		adc SparkXVelFracData,y
+		sta SparkXVelFrac,x
+		lda SparkYVelFracData,y
+		sta SparkYVelFrac,x
+		lda SparkXVelIntData,y
+		sta SparkXVelInt,x
+		lda SparkYVelIntData,y
+		sta SparkYVelInt,x
+		jsr UpdateRNG			; \
+		and #3					; |	Randomize lightning strike direction?
+		sta SparkLightning,x	; /
+		tay
+		lda lc897,y
+		clc
+		adc SparkXPosInt,x
+		sta SparkXPosInt,x
+		lda lc89b,y
+		clc
+		adc SparkYPosInt,x
+		sta SparkYPosInt,x
+		lda lc88f,y
+		beq lc811
+		jsr SparkBounceX
+	lc811:
+		lda lc893,y
+		beq lc819
+		jsr SparkBounceY
+	lc819:
+		lda SparkIntensity
+		cmp #5
+		bcs lc821
+		inc $ba
+	lc821:
+		lda #6
 		sec
-		sbc #4
-		cmp SparkXPosInt,x
-		bcs @ResetFlags	; Platform(y).LeftX-4 >= Spark(x).X
-		@LeftEdgeValid:
-		lda (RightPointer),y	; Get right bound of platform Y
-		cmp SparkXPosInt,x
-		bcs @CheckLeft	; Platform(y).RightX >= Spark(x).X
-		@ResetFlags:
+		sbc SparkIntensity
+		sta $b8
+		lda SFX1Req
+		ora #$04
+		sta SFX1Req
+		jmp lc77a_cloudboltselect
+
+	ManageCloudBlink:
+		lda $b8		; \ If Lightning Bolt Countdown != 1
+		cmp #$01	; | then return
+		bne :+		; /
+		lda $0530	; \ If Lightning Bolt 0 doesn't exist
+		bmi lc846	; / then prepare for one
+		lda $0531	; \ If Lightning Bolt 1 doesn't exist
+		bmi lc846	; / then prepare for one
+		lda #$02	; \ Else up the countdown to 2
+		sta $b8		; /
+		rts
+	lc846:
+		lda FrameCounter	; \
+		and #$7f			; | If Frame Counter < 64
+		cmp #$40			; | then don't do anything
+		bcc :+				; | If not equal to 64
+		bne lc856			; / then don't play SFX
+		lda $f1		; \
+		ora #$08	; | Play Sound Effect
+		sta $f1		; /
+	lc856:
+		and #$03
+		tax
+		lda lc88b,x
+		sta $5a
+		ldx $a4	; \ Blink the selected cloud
+		bmi :+	; /
+		lda #$23	; \
+		sta $57		; | Set Tile Attribute Palette
+		lda $a6,x	; | at PPUADDR[$23xx], Size = 1
+		sta $58		; | 
+		lda #$01	; |
+		sta $59		; /
+		jsr lc883	; Set 16x16 Tile Attribute 1
+		lda $a9,x
+		sta $58
+		jsr lc883	; Set 16x16 Tile Attribute 2
+		lda $ac,x
+		sta $58
+		jsr lc883	; Set 16x16 Tile Attribute 3
+		lda $af,x
+		sta $58
+	lc883:			; Set 16x16 Tile Attribute 4
+		lda #$57			; \
+		ldy #0				; | Copy Temp PPU Block
+		jmp CopyPPUBlock	; / [$0057]
+		:rts
+
+	lc88b:
+		.BYTE $55,$ff,$00,$ff
+	lc88f:
+		.BYTE $00,$00,$ff,$ff
+	lc893:
+		.BYTE $ff,$00,$00,$ff
+	lc897:
+		.BYTE $10,$10,$f0,$f0
+	lc89b:
+		.BYTE $de,$22,$22,$de
+
+	SparkXVelFracData:
+		.BYTE $60,$70,$80,$90,$a0,$b0
+	SparkXVelIntData:
+		.BYTE $00,$00,$00,$00,$00,$00
+	SparkYVelFracData:
+		.BYTE $c0,$f0,$20,$50,$80,$b0
+	SparkYVelIntData:
+		.BYTE $00,$00,$01,$01,$01,$01
+
+	ManageSparks:	; Only for Games A & B. Balloon Trip not included
+		ldx #1
+		@Loop:
+			lda SparkAnim,x
+			bpl @Continue
+			jmp @ManageNextSpark
+			@Continue:
+			lda SparkLightning,x
+			bmi @LeftScreenBounce
+			tay
+			phx
+			ldx $a5
+			lda $b2,x
+			adc LightningStrikeXOffsets,y
+			sta OAM+$e3	;Lightning Strike Spr 0 X
+			sta OAM+$e7	;Lightning Strike Spr 1 X
+			sta OAM+$eb	;Lightning Strike Spr 2 X
+			lda $b5,x
+			adc LightningStrikeYOffsets,y
+			sta OAM+$e0	;Lightning Strike Spr 0 Y
+			adc LightningStrikeYDirectionOffsets,y
+			sta OAM+$e4	;Lightning Strike Spr 1 Y
+			adc LightningStrikeYDirectionOffsets,y
+			sta OAM+$e8	;Lightning Strike Spr 2 Y
+			tya		; \
+			and #3	; |	X = Y AND 3
+			tax		; /
+			tya
+			lsrr 2
+			tay
+			lda FrameCounter
+			lsrr 2
+			bcs @SkipYInc
+			tya		; \
+			adc #5	; | Add 5 to Y
+			tay		; /
+			@SkipYInc:
+			lda lca15,y
+			sta OAM+$e1
+			lda lca1f,y
+			sta OAM+$e5
+			lda lca29,y
+			sta OAM+$e9
+			lda lca33,x
+			sta OAM+$e2
+			sta OAM+$e6
+			sta OAM+$ea
+			plx
+			lda FrameCounter
+			and #7
+			bne @SkipSettingSparkLightning
+			lda SparkLightning,x
+			clc
+			adc #4
+			sta SparkLightning,x
+			cmp #$14
+			bcc @SkipSettingSparkLightning
+			lda #$ff
+			sta SparkLightning,x
+			@SkipSettingSparkLightning:
+			lda SparkLightning,x
+			cmp #16
+			bcs @LeftScreenBounce
+			jmp @ManageNextSpark
+			@LeftScreenBounce:
+				jsr UpdateSparkPos
+				lda SparkXPosInt,x
+				cmp #2
+				bcs @RightScreenBounce
+				jsr SparkBounceXSFX
+			@RightScreenBounce:
+				lda SparkXPosInt,x
+				cmp #$f7
+				bcc @TopScreenBounce
+				jsr SparkBounceXSFX
+			@TopScreenBounce:
+				lda SparkYPosInt,x
+				cmp #2
+				bcs @BottomScreenCheck
+				jsr SparkBounceYSFX
+			@BottomScreenCheck:
+				lda SparkYPosInt,x
+				cmp #$e0
+				bcc @SparkCollision
+				lda #$ff
+				sta SparkAnim,x
+				lda #$f0
+				sta SparkYPosInt,x
+				jmp @ManageNextSpark
+			@SparkCollision:
+				jsr SparkPlatformCollision
+				jsr SparkPlayerCollision
+			ldy SparkAnim,x
+			iny
+			tya
+			and #7
+			sta SparkAnim,x
+			ldy SparkAnim,x
+			lda lc9dd,y
+			sta Temp12
+			txa
+			aslr 2
+			clc
+			tay
+			lda SparkYPosInt,x
+			cmp #$d0
+			sta OAM,y
+			lda SparkXPosInt,x
+			sta OAM+3,y
+			lda Temp12
+			sta OAM+1,y
+			lda #0	; Set priority to 0 (In front of background)
+			bcc @SetPriority
+			lda #$20	; Set priority to 1 (Behind of background)
+			@SetPriority:
+			sta OAM+2,y
+			@ManageNextSpark:
+				dex
+				bmi :+
+				jmp @Loop
+		:rts
+
+	UpdateSparkPos:
+		lda SparkXVelFrac,x	; \
+		clc					; | Update X Position (Frac)
+		adc SparkXPosFrac,x	; |	X = X + XVel
+		sta SparkXPosFrac,x	; /
+		lda SparkXVelInt,x	; \
+		adc SparkXPosInt,x	; | Update X Position (Int)
+		sta SparkXPosInt,x	; /
+		lda SparkYVelFrac,x	; \
+		clc					; | Update Y Position (Frac)
+		adc SparkYPosFrac,x	; | Y = Y + YVel
+		sta SparkYPosFrac,x	; /
+		lda SparkYVelInt,x	; \
+		adc SparkYPosInt,x	; | Update Y Position (Int)
+		sta SparkYPosInt,x	; /
+		rts
+
+	lc9dd:
+		.BYTE $9d,$9e,$9f,$9e,$9d,$a0,$a1,$a0
+	LightningStrikeXOffsets:
+		.BYTE $08,$08,$f0,$f0
+		.BYTE $08,$08,$f0,$f0
+		.BYTE $08,$08,$f0,$f0
+		.BYTE $08,$08,$f0,$f0
+	LightningStrikeYOffsets:
+		.BYTE $ee,$0a,$0a,$ee
+		.BYTE $ee,$0a,$0a,$ee
+		.BYTE $ee,$0a,$0a,$ee
+		.BYTE $ee,$0a,$0a,$ee
+	LightningStrikeYDirectionOffsets:
+		.BYTE $f8,$08,$08,$f8
+		.BYTE $f8,$08,$08,$f8
+		.BYTE $f8,$08,$08,$f8
+		.BYTE $f8,$08,$08,$f8
+	lca15:
+		.BYTE $91,$93,$97,$97,$fc
+		.BYTE $92,$95,$9a,$9a,$fc
+	lca1f:
+		.BYTE $fc,$94,$98,$98,$fc
+		.BYTE $fc,$96,$9b,$9b,$fc
+	lca29:
+		.BYTE $fc,$fc,$99,$99,$fc
+		.BYTE $fc,$fc,$9c,$9c,$fc
+	lca33:
+		.BYTE $c0,$40,$00,$80
+
+	SparkBounceXSFX:
+		lda $f3		; \
+		ora #$80	; | Play SFX
+		sta $f3		; /
+	SparkBounceX:
+		lda #0				; \
+		sec					; |
+		sbc SparkXVelFrac,x	; | Lightning Bolt
+		sta SparkXVelFrac,x	; | Reverse X Velocity
+		lda #0				; |
+		sbc SparkXVelInt,x	; |
+		sta SparkXVelInt,x	; /
+		rts
+
+	SparkBounceYSFX:
+		lda $f3		; \
+		ora #$80	; | Play SFX
+		sta $f3		; /
+	SparkBounceY:
+		lda #0				; \
+		sec					; |
+		sbc SparkYVelFrac,x	; | Lightning Bolt
+		sta SparkYVelFrac,x	; | Reverse Y Velocity
+		lda #0				; |
+		sbc SparkYVelInt,x	; |
+		sta SparkYVelInt,x	; /
+		rts
+
+	SparkPlatformCollision:
+		ldy PlatformCount
+		@Loop:
 			lda #0				; \
 			sta CollisionFlags	; / Reset Collision Flags
-		@CheckLeft:
-		lda (LeftPointer),y	; Get left bound of platform Y
-		cmp #16
-		beq @LeftEdgeValid2	; If the left edge is 16 (Up against edge of screen)
-		sec
-		sbc #8
-		cmp SparkXPosInt,x
-		bcs @NoCollision
-		adc #3
-		cmp SparkXPosInt,x
-		bcc @LeftEdgeValid2
-		lda CollisionFlags
-		ora #4
-		bne @SetHorizontalFlag
-		@LeftEdgeValid2:
-		lda (RightPointer),y	; Get right bound of platform Y
-		cmp #$FF
-		beq @NoCollision
-		cmp SparkXPosInt,x
-		bcc @NoCollision
-		sbc #3
-		bcs @NoCollision
-		lda CollisionFlags
-		ora #8
-		@SetHorizontalFlag:
-		sta CollisionFlags
-		@NoCollision:
-		lda CollisionFlags
-		bne @CheckFlags
-		@CheckNext:
-		dey
-		bmi :+
-		jmp @Loop
-	:rts
-	@CheckFlags:
-		lsr CollisionFlags
-		bcc @SkipTopBounce
-		lda SparkYVelInt,x
-		bmi @SkipTopBounce
-		jsr SparkBounceYSFX
-	@SkipTopBounce:
-		lsr CollisionFlags
-		bcc @SkipBottomBounce
-		lda SparkYVelInt,x
-		bpl @SkipBottomBounce
-		jsr SparkBounceYSFX
-	@SkipBottomBounce:
-		lsr CollisionFlags
-		bcc @SkipLeftBounce
-		lda SparkXVelInt,x
-		bmi @SkipLeftBounce
-		jsr SparkBounceXSFX
-	@SkipLeftBounce:
-		lsr CollisionFlags
-		bcc @SkipRightBounce
-		lda SparkXVelInt,x
-		bpl @SkipRightBounce
-		jsr SparkBounceXSFX
-	@SkipRightBounce:
-	jmp @CheckNext
-	rts
+			lda (TopPointer),y	; Get upper bound of platform Y
+			sec		; \
+			sbc #8	; / Offset upward by 8px for sprite size
+			cmp SparkYPosInt,x	; Compare Platform(y).TopY against Spark(x).Y
+			bcs @NoCollision	; Platform(y).TopY-8 >= Spark(x).Y (Spark too far above)
+			adc #3
+			cmp SparkYPosInt,x
+			bcc @CheckBottom	; Platform(y).TopY-5 < Spark(x).Y
+			lda #1					; If Spark X's Y Pos is 5-7 px above top of Platform Y
+			bne @SetVerticalFlag	; Set bit 1 of the Collision Flags
+			@CheckBottom:
+				lda (BottomPointer),y	; Lower bound of Platform Y
+				cmp SparkYPosInt,x	; Compare Platform(y).BottomY against Spark(x).Y
+				bcc @NoCollision	; Platform(y).BottomY < Spark(x).Y (Spark too far below)
+				sbc #3
+				cmp SparkYPosInt,x
+				bcs @CheckLeft	; Platform(y).BottomY-3 >= Spark(x).Y
+				lda #2		; If Spark X's Y Pos is 0-2px above bottom of Platform Y, set bit 2 of Collision Flags
+			@SetVerticalFlag:
+				sta CollisionFlags
+			lda (LeftPointer),y	; Get left bound of platform Y
+			cmp #16
+			beq @LeftEdgeValid	; If the left edge is 16 (Up against edge of screen)
+			sec
+			sbc #4
+			cmp SparkXPosInt,x
+			bcs @ResetFlags	; Platform(y).LeftX-4 >= Spark(x).X
+			@LeftEdgeValid:
+			lda (RightPointer),y	; Get right bound of platform Y
+			cmp SparkXPosInt,x
+			bcs @CheckLeft	; Platform(y).RightX >= Spark(x).X
+			@ResetFlags:
+				lda #0				; \
+				sta CollisionFlags	; / Reset Collision Flags
+			@CheckLeft:
+			lda (LeftPointer),y	; Get left bound of platform Y
+			cmp #16
+			beq @LeftEdgeValid2	; If the left edge is 16 (Up against edge of screen)
+			sec
+			sbc #8
+			cmp SparkXPosInt,x
+			bcs @NoCollision
+			adc #3
+			cmp SparkXPosInt,x
+			bcc @LeftEdgeValid2
+			lda CollisionFlags
+			ora #4
+			bne @SetHorizontalFlag
+			@LeftEdgeValid2:
+			lda (RightPointer),y	; Get right bound of platform Y
+			cmp #$FF
+			beq @NoCollision
+			cmp SparkXPosInt,x
+			bcc @NoCollision
+			sbc #3
+			bcs @NoCollision
+			lda CollisionFlags
+			ora #8
+			@SetHorizontalFlag:
+			sta CollisionFlags
+			@NoCollision:
+			lda CollisionFlags
+			bne @CheckFlags
+			@CheckNext:
+			dey
+			bmi :+
+			jmp @Loop
+		:rts
+		@CheckFlags:
+			lsr CollisionFlags
+			bcc @SkipTopBounce
+			lda SparkYVelInt,x
+			bmi @SkipTopBounce
+			jsr SparkBounceYSFX
+		@SkipTopBounce:
+			lsr CollisionFlags
+			bcc @SkipBottomBounce
+			lda SparkYVelInt,x
+			bpl @SkipBottomBounce
+			jsr SparkBounceYSFX
+		@SkipBottomBounce:
+			lsr CollisionFlags
+			bcc @SkipLeftBounce
+			lda SparkXVelInt,x
+			bmi @SkipLeftBounce
+			jsr SparkBounceXSFX
+		@SkipLeftBounce:
+			lsr CollisionFlags
+			bcc @SkipRightBounce
+			lda SparkXVelInt,x
+			bpl @SkipRightBounce
+			jsr SparkBounceXSFX
+		@SkipRightBounce:
+		jmp @CheckNext
+		rts
 
-lcb1c_bolt_playercollision:		; Lightning Bolt Player Collision
-	ldy #1
-	@Loop:
-		lda ObjectBalloons,y	; \
-		bmi @Skip				; | If Player Y has balloons...
-		beq @Skip				; /
-		lda PlayerInvincible,y	; \ and if Player Y is not invincible...
-		bne @Skip				; /
-		lda SparkXPosInt,x		; \
-		sec						; | If Player Y's X position
-		sbc ObjectXPosInt,y		; | is within the X position
-		jsr GetAbsoluteValue	; | of Lightning Bolt X
-		cmp #8					; | (size 8 pixels)
-		bcs @Skip				; /
-		lda SparkYPosInt,x		; \
-		sec						; |
-		sbc ObjectYPosInt,y		; | If Player Y's Y position
-		sec						; | is within the Y position
-		sbc #8					; | of Lightning Bolt X
-		jsr GetAbsoluteValue	; | (size 12 pixels high
-		cmp #12					; | to take balloons into account)
-		bcs @Skip				; /
-		lda #0
-		sta ObjectBalloons,y	; Player Y's balloons = 00
-		lda #1
-		sta ObjectStatus,y	; Player Y's status = 01 
-		sta PlayerFreeze,y	; Player Y's freeze flag = 01
-		lda #11
-		sta ObjectType,y	; Player Y's type = 0B
-		lda #32
-		sta ObjectUnknown1,y	; Player Y's ? = 20
-		lda SFX1Req	; \
-		ora #$80	; | Play SFX
-		sta SFX1Req	; /
-		lda #$f0			; \
-		sta SparkYPosInt,x	; | Lightning Bolt X
-		lda #$ff			; | disappears
-		sta SparkAnim,x		; /
-		@Skip:
-		dey			; \ Check next player
-		bpl @Loop	; /
-	rts
-
+	SparkPlayerCollision:		; Lightning Bolt Player Collision
+		ldy #1
+		@Loop:
+			lda ObjectBalloons,y	; \
+			bmi @Skip				; | If Player Y has balloons...
+			beq @Skip				; /
+			lda PlayerInvincible,y	; \ and if Player Y is not invincible...
+			bne @Skip				; /
+			lda SparkXPosInt,x		; \
+			sec						; | If Player Y's X position
+			sbc ObjectXPosInt,y		; | is within the X position
+			jsr GetAbsoluteValue	; | of Lightning Bolt X
+			cmp #8					; | (size 8 pixels)
+			bcs @Skip				; /
+			lda SparkYPosInt,x		; \
+			sec						; |
+			sbc ObjectYPosInt,y		; | If Player Y's Y position
+			sec						; | is within the Y position
+			sbc #8					; | of Lightning Bolt X
+			jsr GetAbsoluteValue	; | (size 12 pixels high
+			cmp #12					; | to take balloons into account)
+			bcs @Skip				; /
+			lda #0
+			sta ObjectBalloons,y	; Player Y's balloons = 00
+			lda #1
+			sta ObjectStatus,y	; Player Y's status = 01 
+			sta PlayerFreeze,y	; Player Y's freeze flag = 01
+			lda #11
+			sta ObjectType,y	; Player Y's type = 0B
+			lda #32
+			sta ObjectUnknown1,y	; Player Y's ? = 20
+			lda SFX1Req	; \
+			ora #$80	; | Play SFX
+			sta SFX1Req	; /
+			lda #$f0			; \
+			sta SparkYPosInt,x	; | Lightning Bolt X
+			lda #$ff			; | disappears
+			sta SparkAnim,x		; /
+			@Skip:
+			dey			; \ Check next player
+			bpl @Loop	; /
+		rts
 
 ;----------------------
 ; Propeller code
@@ -1580,29 +1579,29 @@ lcb1c_bolt_playercollision:		; Lightning Bolt Player Collision
 PropellerManage:
 	ldx PropellerCount
 	bmi :+
-lcb79:
-	jsr lcba8
-	lda $0604,x
-	beq lcba4
-	txa
-	eor FrameCounter
-	and #1
-	bne lcba4
-	ldy $05fa,x
-	iny
-	tya
-	and #3
-	sta $05fa,x
-	jsr lcccb
-	lda $05fa,x
-	cmp #1
-	bne lcba4
-	dec $060e,x
-	bne lcba4
-	dec $0604,x
-lcba4:
-	dex
-	bpl lcb79
+	@Loop:
+		jsr lcba8
+		lda $0604,x
+		beq @Next
+		txa
+		eor FrameCounter
+		and #1
+		bne @Next
+		ldy PropellerType,x
+		iny
+		tya
+		and #3
+		sta PropellerType,x
+		jsr lcccb
+		lda PropellerType,x
+		cmp #1
+		bne @Next
+		dec $060e,x
+		bne @Next
+		dec $0604,x
+	@Next:
+		dex
+		bpl @Loop
 	:rts
 
 lcba8:
@@ -1611,7 +1610,7 @@ lcba8:
 	bne lcbb2
 	jmp lcc3a
 lcbb2:
-	lda $0088,y
+	lda ObjectBalloons,y
 	bmi lcc2f
 	beq lcc2f
 	cpy #2
@@ -1619,7 +1618,7 @@ lcbb2:
 	cmp #1
 	beq lcc2f
 lcbc1:
-	lda $0091,y
+	lda ObjectXPosInt,y
 	clc
 	adc #8
 	sec
@@ -1628,7 +1627,7 @@ lcbc1:
 	jsr GetAbsoluteValue
 	cmp #$12
 	bcs lcc2f
-	lda $009a,y
+	lda ObjectYPosInt,y
 	clc
 	adc #$0c
 	sec
@@ -1643,16 +1642,16 @@ lcbc1:
 	bcc lcc0b
 	lda #2
 	sta ObjectYVelInt,y
-	jsr lcc33
-	jsr lebbb
+	jsr PlayBumpSFX
+	jsr ObjectYApplyYVelocity
 	bne lcc0b
 lcbfc:
 	cmp #$fd
 	bcs lcc0b
 	lda #$fe
 	sta ObjectYVelInt,y
-	jsr lebbb
-	jsr lcc33
+	jsr ObjectYApplyYVelocity
+	jsr PlayBumpSFX
 lcc0b:
 	lda Temp13
 	bmi lcc20
@@ -1660,25 +1659,25 @@ lcc0b:
 	bcc lcc2f
 	lda #2
 	sta ObjectXVelInt,y
-	jsr lebb2
-	jsr lcc33
+	jsr ObjectYApplyXVelocity
+	jsr PlayBumpSFX
 	bne lcc2f
 lcc20:
 	cmp #$fd
 	bcs lcc2f
 	lda #$fe
 	sta ObjectXVelInt,y
-	jsr lebb2
-	jsr lcc33
+	jsr ObjectYApplyXVelocity
+	jsr PlayBumpSFX
 lcc2f:
 	dey
 	bpl lcbb2
 	rts
 
-lcc33:
-	lda $f1
+PlayBumpSFX:
+	lda SFX2Req
 	ora #2
-	sta $f1
+	sta SFX2Req
 	rts
 
 lcc3a:
@@ -2533,7 +2532,7 @@ InitGameMode:
 	@FinishClouds:
 	dex				; \ Write amount of clouds to RAM
 	stx CloudCount	; /
-	ldx #0						; \
+	ldx #0							; \
 	@PropellerLoop:
 		jsr GetByteFromLoadPointer	; |
 		cmp #$ff					; | Load Propellers (XX YY TT)
@@ -2542,15 +2541,15 @@ InitGameMode:
 		jsr GetByteFromLoadPointer	; |
 		sta PPUBlockAddrHi			; |
 		jsr GetByteFromLoadPointer	; |
-		sta $05fa,x					; /
+		sta PropellerType,x			; /
 		lda PPUBlockAddrLo
 		aslr 3
 		adc #12
-		sta $05d2,x
+		sta PropellerXPos,x
 		lda PPUBlockAddrHi
 		aslr 3
 		adc #12
-		sta $05dc,x
+		sta PropellerYPos,x
 		lda #0
 		sta $0604,x
 		jsr ld4fb_setppuaddr_render
@@ -3744,7 +3743,7 @@ le6b8:
 	lda #0					; | Then disable invincibility
 	sta PlayerInvincible,x	; /
 le6ce:
-	jsr lea18_objectupdateanim
+	jsr ObjectUpdateAnim
 	stx TargetUpdateScore
 	jsr lebc4
 	jsr le796
@@ -3859,13 +3858,13 @@ PollControllerX:
 	rts			; Returns pressed buttons in A
 
 le796:
-	lda $88,x	; \ If object has balloons
-	bne le7a3	; / then continue
+	lda ObjectBalloons,x	; \ If object has balloons
+	bne le7a3				; / then continue
 le79a:
-	lda #$00	; \ If no balloons:
+	lda #0					; \ If no balloons:
 	sta ObjectXVelFrac,x	; | X Velocity = 0
-	sta ObjectXVelInt,x	; /
-	rts			; Return
+	sta ObjectXVelInt,x		; /
+	rts	; Return
 le7a3:
 	cmp #2		; \ If 2 balloons
 	beq le7e8	; /
@@ -3900,12 +3899,12 @@ le7b1:
 	rts
 le7e8:
 	lda ObjectStatus,x
-	cmp #$06
+	cmp #6
 	bcc le7ef
 	rts
 le7ef:
 	lda ObjectStatus,x
-	cmp #$04
+	cmp #4
 	bne le811
 	lda ObjectAction,x
 	and #LeftDPad
@@ -3920,16 +3919,16 @@ le802:
 	lda ObjectDirection,x
 	bne le811
 le80d:
-	lda #$05
+	lda #5
 	sta ObjectStatus,x
 le811:
 	lda ObjectStatus,x
-	cmp #$02
+	cmp #2
 	bne le832
 	lda ObjectAction,x
 	and #LeftDPad
 	beq le821
-	lda #$00
+	lda #0
 	beq le829
 le821:
 	lda ObjectAction,x
@@ -3944,7 +3943,7 @@ le82e:
 	sta ObjectStatus,x
 le832:
 	lda ObjectStatus,x
-	cmp #$04
+	cmp #4
 	bcc le854
 	lda ObjectAction,x
 	and #LeftDPad
@@ -3959,39 +3958,39 @@ le845:
 	lda ObjectDirection,x
 	beq le854
 le850:
-	lda #$02
+	lda #2
 	sta ObjectStatus,x
 le854:
 	lda ObjectStatus,x
-	cmp #$03
+	cmp #3
 	bne le864
 	lda ObjectAction,x
 	and #LeftDPad | RightDPad
 	beq le864
-	lda #$02
+	lda #2
 	sta ObjectStatus,x
 le864:
 	lda ObjectStatus,x
-	cmp #$04
+	cmp #4
 	bcs le87f
 	lda ObjectAction,x
 	and #LeftDPad
 	beq le874
-	lda #$00
+	lda #0
 	beq le87c
 le874:
 	lda ObjectAction,x
 	and #RightDPad
 	beq le87f
-	lda #$01
+	lda #1
 le87c:
 	sta ObjectDirection,x
 le87f:
 	lda ObjectStatus,x
-	cmp #$04
+	cmp #4
 	bcc le8b8
 	lda ObjectAnimFrame,x
-	cmp #$01
+	cmp #1
 	bne le8b8
 	ldy ObjectType,x
 	lda ObjectDirection,x
@@ -4014,14 +4013,14 @@ le8a6:
 le8b8:
 	lda ObjectStatus,x
 	beq le8c7
-	cmp #$02
+	cmp #2
 	beq le907
-	cmp #$03
+	cmp #3
 	beq le8c7
 	jmp le951
 le8c7:
 	lda ObjectAnimFrame,x
-	cmp #$01
+	cmp #1
 	beq le8d1
 	jmp le951
 le8d1:
@@ -4034,7 +4033,7 @@ le8d1:
 	sbc le619,y
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
-	sbc #$00
+	sbc #0
 	jmp le901
 le8ec:
 	lda ObjectAction,x
@@ -4045,13 +4044,13 @@ le8ec:
 	adc le619,y
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
-	adc #$00
+	adc #0
 le901:
 	sta ObjectXVelInt,x
 	jmp le951
 le907:
 	lda ObjectAnimFrame,x
-	cmp #$01
+	cmp #1
 	bne le951
 	ldy ObjectType,x
 	lda ObjectAction,x
@@ -4086,7 +4085,7 @@ le93e:
 	sta SFX1Req
 le951:
 	lda ObjectStatus,x
-	cmp #$04
+	cmp #4
 	bcc :+
 	lda ObjectDirection,x
 	bne le963
@@ -4101,12 +4100,12 @@ le968:
 	cmp #5
 	bne le976
 	lda ObjectDirection,x
-	eor #$01
+	eor #1
 	sta ObjectDirection,x
 le976:
-	lda #$03
+	lda #3
 	sta ObjectStatus,x
-	lda #$00
+	lda #0
 	sta ObjectXVelFrac,x
 	sta ObjectXVelInt,x
 	:rts
@@ -4114,9 +4113,9 @@ le976:
 le983:
 	lda $cb
 	bne le9b6
-	lda $bd,x
+	lda PlayerInvincible,x
 	beq le99a
-	lda $0488
+	lda BTPlatformX
 	beq le99a
 	sec
 	sbc ObjectXPosInt,x
@@ -4126,7 +4125,7 @@ le983:
 le99a:
 	cpx #2
 	bcc le9a4
-	lda $88,x
+	lda ObjectBalloons,x
 	cmp #2
 	bne :+
 le9a4:
@@ -4147,7 +4146,7 @@ le9b6:
 	sta $cb
 	cpx #2
 	bcc le9fd
-	lda $88,x
+	lda ObjectBalloons,x
 	cmp #2
 	beq le9f3
 	cmp #1
@@ -4195,40 +4194,40 @@ lea15:
 ; Object Code
 ;----------------------
 
-lea18_objectupdateanim:
-	cpx #$02	; \ Object is not Player
-	bcs lea2c	; /
-	lda $bd,x	; \ If Player X Invincible
-	bne lea44	; /
+ObjectUpdateAnim:
+	cpx #2			; \ Object is not Player
+	bcs @NotPlayer	; /
+	lda PlayerInvincible,x	; \ If Player X Invincible
+	bne @NextFrame			; /
 	lda ObjectStatus,x	; \ If Player X Status == 1
-	cmp #$01	; | Then update animation every 8th frame
-	beq lea3e	; /
-	cmp #$03	; \ If Player X Status != 3
-	bne lea44	; | Then update animation
-	beq lea3e	; / Else update animation every 8th frame
-lea2c:
+	cmp #1				; | Then update animation every 8th frame
+	beq @SlowAnim		; /
+	cmp #3			; \ If Player X Status != 3
+	bne @NextFrame	; | Then update animation
+	beq @SlowAnim	; / Else update animation every 8th frame
+	@NotPlayer:
 	lda ObjectStatus,x	; \ If Enemy Status == 1
-	cmp #$01	; | Then update animation every 8th frame
-	beq lea3e	; /
-	cmp #$03	; \ If Enemy Status < 1
-	bcc lea44	; / Then update animation
-	lda FrameCounter		; \
-	and #$03	; | Update Animation Frame
-	bne lea47	; | every 4 frames
-	beq lea44	; /
-lea3e:
-	lda FrameCounter		; \ Update Animation Frame
-	and #$07	; | every 8 frames
-	bne lea47	; /
-lea44:
-	inc ObjectAnimFrame,x	; Increment Animation Frame
-lea47:
-	lda ObjectAnimFrame,x	; \
-	and #$03	; | Stay within Frame 0 to 3
-	sta ObjectAnimFrame,x	; /
-	bne :+	; 
+	cmp #1				; | Then update animation every 8th frame
+	beq @SlowAnim		; /
+	cmp #3			; \ If Enemy Status < 1
+	bcc @NextFrame	; / Then update animation
+	lda FrameCounter	; \
+	and #3				; | Update Animation Frame
+	bne @ClampFrame		; | every 4 frames
+	beq @NextFrame		; /
+	@SlowAnim:
+		lda FrameCounter	; \ Update Animation Frame
+		and #7				; | every 8 frames
+		bne @ClampFrame		; /
+	@NextFrame:
+		inc ObjectAnimFrame,x	; Increment Animation Frame
+	@ClampFrame:
+		lda ObjectAnimFrame,x	; \
+		and #3					; | Stay within Frame 0 to 3
+		sta ObjectAnimFrame,x	; /
+	bne :+ 
 	lda ObjectStatus,x	; \
-	bne :+	; | Increment Status if not 0
+	bne :+				; | Increment Status if not 0
 	inc ObjectStatus,x	; /
 	:rts
 
@@ -4239,7 +4238,7 @@ lea58:
 lea60:
 	cpx #2
 	bcs lea8c
-	lda $c1,x
+	lda PlayerFreeze,x
 	beq lea8c
 	lda FrameCounter
 	lsr
@@ -4253,7 +4252,7 @@ lea60:
 	dec ObjectUnknown1,x
 	bne :+
 	lda #0
-	sta $c1,x
+	sta PlayerFreeze,x
 	sta ObjectStatus,x
 	lda #$20
 	sta SFX1Req
@@ -4294,21 +4293,21 @@ lead0:
 	lda le685,y
 	sta ObjectYVelInt,x
 leadc:
-	jsr leba0_objectapplyyvelocity
+	jsr ObjectApplyYVelocity
 	cmp #$f8
 	bcs leb0d
 	cmp #$e8
 	bcc leb0d
 	lda #$ff
-	sta $88,x
-	lda #$04	; \ Do Water Plonk
+	sta ObjectBalloons,x
+	lda #4		; \ Do Water Plonk
 	sta $bb		; / Animation
 	lda ObjectXPosInt,x
 	sta SplashXOffset
 	cpx #2
 	bcc leb05
 	lda #$80
-	sta $88,x
+	sta ObjectBalloons,x
 	lda #0
 	sta ObjectStatus,x
 	lda #1
@@ -4347,7 +4346,7 @@ leb3f:
 	lda le655,y
 	sta ObjectXVelInt,x
 leb4b:
-	jsr leb8e_objectapplyxvelocity
+	jsr ObjectApplyXVelocity
 	lda GameMode
 	beq leb62
 	lda ObjectXPosInt,x
@@ -4363,7 +4362,7 @@ leb60:
 leb62:
 	lda PhaseType
 	beq :+
-	lda $88,x
+	lda ObjectBalloons,x
 	bne :+
 	lda ObjectYPosInt,x
 	cmp #$c8
@@ -4374,18 +4373,18 @@ leb62:
 	cmp #$0b
 	bne leb84
 	dec ObjectType,x
-	jsr lf107_reverseyvelocity
+	jsr ObjectBounceY
 	jmp lf18c
 leb84:
 	lda #2
-	sta $88,x
+	sta ObjectBalloons,x
 	lda #3
 	sta ObjectType,x
 	:rts
 
-leb8e_objectapplyxvelocity:
+ObjectApplyXVelocity:
 	lda ObjectXPosFrac,x	; \
-	clc			; | Apply Velocity to
+	clc						; | Apply Velocity to
 	adc ObjectXVelFrac,x	; | X Position (Frac)
 	sta ObjectXPosFrac,x	; /
 	lda ObjectXPosInt,x	; \ Apply Velocity to
@@ -4393,7 +4392,7 @@ leb8e_objectapplyxvelocity:
 	sta ObjectXPosInt,x	; /
 	rts
 
-leba0_objectapplyyvelocity:
+ObjectApplyYVelocity:
 	lda ObjectYPosFrac,x	; \
 	clc						; | Apply Velocity to
 	adc ObjectYVelFrac,x	; | Y Position (Frac)
@@ -4403,41 +4402,42 @@ leba0_objectapplyyvelocity:
 	sta ObjectYPosInt,x	; /
 	rts
 
-lebb2:
-	jsr SwapXY
-	jsr leb8e_objectapplyxvelocity
-	jmp SwapXY
-lebbb:
-	jsr SwapXY
-	jsr leba0_objectapplyyvelocity
-	jmp SwapXY
+ObjectYApplyXVelocity:
+	jsr SwapXY	; Swap X & Y registers
+	jsr ObjectApplyXVelocity
+	jmp SwapXY	; Swap X & Y back before returning
+
+ObjectYApplyYVelocity:
+	jsr SwapXY	; Swap X & Y registers
+	jsr ObjectApplyYVelocity
+	jmp SwapXY	; Swap X & Y back before returning
 
 lebc4:
-	cpx #$02	; \ If not player
+	cpx #2		; \ If not player
 	bcs lebe3	; /
-	lda $88,x	; \ If player still has balloons
-	bne lebd6	; /
+	lda ObjectBalloons,x	; \ If player still has balloons
+	bne lebd6				; /
 	lda ObjectAnimFrame,x	; \ If player animation frame != 0
-	bne lebd6	; /
-	lda #$00	; \ Then Player Status = 0 (Dead)
+	bne lebd6				; /
+	lda #0				; \ Then Player Status = 0 (Dead)
 	sta ObjectStatus,x	; /
 	rts
 lebd6:	; Player
 	lda ObjectStatus,x	; \ If Player Status < 6
-	cmp #$06	; | Then ?
-	bcc lec38	; /
-	lda #$01	; \ Else Status = 1
+	cmp #6				; | Then ?
+	bcc lec38			; /
+	lda #1				; \ Else Status = 1
 	sta ObjectStatus,x	; /
-	dec $88,x	; Decrease one balloon
+	dec ObjectBalloons,x	; Decrease one balloon
 	rts
 lebe3:	; Enemy
-	lda $88,x	; \ If Enemy Status == 2
-	cmp #$02	; | Then ?
-	beq lec38	; /
+	lda ObjectBalloons,x	; \ If Enemy Status == 2
+	cmp #2					; | Then ?
+	beq lec38				; /
 	lda ObjectAnimFrame,x	; \ If enemy animation frames != 0
 	bne :+					; / Then
-	lda $88,x	; \ If Enemy Status != 0
-	bne lebf7	; / Then
+	lda ObjectBalloons,x	; \ If Enemy Status != 0
+	bne lebf7				; / Then
 	lda #0				; \ Enemy Status = 0 (Dead)
 	sta ObjectStatus,x	; /
 	rts
@@ -4458,7 +4458,7 @@ lebfe:
 	cmp #7
 	bcc :+
 	lda #2
-	sta $88,x
+	sta ObjectBalloons,x
 	lda #0
 	sta ObjectStatus,x
 	ldy ObjectType,x
@@ -4483,25 +4483,25 @@ lec38:
 	lda #0					; \ If Player
 	sta PlayerInvincible,x	; / Disable invincibility
 	@ApplyObjectAction:
-	lda ObjectAction,x	; \
-	and #BBtn			; | B button
-	bne lec61			; /
-	lda ObjectAction,x	; \
-	and #ABtn			; | A button
-	bne lec5c			; /
-	lda #0		; \
-	sta $0620,x	; | ?
-	beq :+		; / Return
-lec5c:
-	lda $0620,x	; \
-	bne :+		; / Return
-lec61:
+		lda ObjectAction,x	; \
+		and #BBtn			; | B button
+		bne @BPressed		; /
+		lda ObjectAction,x	; \
+		and #ABtn			; | A button
+		bne @APressed		; /
+		lda #0				; \
+		sta ABtnCooldown,x	; | Mark the A button as lifted
+		beq :+				; / Return
+	@APressed:
+		lda ABtnCooldown,x	; \ Return if the A Button was already being pressed
+		bne :+				; /
+	@BPressed:
 	lda ObjectStatus,x
-	cmp #$02
+	cmp #2
 	bcc lec75
 	dec ObjectYPosInt,x
 	dec ObjectYPosInt,x
-	lda #$00
+	lda #0
 	sta ObjectYVelFrac,x
 	sta ObjectYVelInt,x
 	beq lec7e
@@ -4516,15 +4516,15 @@ lec7e:
 	lda #1
 	sta ObjectAnimFrame,x
 	lda #1
-	sta $0620,x
+	sta ABtnCooldown,x
 	ldy #0
 	cpx #2
 	bcc lec93
 	iny
 lec93:
-	lda $00f0,y
+	lda SFX1Req,y
 	ora #$10
-	sta $00f0,y
+	sta SFX1Req,y
 	lda ObjectYVelFrac,x
 	sec
 	ldy ObjectType,x
@@ -4535,14 +4535,15 @@ lec93:
 	:rts
 
 lecae:
-    ;12 bytes
-.BYTE $01,$02,$02,$03,$01,$02,$02,$03,$01,$02,$02,$03
+	.BYTE $01,$02,$02,$03
+	.BYTE $01,$02,$02,$03
+	.BYTE $01,$02,$02,$03
 
 lecba:
 	lda ObjectStatus,x	; \ If Object(x).Status != 0
 	bne :+	; / then don't do anything
 	jsr le7b1
-	jsr leb8e_objectapplyxvelocity
+	jsr ObjectApplyXVelocity
 	lda ObjectYPosFrac,x
 	sec
 	sbc #$60
@@ -4553,7 +4554,7 @@ lecba:
 	cmp #$f1
 	bcc lecdb
 	lda #$ff
-	sta $88,x
+	sta ObjectBalloons,x
 lecdb:
 	phx
 	ldy #1
@@ -4596,7 +4597,7 @@ lecdb:
 	:rts
 
 led28:
-	ldy $88,x
+	ldy ObjectBalloons,x
 	dey
 	bpl led2e
 	:rts
@@ -4654,7 +4655,7 @@ led85:
 	lda #0
 	sta CollisionFlags
 led89:
-	lda ($23),y
+	lda (LeftPointer),y
 	sec
 	sbc #$10
 	beq leda0
@@ -4667,7 +4668,7 @@ led89:
 	ora #4
 	bne ledb4
 leda0:
-	lda ($25),y
+	lda (RightPointer),y
 	cmp #$ff
 	beq ledb6
 	cmp ObjectXPosInt,x
@@ -4692,7 +4693,7 @@ ledc1:
 	bcc ledd6
 	lda ObjectYVelInt,x
 	bmi ledd6
-	lda ($27),y
+	lda (TopPointer),y
 	sbc #$18
 	sta ObjectYPosInt,x
 	inc ObjectYPosInt,x
@@ -4703,14 +4704,14 @@ ledd6:
 	bcc ledf4
 	lda ObjectYVelInt,x
 	bpl ledf4
-	lda ($29),y
+	lda (BottomPointer),y
 lede1:
 	sta ObjectYPosInt,x
-	jsr lf107_reverseyvelocity
+	jsr ObjectBounceY
 	jsr lf18c
 	cpx #2
 	bcs ledf0
-	jsr lcc33
+	jsr PlayBumpSFX
 ledf0:
 	lda $cb
 	bne :+
@@ -4726,7 +4727,7 @@ ledff:
 	lda ObjectXVelInt,x
 	bpl :+
 lee08:
-	jsr lf0de_reversexvelocity
+	jsr ObjectBounceX
 	jsr lf172
 	lda ObjectXVelInt,x
 	ora ObjectXVelFrac,x
@@ -4840,10 +4841,10 @@ leecd:
 leed6:
 	jsr lf0bd	; \ Do both object X and Y exist?
 	bcs leeed	; /
-	jsr lf107_reverseyvelocity
+	jsr ObjectBounceY
 	jsr lf18c
 	jsr SwapXY
-	jsr lf107_reverseyvelocity
+	jsr ObjectBounceY
 	jsr lf18c
 	jsr SwapXY
 leeed:
@@ -4862,10 +4863,10 @@ leefa:
 lef03:
 	jsr lf0bd	; \ Do both object X and Y exist?
 	bcs lef1a	; /
-	jsr lf0de_reversexvelocity
+	jsr ObjectBounceX
 	jsr lf172
 	jsr SwapXY
-	jsr lf0de_reversexvelocity
+	jsr ObjectBounceX
 	jsr lf172
 	jsr SwapXY
 lef1a:
@@ -4893,7 +4894,7 @@ lef37:
 	bcc lef42	; /
 	jmp lf043	; Skip
 lef42:
-	lda #$00
+	lda #0
 	sta $0487
 	lda ObjectUnknown4,x
 	beq lef4f
@@ -4905,44 +4906,44 @@ lef4f:
 lef56:
 	cpx #2
 	bcs lef61
-	lda $bd,x
+	lda PlayerInvincible,x
 	beq lef72
 	jmp lf043	; Skip
 lef61:
-	lda $88,x
-	cmp #$01
+	lda ObjectBalloons,x
+	cmp #1
 	bne lef72
 	lda ObjectStatus,x
-	cmp #$02
+	cmp #2
 	bcs lef7f
-	lda #$01
+	lda #1
 	sta $0487
 lef72:
-	lda $009a,y
+	lda ObjectYPosInt,y
 	clc
-	adc #$04
+	adc #4
 	cmp ObjectYPosInt,x
 	bcc lef7f
 	jmp lf043	; Skip
 lef7f:
 	lda #$14
 	sta ObjectUnknown4,x
-	lda #$00
+	lda #0
 	sta ObjectAnimFrame,x
-	cpy #$02
+	cpy #2
 	bcc lef97
-	lda $0088,y
-	cmp #$02
+	lda ObjectBalloons,y
+	cmp #2
 	beq lef97
 	jmp lf043	; Skip
 lef97:
 	lda SFX1Req
-	ora #$02
+	ora #2
 	sta SFX1Req
-	lda $88,x
-	cmp #$02
+	lda ObjectBalloons,x
+	cmp #2
 	bne lefc0
-	cpx #$02
+	cpx #2
 	bcs lefc0
 	sty Temp12
 	ldy ObjectStatus,x
@@ -4954,18 +4955,18 @@ lef97:
 	jmp lf043	; Skip
 lefb7:
 	sta ObjectStatus,x
-	lda #$00
+	lda #0
 	sta ObjectAnimFrame,x
 	beq lefea
 lefc0:
-	dec $88,x
+	dec ObjectBalloons,x
 	bne lefce
 	lda #$ff
 	sta ObjectYVelInt,x
-	lda #$00
+	lda #0
 	sta ObjectYVelFrac,x
 lefce:
-	lda #$00
+	lda #0
 	sta ObjectStatus,x
 	sta ObjectXVelFrac,x
 	sta ObjectXVelInt,x
@@ -4974,7 +4975,7 @@ lefce:
 	lda #$ff
 	bne lefe2
 lefe0:
-	lda #$00
+	lda #0
 lefe2:
 	sta ObjectUnknown3,x
 	lda #$80
@@ -4984,15 +4985,15 @@ lefea:
 	ldy ObjectType,x
 	lda lf05e,y
 	sta ObjectType,x
-	lda #$01
+	lda #1
 	sta ObjectUnknown5,x
 	ldy Temp12
-	cpy #$02
+	cpy #2
 	bcs lf043	; Skip
 	lda ObjectType,x
-	cmp #$07
+	cmp #7
 	beq lf011
-	cmp #$08
+	cmp #8
 	bcc lf011
 	lda $f1
 	ora #$80
@@ -5013,18 +5014,15 @@ lf023:
 	lda Temp12
 	sta TargetUpdateScore
 	pha
-	txa
-	pha
+	phx
 	lda Temp13
 	pha
 	lda Temp14
 	jsr ld871
 	pla
 	jsr AddScore
-	pla
-	tax
-	pla
-	tay
+	plx
+	ply
 lf043:
 	lda ObjectType,x	; \ If Object X is not dead
 	cmp #$0b	; | then don't play any SFX
@@ -5036,20 +5034,15 @@ lf043:
 	:rts
 
 lf053:
-    ;11 bytes
-.BYTE $06,$06,$07,$08,$09,$0a,$00,$00,$00,$00,$00
+	.BYTE $06,$06,$07,$08,$09,$0a,$00,$00,$00,$00,$00
 lf05e:
-    ;12 bytes
-.BYTE $04,$05,$06,$07,$08,$09,$0a,$0b,$08,$09,$0a,$0b
+	.BYTE $04,$05,$06,$07,$08,$09,$0a,$0b,$08,$09,$0a,$0b
 lf06a:
-    ;12 bytes
-.BYTE $00,$00,$00,$00,$32,$4b,$64,$64,$4b,$64,$96,$64
+	.BYTE $00,$00,$00,$00,$32,$4b,$64,$64,$4b,$64,$96,$64
 lf076:
-    ;12 bytes
-.BYTE $00,$00,$00,$00,$32,$4b,$64,$64,$64,$96,$c8,$64
+	.BYTE $00,$00,$00,$00,$32,$4b,$64,$64,$64,$96,$c8,$64
 lf082:
-    ;12 bytes
-.BYTE $00,$00,$00,$00,$01,$02,$03,$03,$02,$03,$04,$03
+	.BYTE $00,$00,$00,$00,$01,$02,$03,$03,$02,$03,$04,$03
 
 GetAbsoluteValue:
 	pha			; \
@@ -5058,7 +5051,7 @@ GetAbsoluteValue:
 	eor #$ff	; |
 	clc			; |
 	adc #1		; |
-	:rts			; /
+	:rts		; /
 
 ObjectXVelSbcYX:
 	lda ObjectXVelFrac,y	; \ Object(y).XVelocityFrac - Object(x).XVelocityFrac
@@ -5101,12 +5094,12 @@ lf0bd:
 	cmp ObjectBalloons,y	; /
 	:rts
 
-lf0de_reversexvelocity:
+ObjectBounceX:
 	lda #0					; \
 	sec						; |
 	sbc ObjectXVelFrac,x	; | Reverse X Velocity of Object X
 	sta ObjectXVelFrac,x	; | (Bounce Horizontally)
-	lda #$00				; |
+	lda #0					; |
 	sbc ObjectXVelInt,x		; |
 	sta ObjectXVelInt,x		; /
 	lda #0					; \
@@ -5117,11 +5110,11 @@ lf0de_reversexvelocity:
 	sbc ObjectUnknown3,x	; | ?
 	sta ObjectUnknown3,x	; /
 	lda ObjectAction,x	; \
-	and #BBtn			; | ?
+	and #BBtn			; | Clear player's held left & right inputs
 	sta ObjectAction,x	; /
 	rts
 
-lf107_reverseyvelocity:
+ObjectBounceY:
 	lda #0					; \
 	sec						; |
 	sbc ObjectYVelFrac,x	; | Reverse Y Velocity of Object X
@@ -5348,7 +5341,7 @@ lf29b:
 	beq lf2a2_balloonfight_load	; Normal Phase Type
 	jmp lcf13	; Bonus Phase Type
 lf2a2_balloonfight_load:
-	jsr lc716_initcloudbolt
+	jsr InitializeSparks
 	lda CurrentPhaseHeader	; \ Level Header?
 	and #$03				; |
 	bne lf2b3				; /
