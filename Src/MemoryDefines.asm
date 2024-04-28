@@ -286,13 +286,13 @@ SparkYVelInt		.set $04F4	;$04F4-$0507
 SparkXVelFrac		.set $0508	;$0508-$051B
 SparkYVelFrac		.set $051C	;$051C-$052F
 SparkAnim			.set $0530	;$0530-$0543
-SparkUnknown		.set $0544	;$0544-$0557
+SparkLightning		.set $0544	;$0544-$0557
 
 BonusPhaseIntensity	.set $0558
 BalloonPts			.set $0559	; In hundreds of points
 BalloonRiseSpeed	.set $055A
 SuperBonusPtsUpper	.set $055B
-SuperBonusPtsUpper	.set $055C
+SuperBonusPtsLower	.set $055C
 
 ; $055D-$0566 = Balloon GFX (Type? Status?)
 ; $0567-$0570 = Balloon X positions
