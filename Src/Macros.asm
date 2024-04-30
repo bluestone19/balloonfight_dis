@@ -32,6 +32,19 @@
 	ldy #>addr
 	.endmacro
 
+.macro cadc var, reg
+	clc
+	.ifblank reg
+		adc	var
+		.endif
+	.if reg==x
+		adc	var, x
+		.endif
+	.if reg==y
+		adc	var, y
+		.endif
+	.endmacro
+
 .macro incr rep, var
 	.repeat rep
 		inc	var

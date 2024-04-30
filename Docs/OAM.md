@@ -96,3 +96,6 @@ OAM is updated each frame by initiating the NES' built-in function to copy a pag
 * 56-59: Splash (Overrides Lightning if overlap)
 * 60-61: Score Popup 1
 * 62-63: Score Popup 2
+
+## Game C (Balloon Trip) Objects
+* 0-1: Starting Platform

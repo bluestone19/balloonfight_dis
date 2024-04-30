@@ -50,6 +50,7 @@ StatusUpdateFlag	.set $46
 MainMenuCursor		.set $3F
 
 TargetUpdateScore	.set $3E
+ScoreDigits			.set $43	;$43-$48
 ScoreDigit1			.set $43
 ScoreDigit2			.set $44
 ScoreDigit3			.set $45
@@ -58,8 +59,8 @@ ScoreDigit5			.set $48
 
 ; $0043 = Division Dividend & Modulo Result
 
-; $0049 = Balloon Trip Rank 0x
-; $004A = Balloon Trip Rank x0
+BTRankLo			.set $49
+BTRankHi			.set $4A
 ; $004B = ?
 
 CloudCount			.set $A3	; Amount of Clouds (zero-based) (-1 if none)
@@ -227,7 +228,7 @@ StarUpdateFlag		.set $4C
 ; - Object RAM:
 ; Note: One byte per object (Player, Enemy...)
 ; +0 = Player 1
-; +1 = Player 2
+; +1 = Player 2 (Bubble in Balloon Trip)
 ; +2 to +7 = Enemies
 ; +8 = Fish (Mostly Unused)
 
@@ -261,22 +262,24 @@ ObjectUnknown3		.set $046C	;$046C-$0474
 ObjectUnknown4		.set $0475	;$0475-$047D
 ObjectUnknown5		.set $047E	;$047E-$0486
 
-PlayerInvincible	.set $BD	; $00BD-$00BE
-PlayerInvTimer		.set $BF	; $00BF-$00C0
-PlayerFreeze		.set $C1	; $00C1-$00C2
-PlayerSpawnDelay	.set $C3	; $00C3-$00C4
+PlayerInvincible	.set $BD	;$00BD-$00BE
+PlayerInvTimer		.set $BF	;$00BF-$00C0
+PlayerFreeze		.set $C1	;$00C1-$00C2
+PlayerSpawnDelay	.set $C3	;$00C3-$00C4
 
 ;$0487 = ???
 BTPlatformX			.set $0488	;Balloon Trip Starting Platform X Position
 
-; $0489 = Fish Y Direction (0 = Up, 1 = Down)
-; $048A = Fish Animation?
-; $048B = Fish Target ID (Object ID)
-; $048C = Fish Target Eaten Flag
-; $048D = Fish Frame Time?
-; $048E = Fish? Unused?
-; $048F = Fish? Unused?
+;Fish
+FishYDirection		.set $0489	;0 = Up, 1 = Down
+FishAnimation		.set $048A
+FishTargetID		.set $048B	;Matches target object ID
+FishTargetEaten		.set $048C
+FishFrameTime		.set $048D
+FishUnknown1		.set $048E
+FishUnknown2		.set $048F
 
+;Sparks
 SparkXPosInt		.set $0490	;$0490-$04A3
 SparkYPosInt		.set $04A4	;$04A4-$04B7
 SparkXPosFrac		.set $04B8	;$04B8-$04CB
@@ -294,10 +297,10 @@ BalloonRiseSpeed	.set $055A
 SuperBonusPtsUpper	.set $055B
 SuperBonusPtsLower	.set $055C
 
-; $055D-$0566 = Balloon GFX (Type? Status?)
-; $0567-$0570 = Balloon X positions
-; $0571-$057A = Balloon?
-; $057B-$0584 = Balloon Y positions
+BalloonStatus		.set $055D	; $055D-$0566 = Balloon GFX (Type? Status?)
+BalloonXPos			.set $0567	; $0567-$0570 = Balloon X positions
+	; $0571-$057A = Balloon?
+BalloonYPos			.set $057B	; $057B-$0584 = Balloon Y positions
 
 ; $05CB = ?
 ; $05CC = ?
