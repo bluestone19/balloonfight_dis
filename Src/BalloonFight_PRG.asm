@@ -1554,7 +1554,7 @@ lc70d:
 			lda #11
 			sta ObjectType,y	; Player Y's type = 0B
 			lda #32
-			sta ObjectUnknown1,y	; Player Y's ? = 20
+			sta ObjectCountdown,y	; Player Y's ? = 32
 			lda SFX1Req	; \
 			ora #$80	; | Play SFX
 			sta SFX1Req	; /
@@ -2578,7 +2578,7 @@ LoadEnemy:
 		sta ObjectStatus+2,x	; / (02 = Sitting)
 		lda #1					; \ Initialize Enemy Balloons
 		sta ObjectBalloons+2,x	; / (01 = Sitting/Parachute)
-		lda $c6					; \ Initialize Enemy Anim Timer
+		lda EnemyStartDelay		; \ Initialize Enemy Anim Timer
 		sta ObjectAnimTimer+2,x	; /
 		dex
 		bpl @LoadLoop	; Load another enemy data
@@ -3579,7 +3579,7 @@ le553:
 	sta OAM+5,y
 	sta OAM+9,y
 	sta OAM+13,y
-	dec ObjectUnknown1,x
+	dec ObjectCountdown,x
 	bpl le584
 	lda #$ff
 	sta ObjectBalloons,x
@@ -3757,13 +3757,13 @@ AutoInput:	; Demo Players & Enemies
 	sta ObjectAction,x	; / (B Button)
 	rts
 	@YCheckSkip:
-	dec ObjectUnknown1,x	; \
+	dec ObjectCountdown,x	; \
 	bne :-					; / then return
 	jsr UpdateRNG
 	ldy ObjectType,x
 	and le762,y
 	adc le765,y
-	sta ObjectUnknown1,x
+	sta ObjectCountdown,x
 	stx Temp12
 	lda FrameCounter
 	rolr 2
@@ -4108,7 +4108,7 @@ le9a4:
 	bcs :+
 	lda #1
 	sta ObjectStatus,x
-	sta ObjectUnknown1,x
+	sta ObjectCountdown,x
 	rts
 le9b6:
 	lda #0
@@ -4128,7 +4128,7 @@ le9b6:
 	bcs :+
 	lda #2
 	sta ObjectStatus,x
-	lda $c6
+	lda EnemyStartDelay
 	sta ObjectAnimTimer,x
 	lda #0
 	sta ObjectXVelFrac,x
@@ -4142,7 +4142,7 @@ le9f3:
 	lda #0
 	sta ObjectStatus,x
 	lda #1
-	sta ObjectUnknown1,x
+	sta ObjectCountdown,x
 	rts
 le9fd:
 	lda ObjectStatus,x
@@ -4221,7 +4221,7 @@ lea60:
 	sta ObjectAnimFrame,x
 	lda #1
 	sta ObjectStatus,x
-	dec ObjectUnknown1,x
+	dec ObjectCountdown,x
 	bne :+
 	lda #0
 	sta PlayerFreeze,x
@@ -4421,10 +4421,10 @@ lebf7:
 lebfe:
 	cmp #2	; \ If Player
 	bcc :-	; / then return
-	dec ObjectUnknown1,x
+	dec ObjectCountdown,x
 	bne :+
-	lda $c7
-	sta ObjectUnknown1,x
+	lda EnemyInflateSpeed
+	sta ObjectCountdown,x
 	inc ObjectStatus,x
 	lda ObjectStatus,x
 	cmp #7
@@ -4440,7 +4440,7 @@ lebfe:
 	dec ObjectUnknown5,x
 	lda ObjectType,x
 	and #3
-lec2f:
+	lec2f:
 	sta ObjectType,x
 	lda #$fe
 	sta ObjectYVelInt,x
@@ -4549,7 +4549,7 @@ lecdb:
 		lda #$ff
 		sta ObjectStatus,x
 		lda #3
-		sta ObjectUnknown1,x
+		sta ObjectCountdown,x
 		lda #120
 		sta ScrollLockTimer
 		lda #2
@@ -5243,24 +5243,24 @@ StartDemoGame:
 LoadPhase:
 	lda #0			; \ Set to Regular Phase
 	sta PhaseType	; /
-	lda CurrentPhaseNum	; \
-	lsrr 2				; | (Current Phase >> 2) cannot
-	cmp #8				; | be higher than 8
-	bcc lf221			; |
-	lda #8				; /
-lf221:
+	lda CurrentPhaseNum		; \
+	lsrr 2					; | Phase difficulty = Current Phase / 4
+	cmp #8					; | 
+	bcc @SetPhaseDifficulty	; | Can't be higher than 8
+	lda #8					; /
+	@SetPhaseDifficulty:
 	tax
-	lda lf3ba,x
-	sta $c6
-	lda lf3c3,x
-	sta $c7
-	lda CurrentPhaseNum	; \
-	cmp #2				; | If Current Phase >= 2
-	bcs lf238			; / then
-	lda #3
-	sta $c6
-	sta $c7
-lf238:
+	lda EnemyStartDelayData,x
+	sta EnemyStartDelay
+	lda EnemyInflateSpeedData,x
+	sta EnemyInflateSpeed
+	lda CurrentPhaseNum			; \
+	cmp #2						; | If Current Phase >= 2
+	bcs @FinishSetDifficulty	; / then finish
+	lda #3					; \ For Phases 1 & 2:
+	sta EnemyStartDelay		; | Set enemy start delay to 3 (Very short! They get going almost immediately)
+	sta EnemyInflateSpeed	; / Set inflate speed to 3 (Moderate)
+	@FinishSetDifficulty:
 	ldx #7						; \
 	@ClearLoop:
 		lda #0					; | Initialize variables for each object (except Fish?)
@@ -5277,7 +5277,7 @@ lf238:
 		sta ObjectYPosFrac,x	; | - Y Positions (Frac)
 		lda #1					; |
 		sta ObjectAnimTimer,x	; |
-		sta ObjectUnknown1,x	; |
+		sta ObjectCountdown,x	; |
 		lda #3					; |
 		sta ObjectAnimFrame,x	; | - Animation Frame
 		dex						; |
@@ -5295,12 +5295,12 @@ lf238:
 		bpl @PlayerInitLoop			; /
 	jsr ClearPPU
 	jsr InitGameMode
-	lda $c6
+	lda EnemyStartDelay
 	cmp #16
 	bcs lf28e
 	lda #$58
-	sta $c6
-lf28e:
+	sta EnemyStartDelay
+	lf28e:
 	jsr InitializeFish
 	jsr ld8ff
 	lda GameMode
@@ -5466,9 +5466,9 @@ InitPlayerType:
 	sta ObjectBalloons,x	; /
 	rts
 
-lf3ba:
+EnemyStartDelayData:
 	.BYTE $58,$50,$58,$50,$50,$40,$38,$30,$28
-lf3c3:
+EnemyInflateSpeedData:
 	.BYTE $04,$04,$03,$03,$02,$02,$02,$02,$02
 
 lf3cc_phasedisplay:

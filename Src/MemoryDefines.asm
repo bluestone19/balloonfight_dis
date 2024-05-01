@@ -79,8 +79,8 @@ SplashAnim			.set $BB	;Water Splash Animation Frame
 SplashXOffset		.set $BC	;The X position of the splash sprite
 
 ScrollLockTimer		.set $C5	;Balloon Trip Scroll Lock Timer
-; $00C6 = ???
-; $00C7 = ???
+EnemyStartDelay		.set $C6	;Frames before enemies start to inflate their balloons
+EnemyInflateSpeed	.set $C7	;Higher=slower, determines how long it takes for enemy to inflate balloon
 PhaseType			.set $C8	;0 = Regular, 1 = Bonus
 TileScrollCount		.set $C9	;For Balloon Trip
 ScreenScrollCount	.set $CA	;For Balloon Trip
@@ -255,8 +255,8 @@ ObjectYVelInt		.set $041B	;$041B-$0423
 ObjectXVelFrac		.set $0424	;$0424-$042C
 ObjectXVelInt		.set $042D	;$042D-$0435
 
-;Unknown Attributes
-ObjectUnknown1		.set $045A	;$045A-$0462
+;Extra Attributes
+ObjectCountdown		.set $045A	;$045A-$0462 Used for Auto-Input and spark death delay before falling
 ObjectUnknown2		.set $0463	;$0463-$046B
 ObjectUnknown3		.set $046C	;$046C-$0474
 ObjectUnknown4		.set $0475	;$0475-$047D
