@@ -126,6 +126,17 @@ TempWord			.set $2B
 TempWordLo			.set TempWord
 TempWordHi			.set $2C
 
+TempVel				.set $2B
+TempVelFrac			.set TempWord
+TempVelInt			.set $2C
+
+VelMult				.set $2d
+
+PreciseVel			.set $2e
+PreciseVelSub		.set PreciseVel
+PreciseVelFrac		.set $2f
+PreciseVelInt		.set $30
+
 ; Sound:
 ; $00D0 = ?
 ; $00D1 = ?
@@ -218,7 +229,6 @@ PPUTempBlock		.set $57
 
 ; Star Animation:
 StarUpdateFlag		.set $4C
-; $004C = Star Update?
 ; $004D-$004E = Unused
 ; $004F = Star Animation - Star ID
 ; $0050 = PPU Address Low
@@ -276,8 +286,8 @@ FishAnimation		.set $048A
 FishTargetID		.set $048B	;Matches target object ID
 FishTargetEaten		.set $048C
 FishFrameTime		.set $048D
-FishUnknown1		.set $048E
-FishUnknown2		.set $048F
+FishUnused1			.set $048E
+FishUnused2			.set $048F
 
 ;Sparks
 SparkXPosInt		.set $0490	;$0490-$04A3

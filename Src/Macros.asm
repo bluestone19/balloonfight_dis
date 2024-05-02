@@ -32,7 +32,7 @@
 	ldy #>addr
 	.endmacro
 
-.macro cadc var
+.macro cadc var	;ADC (Add with carry) is often used with CLC (Clear carry flag) before it
 	clc
 	adc	var
 	.endmacro
@@ -45,6 +45,21 @@
 .macro cadcy var
 	clc
 	adc	var, y
+	.endmacro
+
+.macro ssbc var ;Similarly, SBC usually has a SEC before it
+	sec
+	sbc var
+	.endmacro
+
+.macro ssbcx var
+	sec
+	sbc var, x
+	.endmacro
+
+.macro ssbcy var
+	sec
+	sbc	var, y
 	.endmacro
 
 .macro incr rep, var
@@ -106,6 +121,11 @@
 	.repeat rep
 		lsr
 		.endrep
+	.endmacro
+
+.macro bmieq label
+	bmi label
+	beq label
 	.endmacro
 
 .macro phx

@@ -947,14 +947,13 @@ lc658:
 	ldx FishTargetID		; \
 	lda ObjectBalloons,x	; | If Target exists...
 	bmi lc6a3				; / (has balloons)
-	lda ObjectYPosInt,x	; \
-	clc					; | If the target is above
-	adc #16				; | the fish by 16 pixels
+	lda ObjectYPosInt,x	; \ If the target is above
+	cadc #16			; | the fish by 16 pixels
 	cmp ObjectYPosInt+8	; |
 	bcc lc6a3			; /
-	ldy ObjectType,x	; \
-	lda lc6b8,y			; | Change Target Object Type
-	sta ObjectType,x	; /
+	ldy ObjectType,x			; \
+	lda PostFishTargetType,y	; | Change Target Object Type
+	sta ObjectType,x			; /
 	lda #0					; \ Insta Kill
 	sta ObjectStatus,x		; | Target Object Status = 0
 	sta ObjectBalloons,x	; / Target Object Balloons = 0
@@ -964,64 +963,65 @@ lc658:
 	inc FishTargetEaten	; Set Fish Target Eaten Flag
 	lc6a3:
 	lda FishAnimation	; \ Fish Animation? != 0
-	beq :+	; /
+	beq :+				; /
 	lda FishFrameTime	; \
-	cmp #$28			; | If Fish Frame Time? == $28
+	cmp #40				; | If Fish Frame Time? == $28
 	beq lc6b3			; / OR
-	cmp #$30	; \ If Fish Frame Time? == $30
-	bne :+		; /
+	cmp #48	; \ If Fish Frame Time? == $30
+	bne :+	; /
 	lc6b3:
-	lda #$cc			; \ then
+	lda #204			; \ then
 	sta ObjectYPosInt+8	; / Fish Y Position = $CC
 	:rts
 
-lc6b8:
-    ;12 bytes
-.BYTE $08,$09,$0a,$0b,$08,$09,$0a,$0b,$08,$09,$0a,$0b
+PostFishTargetType:
+	.BYTE 8,9,10,11
+	.BYTE 8,9,10,11
+	.BYTE 8,9,10,11
 
-lc6c4:
+FishFollowTarget:
 	lda FishYDirection	; \ If Fish Direction is Up
-	bne :+		; /
-	ldx $048b	;
-	lda $88,x	; \ Do Object X exist?
-	bmi lc6e0	; /
+	bne :+				; /
+	ldx FishTargetID		; \
+	lda ObjectBalloons,x	; | Does target still exist?
+	bmi @FishRecede			; /
 	lda ObjectYPosInt,x	; \
-	cmp #$b4	; | Is Object X >= Y pos #$B4?
-	bcc lc6e0	; /
+	cmp #$b4			; | Is target still below Y pos #$B4?
+	bcc @FishRecede		; /
 	lda ObjectXPosInt,x	; \
-	cmp #$40	; | Is Object X between
-	bcc lc6e0	; | X positions #$40 and #$B1?
-	cmp #$b1	; | If so, teleport fish
-	bcc lc6ee	; /
-lc6e0:
-	lda #$30	; \ Else
-	sec			; | Fish Frame Time? = $30 - itself
-	sbc $048d	; |
-	sta $048d	; /
-	inc FishYDirection	; Set Fish Direction to Down
-	bne :+
-lc6ee:
-	lda ObjectXPosInt,x	; \ Teleport Fish
-	sta $99		; / to Object's X position
-	lda ObjectDirection,x	; \ Change Fish Direction
-	sta $0450	; / to Object's Direction
-	:rts
+	cmp #$40			; | Is target between
+	bcc @FishRecede		; | X positions #$40 and #$B1?
+	cmp #$b1			; | If so, teleport fish
+	bcc @MoveFish		; /
+	@FishRecede:
+		lda #$30			; \ Else
+		sec					; | Fish Frame Time = $30 - itself
+		sbc FishFrameTime	; |
+		sta FishFrameTime	; /
+		inc FishYDirection	; Set Fish Direction to Down
+		bne :+
+	@MoveFish:
+		lda ObjectXPosInt,x	; \ Teleport Fish
+		sta ObjectXPosInt+8	; / to Object's X position
+		lda ObjectDirection,x	; \ Change Fish Direction
+		sta ObjectDirection+8	; / to Object's Direction
+		:rts
 
 FishManage:
-	lda $87		; \ If Fish Status >= 0
-	bpl lc70d	; / then handle eating
+	lda ObjectStatus+8		; \ If Fish Status >= 0
+	bpl ContinueFishAttack	; / then handle eating
 	jsr FishMove	
 	jsr FishSearchTarget
-	lda $048b	; \ If Target found
-	bpl lc709	; / then handle Fish attack
+	lda FishTargetID	; \ If Target found
+	bpl PlayFishSFX		; / then handle Fish attack
 	rts
-lc709:
-	lda #$40	; \ Play Fish Eating SFX
-	sta $f3		; /
-lc70d:
-	jsr lc6c4	; Handle Fish Teleport to Target
-	jsr lc658	; Handle Fish Target Eating
-	jmp lc5c3	; Handle Fish Target Eating Movement
+	PlayFishSFX:
+		lda #$40	; \ Play Fish Eating SFX
+		sta SFX3Req	; /
+	ContinueFishAttack:
+		jsr FishFollowTarget	; Handle Fish Teleport to Target
+		jsr lc658	; Handle Fish Target Eating
+		jmp lc5c3	; Handle Fish Target Eating Movement & Return
 
 
 ;----------------------
@@ -1070,14 +1070,14 @@ lc70d:
 		lda CloudCount	; \ If there are clouds then select one
 		bpl lc781		; / else don't do anything
 	lc77e:
-		sta $a4		; Select Cloud
+		sta $a4	; Select Cloud
 		rts
 	lc781:
 		jsr UpdateRNG
 	lc784:
-		cmp CloudCount		; \ If RNG value <= amount of Clouds
-		bcc lc77e	; | then select cloud based on value
-		beq lc77e	; /
+		cmp CloudCount	; \ If RNG value <= amount of Clouds
+		bcc lc77e		; | then select cloud based on value
+		beq lc77e		; /
 		clc				; \ Subtract to the RNG
 		sbc CloudCount	; | the amount of clouds
 		jmp lc784		; / until the condition is right
@@ -1130,12 +1130,10 @@ lc70d:
 		sta SparkLightning,x	; /
 		tay
 		lda lc897,y
-		clc
-		adc SparkXPosInt,x
+		cadcx SparkXPosInt
 		sta SparkXPosInt,x
 		lda lc89b,y
-		clc
-		adc SparkYPosInt,x
+		cadcx SparkYPosInt
 		sta SparkYPosInt,x
 		lda lc88f,y
 		beq lc811
@@ -1279,8 +1277,7 @@ lc70d:
 			and #7
 			bne @SkipSettingSparkLightning
 			lda SparkLightning,x
-			clc
-			adc #4
+			cadc #4
 			sta SparkLightning,x
 			cmp #$14
 			bcc @SkipSettingSparkLightning
@@ -1350,16 +1347,14 @@ lc70d:
 		:rts
 
 	UpdateSparkPos:
-		lda SparkXVelFrac,x	; \
-		clc					; | Update X Position (Frac)
-		adc SparkXPosFrac,x	; |	X = X + XVel
+		lda SparkXVelFrac,x	; \ Update X Position (Frac)
+		cadcx SparkXPosFrac	; |	X = X + XVel
 		sta SparkXPosFrac,x	; /
 		lda SparkXVelInt,x	; \
 		adc SparkXPosInt,x	; | Update X Position (Int)
 		sta SparkXPosInt,x	; /
-		lda SparkYVelFrac,x	; \
-		clc					; | Update Y Position (Frac)
-		adc SparkYPosFrac,x	; | Y = Y + YVel
+		lda SparkYVelFrac,x	; \ Update Y Position (Frac)
+		cadcx SparkYPosFrac	; | Y = Y + YVel
 		sta SparkYPosFrac,x	; /
 		lda SparkYVelInt,x	; \
 		adc SparkYPosInt,x	; | Update Y Position (Int)
@@ -2474,8 +2469,7 @@ InitGameMode:
 			lda CloudTiles,y			; | to the screen
 			@Loop2:
 				sta PPUDATA				; |
-				clc						; |
-				adc #4					; |
+				cadc #4					; |
 				dec Temp12				; |
 				bne @Loop2				; |
 			inc PPUBlockAddrHi			; |
@@ -2503,8 +2497,7 @@ InitGameMode:
 		ldx $a4
 		lda PPUBlockAddrLo
 		aslr 3
-		clc
-		adc #16
+		cadc #16
 		sta $b2,x
 		lda PPUBlockAddrHi
 		aslr 3
@@ -2896,8 +2889,7 @@ UpdateStarBG:
 	beq :+				; / Then Do Nothing
 	dec StarUpdateFlag
 	lda $4f		; \
-	clc			; |
-	adc #2		; | Update and Get Current
+	cadc #2		; | Update and Get Current
 	and #$3f	; | Star ID
 	sta $4f		; |
 	tax			; /
@@ -2963,8 +2955,7 @@ AddScore:
 
 	ldy #100			; \ Process Score to add up
 	jsr DivideByY		; | Score to add / 100
-	clc					; |
-	adc ScoreDigit5		; |
+	cadc ScoreDigit5	; |
 	sta ScoreDigit3		; |
 	ldy #10				; |
 	jsr DivideByY		; | Modulo Result / 10
@@ -3475,8 +3466,7 @@ le3a4:
 	ldy #0
 	le49a:
 		lda Temp12
-		clc
-		adc le03d,x
+		cadcx le03d
 		sta (DataPointer),y
 		sta Temp12
 		iny
@@ -3496,8 +3486,7 @@ le3a4:
 		sty Temp13
 		ldy #0
 		lda Temp15
-		clc
-		adc (ScorePointer),y
+		cadcy (ScorePointer)
 		inc ScorePointerLo
 		bne le4ca
 		inc ScorePointerHi
@@ -3614,8 +3603,7 @@ SplashManage:
 	ldy #15
 	@Loop2:
 		lda OAM+$e0,y		; \
-		clc					; | Offset the splash sprites by the Splash X Offset
-		adc SplashXOffset	; |
+		cadc SplashXOffset	; | Offset the splash sprites by the Splash X Offset
 		sta OAM+$e0,y		; /
 		deyr 4
 		bpl @Loop2
@@ -4346,7 +4334,7 @@ leb62:
 	bne leb84
 	dec ObjectType,x
 	jsr ObjectBounceY
-	jmp lf18c
+	jmp ReduceYVelocity
 leb84:
 	lda #2
 	sta ObjectBalloons,x
@@ -4355,9 +4343,8 @@ leb84:
 	:rts
 
 ObjectApplyXVelocity:
-	lda ObjectXPosFrac,x	; \
-	clc						; | Apply Velocity to
-	adc ObjectXVelFrac,x	; | X Position (Frac)
+	lda ObjectXPosFrac,x	; \ Apply Velocity to
+	cadcx ObjectXVelFrac	; | X Position (Frac)
 	sta ObjectXPosFrac,x	; /
 	lda ObjectXPosInt,x	; \ Apply Velocity to
 	adc ObjectXVelInt,x	; | X Position (Int)
@@ -4365,9 +4352,8 @@ ObjectApplyXVelocity:
 	rts
 
 ObjectApplyYVelocity:
-	lda ObjectYPosFrac,x	; \
-	clc						; | Apply Velocity to
-	adc ObjectYVelFrac,x	; | Y Position (Frac)
+	lda ObjectYPosFrac,x	; \ Apply Velocity to
+	cadcx ObjectYVelFrac	; | Y Position (Frac)
 	sta ObjectYPosFrac,x	; /
 	lda ObjectYPosInt,x	; \ Apply Velocity to
 	adc ObjectYVelInt,x	; | Y Position (Int)
@@ -4680,7 +4666,7 @@ ledd6:
 lede1:
 	sta ObjectYPosInt,x
 	jsr ObjectBounceY
-	jsr lf18c
+	jsr ReduceYVelocity
 	cpx #2
 	bcs ledf0
 	jsr PlayBumpSFX
@@ -4700,7 +4686,7 @@ ledff:
 	bpl :+
 lee08:
 	jsr ObjectBounceX
-	jsr lf172
+	jsr ReduceXVelocity
 	lda ObjectXVelInt,x
 	ora ObjectXVelFrac,x
 	beq :+
@@ -4714,149 +4700,136 @@ lee08:
 
 lee25_collision:
 	ldx #7	; Seems to compare balloons from objects
-lee27:
-	stx Temp12
-	ldy Temp12
-	dey
-	bpl lee31
-lee2e:
-	jmp lef2a
-lee31:
-	lda ObjectBalloons,x	; \ If Object(x).Balloon <= 0
-	bmi lee2e				; | then skip
-	beq lee2e				; /
-	lda ObjectBalloons,y	; \ If Object(y).Balloon <= 0
-	bmi lee2e				; | then skip
-	beq lee2e				; /
-	lda #0
-	sta CollisionFlags
-	lda ObjectYPosInt,y		; \
-	sec						; | 
-	sbc ObjectYPosInt,x		; | If abs(Object(y).Y - Object(x).Y)
-	jsr GetAbsoluteValue	; | <= #$18
-	cmp #24					; | then
-	bcs leec0				; /
-	lda ObjectYPosInt,x		; \
-	clc						; | If
-	adc #24					; | abs((Object(y).Y + 7)
-	sta Temp12				; |   - (Object(x).Y + #$18))
-	lda ObjectYPosInt,y		; | >= 4 then
-	clc						; |
-	adc #7					; |
-	sec						; |
-	sbc Temp12				; |
-	jsr GetAbsoluteValue	; |
-	cmp #4					; |
-	bcs lee6a				; /
-	lda #1
-	bne lee7c
-lee6a:
-	lda ObjectYPosInt,y		; \
-	clc						; | If abs(Object(y).Y + #$11 - Object(x).Y)
-	adc #17					; | >= 4 then
-	sec						; |
-	sbc ObjectYPosInt,x		; |
-	jsr GetAbsoluteValue	; |
-	cmp #$04				; |
-	bcs lee8f				; /
-	lda #$02
-lee7c:
-	sta CollisionFlags
-	lda $0091,y		; \
-	sec				; | If abs(Object(y).X - Object(x).X)
-	sbc ObjectXPosInt,x		; | < #$10 then
-	jsr GetAbsoluteValue	; |
-	cmp #$10		; |
-	bcc lee8f		; /
-	lda #$00
-	sta CollisionFlags
-lee8f:
-	lda ObjectXPosInt,x		; \
-	clc				; |
-	adc #$10		; | If abs((Object(y).X + 7)
-	sta Temp12			; |      - (Object(x).X + #$10))
-	lda $0091,y		; | >= 4 then
-	clc				; |
-	adc #$07		; |
-	sec				; |
-	sbc Temp12			; |
-	jsr GetAbsoluteValue	; |
-	cmp #$04		; |
-	bcs leeaa		; /
-	lda #$04
-	bne leebc
-leeaa:
-	lda ObjectXPosInt,y		; \
-	clc						; | If abs(Object(y).X + 9 - Object(x).X)
-	adc #9					; | >= 4 then
-	sec						; |
-	sbc ObjectXPosInt,x		; |
-	jsr GetAbsoluteValue	; |
-	cmp #4					; |
-	bcs leec0				; /
-	lda #8
-leebc:
-	ora CollisionFlags
-	sta CollisionFlags
-leec0:
-	lda #$00	; \
-	sta $4b		; /
-	lsr CollisionFlags		; \ [$CC].bit0 = Velocity Y related
-	bcc leecd	; |
-	jsr ObjectYVelSbcYX	; | 
-	bmi leed6	; /
-leecd:
-	lsr CollisionFlags		; \ [$CC].bit1 = Velocity Y related
-	bcc leef1	; |
-	jsr ObjectYVelSbcYX	; |
-	bmi leef1	; /
-leed6:
-	jsr lf0bd	; \ Do both object X and Y exist?
-	bcs leeed	; /
-	jsr ObjectBounceY
-	jsr lf18c
-	jsr SwapXY
-	jsr ObjectBounceY
-	jsr lf18c
-	jsr SwapXY
-leeed:
-	lda #$01
-	sta $4b
-leef1:
-	lsr CollisionFlags		; \ [$CC].bit2 = Velocity X related
-	bcc leefa	; |
-	jsr ObjectXVelSbcYX	; |
-	bmi lef03	; /
-leefa:
-	lsr CollisionFlags		; \ [$CC].bit3 = Velocity X related
-	bcc lef1e	; |
-	jsr ObjectXVelSbcYX	; |
-	bmi lef1e	; /
-lef03:
-	jsr lf0bd	; \ Do both object X and Y exist?
-	bcs lef1a	; /
-	jsr ObjectBounceX
-	jsr lf172
-	jsr SwapXY
-	jsr ObjectBounceX
-	jsr lf172
-	jsr SwapXY
-lef1a:
-	lda #$01
-	sta $4b
-lef1e:
-	jsr lef37
-	jsr SwapXY
-	jsr lef37
-	jsr SwapXY
-lef2a:
-	dey			; \
-	bmi lef30	; | Loop Y Objects
-	jmp lee31	; /
-lef30:
-	dex			; \
-	bmi :+		; | Loop X Objects
-	jmp lee27	; /
+	@LoopX:
+		stx Temp12
+		ldy Temp12
+		dey
+		bpl @LoopY
+		@NextYLocal:
+		jmp @NextY
+		@LoopY:
+			lda ObjectBalloons,x	; \
+			bmieq @NextYLocal		; | Skip this pair if either object 
+			lda ObjectBalloons,y	; | has 0 or less Balloons
+			bmieq @NextYLocal		; /
+			lda #0				; \
+			sta CollisionFlags	; / Clear collision flags
+			lda ObjectYPosInt,y		; \
+			sec						; | 
+			sbc ObjectYPosInt,x		; | If abs(Object(y).Y - Object(x).Y)
+			jsr GetAbsoluteValue	; | <= #$18
+			cmp #24					; | then
+			bcs @leec0				; /
+			lda ObjectYPosInt,x		; \ If
+			cadc #24				; | abs((Object(y).Y + 7)
+			sta Temp12				; |   - (Object(x).Y + #$18))
+			lda ObjectYPosInt,y		; | >= 4 then
+			cadc #7					; |
+			ssbc Temp12				; |
+			jsr GetAbsoluteValue	; |
+			cmp #4					; |
+			bcs @lee6a				; /
+			lda #1
+			bne @lee7c
+			@lee6a:
+			lda ObjectYPosInt,y		; \ If abs(Object(y).Y + #$11 - Object(x).Y)
+			cadc #17				; | >= 4 then
+			ssbcx ObjectYPosInt		; |
+			jsr GetAbsoluteValue	; |
+			cmp #4					; |
+			bcs @lee8f				; /
+			lda #2
+			@lee7c:
+			sta CollisionFlags
+			lda ObjectXPosInt,y		; \ If abs(Object(y).X - Object(x).X)
+			ssbcx ObjectXPosInt		; | < #$10 then
+			jsr GetAbsoluteValue	; |
+			cmp #16					; |
+			bcc @lee8f				; /
+			lda #0
+			sta CollisionFlags
+			@lee8f:
+			lda ObjectXPosInt,x		; \
+			cadc #16				; | If abs((Object(y).X + 7)
+			sta Temp12				; |      - (Object(x).X + #$10))
+			lda ObjectXPosInt,y		; | >= 4 then
+			cadc #7					; |
+			ssbc Temp12				; |
+			jsr GetAbsoluteValue	; |
+			cmp #4					; |
+			bcs @leeaa				; /
+			lda #4
+			bne @leebc
+			@leeaa:
+			lda ObjectXPosInt,y		; \ If abs(Object(y).X + 9 - Object(x).X)
+			cadc #9					; | >= 4 then
+			ssbcx ObjectXPosInt		; |
+			jsr GetAbsoluteValue	; |
+			cmp #4					; |
+			bcs @leec0				; /
+			lda #8
+			@leebc:
+			ora CollisionFlags
+			sta CollisionFlags
+			@leec0:
+			lda #0	; \
+			sta $4b	; /
+			lsr CollisionFlags	; \ [$CC].bit0 = Velocity Y related
+			bcc @leecd			; |
+			jsr ObjectYVelSbcYX	; | 
+			bmi @leed6			; /
+			@leecd:
+			lsr CollisionFlags	; \ [$CC].bit1 = Velocity Y related
+			bcc @leef1			; |
+			jsr ObjectYVelSbcYX	; |
+			bmi @leef1			; /
+			@leed6:
+			jsr lf0bd	; \ Do both object X and Y exist?
+			bcs @leeed	; /
+			jsr ObjectBounceY	; \
+			jsr ReduceYVelocity	; | Bounce both objects and reduce velocity vertically
+			jsr SwapXY			; |
+			jsr ObjectBounceY	; |
+			jsr ReduceYVelocity	; |
+			jsr SwapXY			; /
+			@leeed:
+			lda #1
+			sta $4b
+			@leef1:
+			lsr CollisionFlags	; \ [$CC].bit2 = Velocity X related
+			bcc @leefa			; |
+			jsr ObjectXVelSbcYX	; |
+			bmi @lef03			; /
+			@leefa:
+			lsr CollisionFlags	; \ [$CC].bit3 = Velocity X related
+			bcc @lef1e			; |
+			jsr ObjectXVelSbcYX	; |
+			bmi @lef1e			; /
+			@lef03:
+			jsr lf0bd	; \ Do both object X and Y exist?
+			bcs @lef1a	; /
+			jsr ObjectBounceX	; \
+			jsr ReduceXVelocity	; | Bounce both objects and reduce velocity horizontally
+			jsr SwapXY			; |
+			jsr ObjectBounceX	; |
+			jsr ReduceXVelocity	; |
+			jsr SwapXY			; /
+			@lef1a:
+			lda #1
+			sta $4b
+			@lef1e:
+			jsr lef37
+			jsr SwapXY
+			jsr lef37
+			jsr SwapXY
+			@NextY:
+			dey			; \
+			bmi @NextX	; | Loop Y Objects
+			jmp @LoopY	; /
+		@NextX:
+		dex			; \
+		bmi :+		; | Loop X Objects
+		jmp @LoopX	; /
 	:rts
 
 lef37:
@@ -4865,7 +4838,7 @@ lef37:
 	cpy #2		; | Is Object Y a player?
 	bcc lef42	; /
 	jmp lf043	; Skip
-lef42:
+	lef42:
 	lda #0
 	sta $0487
 	lda ObjectUnknown4,x
@@ -4897,7 +4870,7 @@ lef72:
 	bcc lef7f
 	jmp lf043	; Skip
 lef7f:
-	lda #$14
+	lda #20
 	sta ObjectUnknown4,x
 	lda #0
 	sta ObjectAnimFrame,x
@@ -5094,83 +5067,81 @@ ObjectBounceY:
 	sta ObjectYVelInt,x		; |
 	rts						; /
 
-lf119:
-	sta $2d
-	lda $2c		; \ If Velocity Int >= 0
-	bpl lf143	; / then goto lf143
-	lda #0		; \
-	sec			; | Get absolute value of Velocity Frac
-	sbc $2b		; |
-	sta $2b		; /
-	lda #0		; \
-	sbc $2c		; | Get absolute value of Velocity Int
-	sta $2c		; /
-	jsr lf143
-	lda #0
-	sec
-	sbc $2e
-	sta $2e
-	lda #0
-	sbc $2f
-	sta $2f
-	lda #0
-	sbc $30
-	sta $30
+ReduceTempVel:
+	sta VelMult	; A = multiplier for Velocity. (Always #$CD in game)
+	lda TempVelInt		; \ If Velocity Int >= 0
+	bpl DivideVelocity	; / then goto DivideVelocity
+	lda #0				; \
+	ssbc TempVelFrac	; | Get absolute value of Velocity Frac
+	sta TempVelFrac		; /
+	lda #0			; \
+	sbc TempVelInt	; | Get absolute value of Velocity Int
+	sta TempVelInt	; /
+	jsr DivideVelocity
+	lda #0				; \
+	ssbc PreciseVelSub	; | Invert PreciseVel
+	sta PreciseVelSub	; |
+	lda #0				; |
+	sbc PreciseVelFrac	; |
+	sta PreciseVelFrac	; |
+	lda #0				; |
+	sbc PreciseVelInt	; |
+	sta PreciseVelInt	; /
 	rts
 
-lf143:
+DivideVelocity:	; Take in VelMult and TempVel, return PreciseVel = (TempVel / 256 * VelMult)
 	phx
-	lda #0		; \
-	sta $2e		; | Init
-	sta $2f		; |
-	sta $30		; /
-	ldx #8				; \ -Loop 8 times
+	lda #0				; \
+	sta PreciseVelSub	; | Init
+	sta PreciseVelFrac	; |
+	sta PreciseVelInt	; /
+	ldx #8	; Loop 8 times
 	@Loop:
-		asl $2e			; |
-		rol $2f			; |
-		rol $30			; |
-		asl $2d			; |
-		bcc @Next		; |
-		clc				; |
-		lda TempWordLo	; | Old Velocity Frac
-		adc $2e			; |
-		sta $2e			; |
-		lda TempWordHi	; | Old Velocity Int
-		adc $2f			; |
-		sta $2f			; |
-		lda #0			; |
-		adc $30			; |
-		sta $30			; |
+		asl PreciseVelSub	; \
+		rol PreciseVelFrac	; | Shift PreciseVel 1 bit left
+		rol PreciseVelInt	; /
+		asl VelMult	; \ If the next bit in VelMult is 0,
+		bcc @Next	; / Go to next
+		clc					; \
+		lda TempVelFrac		; | If the current bit of VelMult was 1, then
+		adc PreciseVelSub	; | add the TempVel one byte lower into the Fraction and Subfraction of PreciseVel.
+		sta PreciseVelSub	; | The way this loop works is each go around PreciseVel is shifted left (doubled)
+		lda TempVelInt		; | So if VelMult only had the uppermost bit set, The result would be TempVel / 256 * 128
+		adc PreciseVelFrac	; |
+		sta PreciseVelFrac	; |
+		lda #0				; |
+		adc PreciseVelInt	; |
+		sta PreciseVelInt	; /
 		@Next:
-		dex				; |
-		bne @Loop		; /
+		dex
+		bne @Loop
 	plx
 	rts
 
-lf172:
-	lda ObjectXVelFrac,x	; \ X Velocity Frac
-	sta TempWordLo			; /
-	lda ObjectXVelInt,x	; \ X Velocity Int
-	sta TempWordHi		; /
-	lda #$cd	; \ ?
-	jsr lf119	; /
-	lda $2f		; \ Update X Velocity Frac
-	sta ObjectXVelFrac,x	; /
-	lda $30		; \ Update X Velocity Int
-	sta ObjectXVelInt,x	; /
+ReduceXVelocity:
+	lda ObjectXVelFrac,x	; \
+	sta TempWordLo			; | TempVel = Object(x).XVel
+	lda ObjectXVelInt,x		; |
+	sta TempWordHi			; /
+	lda #$cd			; \ Reduce velocity
+	jsr ReduceTempVel	; /
+	lda PreciseVelFrac		; \
+	sta ObjectXVelFrac,x	; | Update X Velocity
+	lda PreciseVelInt		; |
+	sta ObjectXVelInt,x		; /
 	rts
 
-lf18c:
-	lda ObjectYVelFrac,x	; \ Y Velocity Frac
-	sta $2b					; /
-	lda ObjectYVelInt,x	; \ Y Velocity Int
-	sta $2c				; /
-	lda #$cd	; \ ?
-	jsr lf119	; /
-	lda $2f					; \ Update Y Velocity Frac
-	sta ObjectYVelFrac,x	; /
-	lda $30				; \ Update Y Velocity Int
-	sta ObjectYVelInt,x	; /
+ReduceYVelocity:
+	lda ObjectYVelFrac,x	; \
+	sta TempVelFrac			; |	TempVel = Object(x).YVel
+	lda ObjectYVelInt,x		; |
+	sta TempVelInt			; /
+	lda #$cd			; \ Reduce velocity
+	jsr ReduceTempVel	; /
+	lda PreciseVelFrac		; \
+	sta ObjectYVelFrac,x	; | Update Y Velocity
+	lda PreciseVelInt		; |
+	sta ObjectYVelInt,x		; /
 	rts
 
 lf1a6:
@@ -5589,9 +5560,9 @@ Pause:
 
 InitializeFish:
 	lda #1
-	sta FishUnknown1	; \ Set Unused Variables?
-	sta FishUnknown2	; /
-	lda #$ff		; \ Reset Water Plonk Animation
+	sta FishUnused1	; \ Set Unused Variables?
+	sta FishUnused2	; /
+	lda #$FF		; \ Reset Water Plonk Animation
 	sta SplashAnim	; /
 	sta ObjectStatus+8	; Fish Status = #$FF
 	sta FishTargetEaten	; Fish Target Eaten Flag = #$FF
