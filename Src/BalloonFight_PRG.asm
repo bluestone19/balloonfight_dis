@@ -1893,7 +1893,7 @@ lcdac:
 	sbc Temp13
 	sta $058f,x
 	lda $0571,x
-	cadc $0599,x
+	cadcx $0599
 	sta $0571,x
 	lda $0567,x
 	adc $058f,x
@@ -2346,7 +2346,7 @@ ld1dc:
 	dey
 	bmi ld1fe
 	lda $0559
-	cadc $59,x
+	cadcx $59
 	cmp #10
 	bcc ld1ed
 	sbc #10
@@ -3399,7 +3399,7 @@ le3a4:
 	jmp le429
 	le408:
 	ldy ObjectBalloons,x
-	cadc le352,y
+	cadcy le352
 	tay
 	lda EnemyAnimLower,y
 	sta LoadPointerLo
@@ -3979,7 +3979,7 @@ le87f:
 	jmp le901
 le8a6:
 	lda ObjectXVelFrac,x
-	cadc le625,y
+	cadcy le625
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
 	adc #0
@@ -4014,7 +4014,7 @@ le8ec:
 	and #RightDPad
 	beq le951
 	lda ObjectXVelFrac,x
-	cadc le619,y
+	cadcy le619
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
 	adc #0
@@ -4041,7 +4041,7 @@ le929:
 	and #RightDPad
 	beq le951
 	lda ObjectXVelFrac,x
-	cadc le625,y
+	cadcy le625
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
 	adc #0
@@ -4860,9 +4860,9 @@ lef30:
 	:rts
 
 lef37:
-	cpx #$02	; \ Is Object X a player?
+	cpx #2		; \ Is Object X a player?
 	bcc lef42	; |
-	cpy #$02	; | Is Object Y a player?
+	cpy #2		; | Is Object Y a player?
 	bcc lef42	; /
 	jmp lf043	; Skip
 lef42:
