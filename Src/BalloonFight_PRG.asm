@@ -438,7 +438,7 @@ BTPhysics:
 	@BalloonLoop:
 		lda BalloonStatus,x	; \ If Balloon X does not exist
 		bmi @SkipBalloon	; / then skip collision check
-		jsr lcece_ballooncollision
+		jsr CheckBalloonXCollision
 		lda P1BonusBalloons	; \
 		beq @SkipBalloon	; | Every balloon touched
 		dec P1BonusBalloons	; | counts towards the
@@ -448,7 +448,7 @@ BTPhysics:
 		jsr AddScore	; /
 		plx
 		@SkipBalloon:
-		jsr lce2f_balloonxspritemanage
+		jsr ManageBalloonXSprite
 		dex					; \ Check next balloon
 		bpl @BalloonLoop	; /
 	ldx #19
@@ -1670,24 +1670,21 @@ PlayBumpSFX:
 
 lcc3a:
 	lda ObjectBalloons,y
-	bmi lccb8
-	beq lccb8
+	bmieq lccb8
 	cpy #2
 	bcc lcc73
 	lda PropellerType,x
 	cmp #3
 	bne lcc73
 	lda PropellerXPos,x
-	sec
-	sbc #10
+	ssbc #10
 	cmp ObjectXPosInt,y
 	bcs lcc73
 	adc #4
 	cmp ObjectXPosInt,y
 	bcc lcc73
 	lda PropellerYPos,x
-	sec
-	sbc #$1c
+	ssbc #$1c
 	cmp ObjectYPosInt,y
 	bcs lcc73
 	adc #4
@@ -1697,17 +1694,15 @@ lcc3a:
 	lcc73:
 	lda ObjectXPosInt,y
 	cadc #8
-	sec
-	sbc $05d2,x
+	ssbcx PropellerXPos
 	jsr GetAbsoluteValue
 	sta Temp12
 	lda ObjectYPosInt,y
 	cadc #12
-	sec
-	sbc $05dc,x
+	ssbcx PropellerYPos
 	jsr GetAbsoluteValue
 	sta Temp13
-	lda $05fa,x
+	lda PropellerType,x
 	cmp #3
 	beq lcca2
 	lda Temp12
@@ -1721,7 +1716,7 @@ lcc3a:
 	cmp #20
 	bcs lccb8
 	lda Temp13
-	cmp #$0b
+	cmp #11
 	bcs lccb8
 	lda #1
 	sta $0604,x
@@ -1749,7 +1744,7 @@ lcccb:
 	sta $58
 	lda #3
 	sta $59
-	ldy $05fa,x
+	ldy PropellerType,x
 	lda PropellerTileUL,y
 	sta $5a
 	lda PropellerTileUM,y
@@ -1777,7 +1772,7 @@ lcd0f:
 	jsr CopyPPUBlock
 	ply
 	lda $58
-	cadc #$20
+	cadc #32
 	sta $58
 	bcc :+
 	inc $57
@@ -1808,14 +1803,14 @@ PropellerTileLR:
 ;----------------------
 
 InitBalloons:
-	ldx #9				; \ Reset all 10 balloons
+	ldx #9					; \ Reset all 10 balloons
 	@ClearLoop:
-		lda #$ff		; | GFX = #$FF
-		sta $055d,x		; |
-		lda #$f0		; | Y Positions = #$F0
-		sta $057b,x		; |
-		dex				; |
-		bpl @ClearLoop	; /
+		lda #$ff			; | GFX = #$FF
+		sta BalloonStatus,x	; |
+		lda #$f0			; | Y Positions = #$F0
+		sta BalloonYPos,x	; |
+		dex					; |
+		bpl @ClearLoop		; /
 	rts
 
 lcd5a:
@@ -1825,30 +1820,30 @@ lcd5a:
 lcd60:
 	lda RNGOutput
 	and #$3f
-	adc #$28
+	adc #40
 	sta $05cc
 	ldx #9
 lcd6b:
-	lda $055d,x
+	lda BalloonStatus,x
 	bmi lcd74
 	dex
 	bpl lcd6b
 	rts
 lcd74:
 	lda #0
-	sta $055d,x
+	sta BalloonStatus,x
 	sta $0599,x
 	sta $058f,x
 	lda #$80
 	sta $0571,x
 	sta $0585,x
 	lda #$d0
-	sta $057b,x
+	sta BalloonYPos,x
 	jsr UpdateRNG
 	and #3
 	tay
 	lda lceae,y
-	sta $0567,x
+	sta BalloonXPos,x
 	ldy #0
 	lda RNGOutput
 	sta $05b7,x
@@ -1862,66 +1857,66 @@ lcda2:
 
 lcdaa:
 	ldx #9
-lcdac:
-	lda $055d,x
-	bmi lce22
-	beq lcdfc
-	lda $0599,x
-	sta Temp12
-	lda $058f,x
-	sta Temp13
-	jsr lf1a6
-	lda $05b7,x
-	cadc Temp12
-	sta $05b7,x
-	sta Temp12
-	lda $05c1,x
-	adc Temp13
-	sta $05c1,x
-	sta Temp13
-	jsr lf1a6
-	lda $0599,x
-	sec
-	sbc Temp12
-	sta $0599,x
-	lda $058f,x
-	sbc Temp13
-	sta $058f,x
-	lda $0571,x
-	cadcx $0599
-	sta $0571,x
-	lda $0567,x
-	adc $058f,x
-	sta $0567,x
-lcdfc:
-	lda $0585,x
-	sec
-	sbc BalloonRiseSpeed
-	sta $0585,x
-	bcs lce0b
-	dec $057b,x
-lce0b:
-	lda $057b,x
-	cmp #$f0
-	beq lce1d
-	cmp #$a8
-	bcs lce22
-	lda #1
-	sta $055d,x
-	bne lce22
-lce1d:
-	lda #$ff
-	sta $055d,x
-lce22:
-	jsr lce2f_balloonxspritemanage
-	jsr lcece_ballooncollision
-	dex
-	bmi :+
-	jmp lcdac
+	lcdac:
+		lda BalloonStatus,x
+		bmi lce22
+		beq lcdfc
+		lda $0599,x
+		sta Temp12
+		lda $058f,x
+		sta Temp13
+		jsr lf1a6
+		lda $05b7,x
+		cadc Temp12
+		sta $05b7,x
+		sta Temp12
+		lda $05c1,x
+		adc Temp13
+		sta $05c1,x
+		sta Temp13
+		jsr lf1a6
+		lda $0599,x
+		sec
+		sbc Temp12
+		sta $0599,x
+		lda $058f,x
+		sbc Temp13
+		sta $058f,x
+		lda $0571,x
+		cadcx $0599
+		sta $0571,x
+		lda $0567,x
+		adc $058f,x
+		sta $0567,x
+		lcdfc:
+		lda $0585,x
+		sec
+		sbc BalloonRiseSpeed
+		sta $0585,x
+		bcs lce0b
+		dec BalloonYPos,x
+		lce0b:
+		lda BalloonYPos,x
+		cmp #$f0
+		beq lce1d
+		cmp #$a8
+		bcs lce22
+		lda #1
+		sta BalloonStatus,x
+		bne lce22
+		lce1d:
+		lda #$ff
+		sta BalloonStatus,x
+		lce22:
+		jsr ManageBalloonXSprite
+		jsr CheckBalloonXCollision
+		dex
+		bmi :+
+		jmp lcdac
 	:rts
 
-lce2f_balloonxspritemanage:
-	ldy $055d,x
+ManageBalloonXSprite:
+	ldy BalloonStatus,x
 	iny
 	lda lceb2,y
 	sta Temp13
@@ -1931,96 +1926,94 @@ lce2f_balloonxspritemanage:
 	adc Temp12
 	aslr 2
 	tay
-	lda $057b,x
-	sta $0250,y
-	sta $0254,y
+	lda BalloonYPos,x
+	sta OAM+$50,y
+	sta OAM+$54,y
 	cadc #8
-	sta $0258,y
-	lda $0567,x
-	sta $0253,y
+	sta OAM+$58,y
+	lda BalloonXPos,x
+	sta OAM+$53,y
 	cadc #4
-	sta $025b,y
+	sta OAM+$5b,y
 	cadc #4
-	sta $0257,y
+	sta OAM+$57,y
 	lda Temp13
-	sta $0252,y
-	sta $0256,y
-	sta $025a,y
-	lda $055d,x
-	bmi lce99
+	sta OAM+$52,y
+	sta OAM+$56,y
+	sta OAM+$5a,y
+	lda BalloonStatus,x
+	bmi PopBalloonXSprite
 	lda #$a8
-	sta $0251,y
+	sta OAM+$51,y
 	lda #$a9
-	sta $0255,y
+	sta OAM+$55,y
 	lda FrameCounter
 	lsrr 4
 	and #7
 	stx Temp13
 	tax
-	lda lceb2+3,x
-	sta $0259,y
-	lda $025a,y
+	lda lceb5,x
+	sta OAM+$59,y
+	lda OAM+$5a,y
 	eor lcebd,x
-	sta $025a,y
+	sta OAM+$5a,y
 	ldx Temp13
 	rts
 
-lce99:
-	lda #$f0
-	sta $057b,x
-	lda #$ac
-	sta $0251,y
-	lda #$ad
-	sta $0255,y
-	lda #$fc
-	sta $0259,y
+PopBalloonXSprite:
+	lda #$f0			; \ Set position offscreen, so it disappears next frame
+	sta BalloonYPos,x	; /
+	lda #$ac		; \
+	sta OAM+$51,y	; | Set the tile indexes for each object in this balloon
+	lda #$ad		; | Top two become the popped pieces,
+	sta OAM+$55,y	; |
+	lda #$fc		; | Bottom object becomes invisible
+	sta OAM+$59,y	; /
 	rts
 
 lceae:
-.BYTE $20,$50,$a0,$d0
+	.BYTE $20,$50,$a0,$d0
 lceb2:
-    ;11 bytes
-.BYTE $02,$22,$02,$aa,$ab,$ab,$aa,$aa,$ab,$ab,$aa
+	.BYTE $02,$22,$02
+lceb5:
+	.BYTE $aa,$ab,$ab,$aa,$aa,$ab,$ab,$aa
 lcebd:
-    ;17 bytes
-.BYTE $00,$00,$40,$40,$40,$40,$00,$00,$fc,$fc,$df,$fc,$fc,$e0,$e2
-.BYTE $e1,$fc
+	.BYTE $00,$00,$40,$40
+	.BYTE $40,$40,$00,$00
+	.BYTE $fc,$fc,$df,$fc
+	.BYTE $fc,$e0,$e2,$e1,$fc
 
-lcece_ballooncollision:
-	ldy #$01
-lced0:
-	lda $0088,y
-	bmi lcf0f
-	beq lcf0f
-	lda $055d,x
-	bmi :+
-	lda $009a,y
-	cmp #$c0
-	bcs lcf0f
-	sec
-	sbc $057b,x
-	jsr GetAbsoluteValue
-	cmp #$18
-	bcs lcf0f
-	lda $0091,y
-	sec
-	sbc $0567,x
-	jsr GetAbsoluteValue
-	cmp #$10
-	bcs lcf0f
-	lda #$ff
-	sta $055d,x
-	lda P1BonusBalloons,y
-	cadc #$01
-	sta P1BonusBalloons,y
-	lda #$02
-	sta SFX1Req
-	rts
-lcf0f:
-	dey
-	bpl lced0
+CheckBalloonXCollision:
+	ldy #1	;Check Balloon X against both players
+	@Loop:
+		lda ObjectBalloons,y	; \ If Player Y has no Balloons, try next
+		bmieq @Next				; /
+		lda BalloonStatus,x	; \ If this Balloon is not currently real, skip
+		bmi :+				; /
+		lda ObjectYPosInt,y	; \
+		cmp #$c0			; | If this Player's Y Position >= 192, then no collision
+		bcs @Next			; /
+		ssbcx BalloonYPos		; \
+		jsr GetAbsoluteValue	; | If |Player.Y - Balloon.Y| >= 24, then no collision
+		cmp #24					; |
+		bcs @Next				; /
+		lda ObjectXPosInt,y		; \
+		ssbcx BalloonXPos		; | If |Player.X - Balloon.X| >= 16, then no collision
+		jsr GetAbsoluteValue	; |
+		cmp #16					; |
+		bcs @Next				; /
+		lda #$ff			; \ If all the checks passed so far,
+		sta BalloonStatus,x	; / Pop the balloon
+		lda P1BonusBalloons,y	; \
+		cadc #1					; | Add a Balloon to the count for the player that popped it
+		sta P1BonusBalloons,y	; /
+		lda #$02	; \ Play Pop SFX
+		sta SFX1Req	; /
+		rts	; If popped one player, it can't be popped by the other too
+		@Next:
+		dey	; Try next player
+		bpl @Loop
 	:rts
-
 
 ;----------------------
 ; Bonus Phase code
@@ -2100,7 +2093,7 @@ lcf7e:
 	sta $055e
 	ldx TwoPlayerFlag
 lcfb5:
-	jsr lce2f_balloonxspritemanage
+	jsr ManageBalloonXSprite
 	dex
 	bpl lcfb5
 	jsr Wait20Frames
@@ -2149,7 +2142,7 @@ ld013:
 	sta $055e
 	ldx TwoPlayerFlag
 ld01d:
-	jsr lce2f_balloonxspritemanage
+	jsr ManageBalloonXSprite
 	dex
 	bpl ld01d
 	lda #2
@@ -2158,7 +2151,7 @@ ld01d:
 	jsr WaitYFrames
 	ldx TwoPlayerFlag
 ld02e:
-	jsr lce2f_balloonxspritemanage
+	jsr ManageBalloonXSprite
 	dex
 	bpl ld02e
 	jsr ld1a0
@@ -3029,8 +3022,8 @@ ld765:
 		dey						; | 
 		bpl @CopyLoop			; /
 	inc $46		; Status Bar Update Flag
-	lda GameMode			; \
-	beq :+					; | If Balloon Trip Mode then
+	lda GameMode		; \
+	beq :+				; | If Balloon Trip Mode then
 	jsr UpdateBTRank	; / Ranking Update
 	:rts
 
@@ -3284,7 +3277,7 @@ TitleScreenLoop:
 	jsr FinishFrame
 	lda FrameCounter	; \ Start demo if Frame Counter overflows
 	beq StartDemo		; / 
-	jsr ldb08	; Set Modes & Cursor
+	jsr ManageMenu	; Set Modes & Cursor
 	jsr PollController0
 	tax
 	and #StartBtn	; \ If Start button is pressed
@@ -3313,9 +3306,9 @@ StartDemo:
 	beq GotoTitleScreen
 
 TSNextOption:	;Title Screen choices
-.BYTE 1,2,0
+	.BYTE 1,2,0
 
-ldb08:
+ManageMenu:
 	lda MainMenuCursor	; \
 	lsr					; | Set Game Mode
 	sta GameMode		; / depending on selected mode
@@ -3324,12 +3317,12 @@ ldb08:
 	and #1					; | depending on selected mode
 	sta TwoPlayerFlag		; /
 	lda MenuCursorYOptions,x	; \ Set Y position of menu cursor balloon
-	sta $057b					; /
-	lda #44		; \ Set X position of menu cursor balloon
-	sta $0567	; /
-	ldx #0		; \ Set graphics of menu cursor balloon
-	stx $055d	; /
-	jmp lce2f_balloonxspritemanage
+	sta BalloonYPos				; /
+	lda #44			; \ Set X position of menu cursor balloon
+	sta BalloonXPos	; /
+	ldx #0				; \ Set graphics of menu cursor balloon
+	stx BalloonStatus	; /
+	jmp ManageBalloonXSprite
 
 MenuCursorYOptions:
 	.BYTE 140,156,172
@@ -3374,15 +3367,15 @@ le3a4:
 	adc le34c,y				; | Y = (Object Status * 4) + Animation Frame
 	tay						; / + [le34c + Balloons]
 	lda PlayerAnimLower,y	; \
-	sta $1d					; | Set pointer
+	sta LoadPointerLo		; | Set pointer
 	lda PlayerAnimUpper,y	; |
-	sta $1e					; /
-	lda $bd,x	; \ If Player X is invincible
-	beq le429	; /
-	ldy $88,x	; Y = Player X Balloons
-	lda le34c+3,y	; \
-	adc ObjectAnimFrame,x		; | Y = [le34c+3+Balloons+Frame]
-	tay				; /
+	sta LoadPointerHi		; /
+	lda PlayerInvincible,x	; \ If Player X is invincible
+	beq le429				; /
+	ldy ObjectBalloons,x	; Y = Player X Balloons
+	lda le34c+3,y			; \
+	adc ObjectAnimFrame,x	; | Y = [le34c+3+Balloons+Frame]
+	tay						; /
 	lda PlayerFlashAnimLower,y	; \
 	sta LoadPointerLo			; | Set pointer
 	lda PlayerFlashAnimUpper,y	; |
@@ -3464,7 +3457,7 @@ le3a4:
 	phx
 	ldx #5
 	ldy #0
-	le49a:
+	@Loop:
 		lda Temp12
 		cadcx le03d
 		sta (DataPointer),y
@@ -3474,9 +3467,9 @@ le3a4:
 		ldy #0
 		lda (LoadPointer),y
 		inc LoadPointerLo
-		bne le4b1
+		bne @le4b1
 		inc LoadPointerHi
-		le4b1:
+		@le4b1:
 		ldy Temp13
 		sta (DataPointer),y
 		iny
@@ -3488,14 +3481,14 @@ le3a4:
 		lda Temp15
 		cadcy (ScorePointer)
 		inc ScorePointerLo
-		bne le4ca
+		bne @le4ca
 		inc ScorePointerHi
-		le4ca:
+		@le4ca:
 		ldy Temp13
 		sta (DataPointer),y
 		iny
 		dex
-		bpl le49a
+		bpl @Loop
 	plx
 	rts
 
@@ -3649,76 +3642,81 @@ Splash5:
 	.BYTE $f0	; Sprite 2: Empty
 	.BYTE $f0	; Sprite 3: Empty
 
-le601:	;YVelFrac by object type
+;These are all physical constant data for the 12 object types
+ObjectGravityData:
 	.BYTE $04,$04,$05,$06,$03,$03,$03,$06,$0a,$0a,$0a,$0a
-le60d:
+ObjectFlapAccelData:	;Fractional
 	.BYTE $28,$32,$46,$78,$00,$00,$00,$64,$00,$00,$00,$00
-le619:
+ObjectXAccelData1:
 	.BYTE $0a,$1e,$32,$70,$00,$00,$00,$70,$00,$00,$00,$00
-le625:
+ObjectXAccelData2:
 	.BYTE $14,$3c,$64,$a0,$00,$00,$00,$a0,$00,$00,$00,$00
-le631:
+
+ObjectMaxXVelDataFrac:
 	.BYTE $70,$b0,$e0,$40,$80,$80,$80,$40,$00,$00,$00,$00
-le63d:
+ObjectMaxXVelDataInt:
 	.BYTE $00,$00,$00,$01,$00,$00,$00,$01,$00,$00,$00,$00
-le649:
+
+ObjectMinXVelDataFrac:
 	.BYTE $90,$50,$20,$c0,$80,$80,$80,$c0,$00,$00,$00,$00
-le655:
+ObjectMinXVelDataInt:
 	.BYTE $ff,$ff,$ff,$fe,$ff,$ff,$ff,$fe,$00,$00,$00,$00
-le661:
+
+ObjectMaxYVelDataFrac:
 	.BYTE $50,$90,$c0,$40,$40,$40,$40,$40,$00,$00,$00,$00
-le66d:
+ObjectMaxYVelDataInt:
 	.BYTE $00,$00,$00,$01,$00,$00,$00,$01,$02,$02,$02,$02
-le679:
+
+ObjectMinYVelDataFrac:
 	.BYTE $b0,$70,$40,$c0,$c0,$c0,$c0,$c0,$c0,$c0,$c0,$c0
-le685:
+ObjectMinYVelDataInt:
 	.BYTE $ff,$ff,$ff,$fe,$ff,$ff,$ff,$fe,$fe,$01,$fe,$fe
 
 ObjectManage:
-	jsr lee25_collision
+	jsr CheckObjectPairCollision
 	ldx #7					; \
-le696:
-	lda ObjectBalloons,x	; | Check all Object's Balloons
-	bpl le6a4				; | If >= 0 then proceed
-	cmp #$ff				; | else if == -1 then go to next object
-	beq le6e2				; | else ? and go to next object
-	jsr lecba				; |
-	jmp le6e2				; /
-le6a4:
-	cpx #2		; \ Object is Player
-	bcc le6b8	; /
-	cmp #1		; \ One balloon
-	bne le6b8	; /
-	lda ObjectStatus,x	; \ Object Status >= 2
-	cmp #2				; |
-	bcs le6b8			; /
-	lda $f1		; \
-	ora #$20	; | Play SFX
-	sta $f1		; /
-le6b8:
-	dec ObjectAnimTimer,x	; \ Object's Anim Timer != 0
-	bne le6d9				; /
-	lda #3					; \ Object's ? = 3
-	sta ObjectAnimTimer,x	; /
-	cpx #2		; \ Object is not Player
-	bcs le6ce	; /
-	dec PlayerInvTimer,x	; \ Player Invincibility Timer Handle
-	bne le6ce				; | Decrease Time until 0
-	lda #0					; | Then disable invincibility
-	sta PlayerInvincible,x	; /
-le6ce:
-	jsr ObjectUpdateAnim
-	stx TargetUpdateScore
-	jsr lebc4
-	jsr le796
-le6d9:
-	jsr lea58
-	jsr led28
-	jsr le983
-le6e2:
-	jsr le3a4
-	dex
-	bpl le696	; Loop back
+	@Loop:
+		lda ObjectBalloons,x	; | Check all Object's Balloons
+		bpl @le6a4				; | If >= 0 then proceed
+		cmp #$ff				; | else if == -1 then go to next object
+		beq @Next				; | else ? and go to next object
+		jsr lecba				; |
+		jmp @Next				; /
+		@le6a4:
+		cpx #2		; \ Object is Player
+		bcc @le6b8	; /
+		cmp #1		; \ One balloon
+		bne @le6b8	; /
+		lda ObjectStatus,x	; \ Object Status >= 2
+		cmp #2				; |
+		bcs @le6b8			; /
+		lda SFX2Req	; \
+		ora #$20	; | Play Enemy Parachute Jingle
+		sta SFX2Req	; /
+		@le6b8:
+		dec ObjectAnimTimer,x	; \ Object's Anim Timer != 0
+		bne @le6d9				; /
+		lda #3					; \ Object's ? = 3
+		sta ObjectAnimTimer,x	; /
+		cpx #2		; \ Object is not Player
+		bcs @le6ce	; /
+		dec PlayerInvTimer,x	; \ Player Invincibility Timer Handle
+		bne @le6ce				; | Decrease Time until 0
+		lda #0					; | Then disable invincibility
+		sta PlayerInvincible,x	; /
+		@le6ce:
+		jsr ObjectUpdateAnim
+		stx TargetUpdateScore
+		jsr lebc4
+		jsr le796
+		@le6d9:
+		jsr ManageObjectVelocity
+		jsr led28
+		jsr le983
+		@Next:
+		jsr le3a4
+		dex
+		bpl @Loop	; Loop back
 	rts
 
 ObjectUpdateAction:
@@ -3960,14 +3958,14 @@ le87f:
 	beq le8a6
 	lda ObjectXVelFrac,x
 	sec
-	sbc le625,y
+	sbc ObjectXAccelData2,y
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
 	sbc #0
 	jmp le901
 le8a6:
 	lda ObjectXVelFrac,x
-	cadcy le625
+	cadcy ObjectXAccelData2
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
 	adc #0
@@ -3991,8 +3989,7 @@ le8d1:
 	and #LeftDPad
 	beq le8ec
 	lda ObjectXVelFrac,x
-	sec
-	sbc le619,y
+	ssbcy ObjectXAccelData1
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
 	sbc #0
@@ -4002,7 +3999,7 @@ le8ec:
 	and #RightDPad
 	beq le951
 	lda ObjectXVelFrac,x
-	cadcy le619
+	cadcy ObjectXAccelData1
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
 	adc #0
@@ -4019,7 +4016,7 @@ le907:
 	beq le929
 	lda ObjectXVelFrac,x
 	sec
-	sbc le625,y
+	sbc ObjectXAccelData2,y
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
 	sbc #0
@@ -4029,7 +4026,7 @@ le929:
 	and #RightDPad
 	beq le951
 	lda ObjectXVelFrac,x
-	cadcy le625
+	cadcy ObjectXAccelData2
 	sta ObjectXVelFrac,x
 	lda ObjectXVelInt,x
 	adc #0
@@ -4191,156 +4188,157 @@ ObjectUpdateAnim:
 	inc ObjectStatus,x	; /
 	:rts
 
-lea58:
+ManageObjectVelocity:
 	lda ObjectUnknown4,x
-	beq lea60
+	beq @SkipDec
 	dec ObjectUnknown4,x
-lea60:
-	cpx #2
-	bcs lea8c
-	lda PlayerFreeze,x
-	beq lea8c
-	lda FrameCounter
-	lsr
-	bcc :+
-	inc ObjectAnimFrame,x
-	lda ObjectAnimFrame,x
-	and #3
-	sta ObjectAnimFrame,x
-	lda #1
-	sta ObjectStatus,x
-	dec ObjectCountdown,x
-	bne :+
-	lda #0
-	sta PlayerFreeze,x
-	sta ObjectStatus,x
-	lda #$20
-	sta SFX1Req
-	:rts
-lea8c:
-	lda ObjectYVelFrac,x
-	clc
-	ldy ObjectType,x
-	adc le601,y
-	sta ObjectYVelFrac,x
-	bcc lea9e
-	inc ObjectYVelInt,x
-lea9e:
-	lda ObjectYVelInt,x
-	bmi leac1
-	cmp le66d,y
-	bcc leadc
-	bne leab2
-	lda ObjectYVelFrac,x
-	cmp le661,y
-	bcc leadc
-leab2:
-	lda le661,y
-	sta ObjectYVelFrac,x
-	lda le66d,y
-	sta ObjectYVelInt,x
-	jmp leadc
-leac1:
-	cmp le685,y
-	bcc lead0
-	bne leadc
-	lda ObjectYVelFrac,x
-	cmp le679,y
-	bcs leadc
-lead0:
-	lda le679,y
-	sta ObjectYVelFrac,x
-	lda le685,y
-	sta ObjectYVelInt,x
-leadc:
-	jsr ObjectApplyYVelocity
-	cmp #$f8
-	bcs leb0d
-	cmp #$e8
-	bcc leb0d
-	lda #$ff
-	sta ObjectBalloons,x
-	lda #4		; \ Do Water Plonk
-	sta $bb		; / Animation
-	lda ObjectXPosInt,x
-	sta SplashXOffset
-	cpx #2
-	bcc leb05
-	lda #$80
-	sta ObjectBalloons,x
-	lda #0
-	sta ObjectStatus,x
-	lda #1
-	sta $f3
-	bne leb0d
-leb05:
-	lda PhaseType
-	bne leb0d
-	lda #$40
-	sta SFX1Req
-leb0d:
-	lda ObjectXVelInt,x
-	bmi leb30
-	cmp le63d,y
-	bcc leb4b
-	bne leb21
-	lda ObjectXVelFrac,x
-	cmp le631,y
-	bcc leb4b
-leb21:
-	lda le631,y
-	sta ObjectXVelFrac,x
-	lda le63d,y
-	sta ObjectXVelInt,x
-	jmp leb4b
-leb30:
-	cmp le655,y
-	bcc leb3f
-	bne leb4b
-	lda ObjectXVelFrac,x
-	cmp le649,y
-	bcs leb4b
-leb3f:
-	lda le649,y
-	sta ObjectXVelFrac,x
-	lda le655,y
-	sta ObjectXVelInt,x
-leb4b:
-	jsr ObjectApplyXVelocity
-	lda GameMode
-	beq leb62
-	lda ObjectXPosInt,x
-	cmp #$10
-	bcs leb5a
-	lda #$10
-leb5a:
-	cmp #$e0
-	bcc leb60
-	lda #$e0
-leb60:
-	sta ObjectXPosInt,x
-leb62:
-	lda PhaseType
-	beq :+
-	lda ObjectBalloons,x
-	bne :+
-	lda ObjectYPosInt,x
-	cmp #$c8
-	bcc :+
-	lda #$c7
-	sta ObjectYPosInt,x
-	lda ObjectType,x
-	cmp #$0b
-	bne leb84
-	dec ObjectType,x
-	jsr ObjectBounceY
-	jmp ReduceYVelocity
-leb84:
-	lda #2
-	sta ObjectBalloons,x
-	lda #3
-	sta ObjectType,x
-	:rts
+	@SkipDec:
+	cpx #2			; \ If Object X is not player
+	bcs @ManageYVel	; /
+	lda PlayerFreeze,x	; \ If Player X is not frozen
+	beq @ManageYVel		; /
+	; Manage frozen player
+		lda FrameCounter	; \
+		lsr					; | Return every other frame
+		bcc :+				; /
+		inc ObjectAnimFrame,x	; \
+		lda ObjectAnimFrame,x	; | Progress Anim Frame
+		and #3					; |
+		sta ObjectAnimFrame,x	; /
+		lda #1				; \ Keep status at 1
+		sta ObjectStatus,x	; /
+		dec ObjectCountdown,x	; Progress countdown
+		bne :+	; When countdown finishes:
+		lda #0				; \
+		sta PlayerFreeze,x	; | Remove freeze
+		sta ObjectStatus,x	; / Set status to 0
+		lda #$20	; \ Play Falling SFX
+		sta SFX1Req	; /
+		:rts
+	@ManageYVel:
+		lda ObjectYVelFrac,x	; \
+		clc						; |
+		ldy ObjectType,x		; | Y = Current object's Type
+		adc ObjectGravityData,y	; | Accelerate downward with gravity (Determined by type)
+		sta ObjectYVelFrac,x	; /
+		bcc @GravNoCarry		; \
+		inc ObjectYVelInt,x		; / If necessary, carry over into Int portion
+		@GravNoCarry:			
+		lda ObjectYVelInt,x
+		bmi @CheckYVelUp	; If Y Velocity is negative (upward) then impose lower limit
+		cmp ObjectMaxYVelDataInt,y	; \
+		bcc @ApplyYVel				; | If Y Velocity is too high, limit it, otherwise go ahead and apply Y Velocity
+		bne @LimitYVelDown			; |
+		lda ObjectYVelFrac,x		; | If YVelInt == Int portion of upper limit, then also check YVelFrac
+		cmp ObjectMaxYVelDataFrac,y	; |
+		bcc @ApplyYVel				; /
+		@LimitYVelDown:
+			lda ObjectMaxYVelDataFrac,y	; \
+			sta ObjectYVelFrac,x		; | If Y Velocity was too high, set it back down to the maximum
+			lda ObjectMaxYVelDataInt,y	; |
+			sta ObjectYVelInt,x			; /
+			jmp @ApplyYVel
+		@CheckYVelUp:
+			cmp ObjectMinYVelDataInt,y	; \
+			bcc @LimitYVelUp			; | If Y Velocity is too negative, limit it, otherwise go ahead and apply Y Velocity
+			bne @ApplyYVel				; |
+			lda ObjectYVelFrac,x		; | If YVelInt == Int portion of lower limit, then also check YVelFrac
+			cmp ObjectMinYVelDataFrac,y	; |
+			bcs @ApplyYVel				; /
+			@LimitYVelUp:
+				lda ObjectMinYVelDataFrac,y	; \
+				sta ObjectYVelFrac,x		; | If Y Velocity was too low, set it back up to the minimum
+				lda ObjectMinYVelDataInt,y	; |
+				sta ObjectYVelInt,x			; /
+		@ApplyYVel:
+			jsr ObjectApplyYVelocity
+			cmp #$f8		; \ If object hasn't fallen into the water completely
+			bcs @ManageXVel	; | Then go on to managing X Velocity
+			cmp #$e8		; |
+			bcc @ManageXVel	; / Otherwise, kill them
+			lda #$ff
+			sta ObjectBalloons,x
+			lda #4			; \ Do Water Plonk
+			sta SplashAnim	; / Animation
+			lda ObjectXPosInt,x
+			sta SplashXOffset
+			cpx #2			; \ If Object X is Player
+			bcc @PlayerSink	; /
+			lda #$80
+			sta ObjectBalloons,x
+			lda #0
+			sta ObjectStatus,x
+			lda #$01	; \ Play Bubble Rise SFX
+			sta SFX3Req	; /
+			bne @ManageXVel
+			@PlayerSink:
+			lda PhaseType
+			bne @ManageXVel
+			lda #$40
+			sta SFX1Req
+	@ManageXVel:
+		lda ObjectXVelInt,x
+		bmi @CheckXVelLeft
+		cmp ObjectMaxXVelDataInt,y
+		bcc @ApplyXVel
+		bne @LimitXVelRight
+		lda ObjectXVelFrac,x
+		cmp ObjectMaxXVelDataFrac,y
+		bcc @ApplyXVel
+		@LimitXVelRight:
+			lda ObjectMaxXVelDataFrac,y
+			sta ObjectXVelFrac,x
+			lda ObjectMaxXVelDataInt,y
+			sta ObjectXVelInt,x
+			jmp @ApplyXVel
+		@CheckXVelLeft:
+			cmp ObjectMinXVelDataInt,y
+			bcc @LimitXVelLeft
+			bne @ApplyXVel
+			lda ObjectXVelFrac,x
+			cmp ObjectMinXVelDataFrac,y
+			bcs @ApplyXVel
+			@LimitXVelLeft:
+				lda ObjectMinXVelDataFrac,y
+				sta ObjectXVelFrac,x
+				lda ObjectMinXVelDataInt,y
+				sta ObjectXVelInt,x
+		@ApplyXVel:
+			jsr ObjectApplyXVelocity
+			lda GameMode
+			beq leb62
+			lda ObjectXPosInt,x
+			cmp #$10
+			bcs leb5a
+			lda #$10
+			leb5a:
+			cmp #$e0
+			bcc leb60
+			lda #$e0
+			leb60:
+			sta ObjectXPosInt,x
+			leb62:
+			lda PhaseType
+			beq :+
+			lda ObjectBalloons,x
+			bne :+
+			lda ObjectYPosInt,x
+			cmp #$c8
+			bcc :+
+			lda #$c7
+			sta ObjectYPosInt,x
+			lda ObjectType,x
+			cmp #$0b
+			bne leb84
+			dec ObjectType,x
+			jsr ObjectBounceY
+			jmp ReduceYVelocity
+			leb84:
+			lda #2
+			sta ObjectBalloons,x
+			lda #3
+			sta ObjectType,x
+			:rts
 
 ObjectApplyXVelocity:
 	lda ObjectXPosFrac,x	; \ Apply Velocity to
@@ -4371,126 +4369,126 @@ ObjectYApplyYVelocity:
 	jmp SwapXY	; Swap X & Y back before returning
 
 lebc4:
-	cpx #2		; \ If not player
-	bcs lebe3	; /
+	cpx #2			; \ If not player
+	bcs @Enemies	; /
 	lda ObjectBalloons,x	; \ If player still has balloons
-	bne lebd6				; /
+	bne @Players			; /
 	lda ObjectAnimFrame,x	; \ If player animation frame != 0
-	bne lebd6				; /
+	bne @Players			; /
 	lda #0				; \ Then Player Status = 0 (Dead)
 	sta ObjectStatus,x	; /
 	rts
-lebd6:	; Player
-	lda ObjectStatus,x	; \ If Player Status < 6
-	cmp #6				; | Then ?
-	bcc lec38			; /
-	lda #1				; \ Else Status = 1
-	sta ObjectStatus,x	; /
-	dec ObjectBalloons,x	; Decrease one balloon
-	rts
-lebe3:	; Enemy
-	lda ObjectBalloons,x	; \ If Enemy Status == 2
-	cmp #2					; | Then ?
-	beq lec38				; /
-	lda ObjectAnimFrame,x	; \ If enemy animation frames != 0
-	bne :+					; / Then
-	lda ObjectBalloons,x	; \ If Enemy Status != 0
-	bne lebf7				; / Then
-	lda #0				; \ Enemy Status = 0 (Dead)
-	sta ObjectStatus,x	; /
-	rts
-lebf7:
-	lda ObjectStatus,x	; \ If Enemy Status != 0
-	bne lebfe			; / Then
-	inc ObjectStatus,x	; Increase Enemy Status
-	:rts
-lebfe:
-	cmp #2	; \ If Player
-	bcc :-	; / then return
-	dec ObjectCountdown,x
-	bne :+
-	lda EnemyInflateSpeed
-	sta ObjectCountdown,x
-	inc ObjectStatus,x
-	lda ObjectStatus,x
-	cmp #7
-	bcc :+
-	lda #2
-	sta ObjectBalloons,x
-	lda #0
-	sta ObjectStatus,x
-	ldy ObjectType,x
-	lda lecae,y
-	ldy ObjectUnknown5,x
-	bne lec2f
-	dec ObjectUnknown5,x
-	lda ObjectType,x
-	and #3
-	lec2f:
-	sta ObjectType,x
-	lda #$fe
-	sta ObjectYVelInt,x
-	:rts
-lec38:
-	jsr ObjectUpdateAction
-	lda ObjectAction,x	; Limit action to valid inputs
-	and #ABtn | BBtn | LeftDPad | RightDPad
-	beq @ApplyObjectAction
-	cpx #2					; \ If Enemy
-	bcs @ApplyObjectAction	; / Skip
-	lda #0					; \ If Player
-	sta PlayerInvincible,x	; / Disable invincibility
-	@ApplyObjectAction:
-		lda ObjectAction,x	; \
-		and #BBtn			; | B button
-		bne @BPressed		; /
-		lda ObjectAction,x	; \
-		and #ABtn			; | A button
-		bne @APressed		; /
-		lda #0				; \
-		sta ABtnCooldown,x	; | Mark the A button as lifted
-		beq :+				; / Return
-	@APressed:
-		lda ABtnCooldown,x	; \ Return if the A Button was already being pressed
-		bne :+				; /
-	@BPressed:
-	lda ObjectStatus,x
-	cmp #2
-	bcc lec75
-	dec ObjectYPosInt,x
-	dec ObjectYPosInt,x
-	lda #0
-	sta ObjectYVelFrac,x
-	sta ObjectYVelInt,x
-	beq lec7e
-lec75:
-	cmp #1
-	beq lec7e
-	lda ObjectAnimFrame,x
-	bne :+	; Return
-lec7e:
-	lda #0
-	sta ObjectStatus,x
-	lda #1
-	sta ObjectAnimFrame,x
-	lda #1
-	sta ABtnCooldown,x
-	ldy #0
-	cpx #2
-	bcc lec93
-	iny
-lec93:
-	lda SFX1Req,y
-	ora #$10
-	sta SFX1Req,y
-	lda ObjectYVelFrac,x
-	sec
-	ldy ObjectType,x
-	sbc le60d,y
-	sta ObjectYVelFrac,x
-	bcs :+
-	dec ObjectYVelInt,x
-	:rts
+	@Players:	; Player
+		lda ObjectStatus,x	; \ If Player Status < 6
+		cmp #6				; | Then check input
+		bcc lec38			; /
+		lda #1				; \ Else Status = 1
+		sta ObjectStatus,x	; /
+		dec ObjectBalloons,x	; Decrease one balloon
+		rts
+	@Enemies:	; Enemy
+		lda ObjectBalloons,x	; \ If Enemy Balloons == 2
+		cmp #2					; | Then check input
+		beq lec38				; /
+		lda ObjectAnimFrame,x	; \ If enemy animation frames != 0
+		bne :+					; / Then
+		lda ObjectBalloons,x	; \ If Enemy Status != 0
+		bne @EnemyAlive			; / Then
+		lda #0				; \ Enemy Status = 0 (Dead)
+		sta ObjectStatus,x	; /
+		rts
+		@EnemyAlive:
+			lda ObjectStatus,x	; \ If Enemy Status != 0
+			bne lebfe			; / Then
+			inc ObjectStatus,x	; Increase Enemy Status
+			:rts
+		lebfe:
+			cmp #2	; \ If Player
+			bcc :-	; / then return
+			dec ObjectCountdown,x
+			bne :+
+			lda EnemyInflateSpeed
+			sta ObjectCountdown,x
+			inc ObjectStatus,x
+			lda ObjectStatus,x
+			cmp #7
+			bcc :+
+			lda #2
+			sta ObjectBalloons,x
+			lda #0
+			sta ObjectStatus,x
+			ldy ObjectType,x
+			lda lecae,y
+			ldy ObjectUnknown5,x
+			bne lec2f
+			dec ObjectUnknown5,x
+			lda ObjectType,x
+			and #3
+			lec2f:
+			sta ObjectType,x
+			lda #$fe
+			sta ObjectYVelInt,x
+			:rts
+	lec38:
+		jsr ObjectUpdateAction
+		lda ObjectAction,x	; Limit action to valid inputs
+		and #ABtn | BBtn | LeftDPad | RightDPad
+		beq @ApplyObjectAction
+		cpx #2					; \ If Enemy
+		bcs @ApplyObjectAction	; / Skip
+		lda #0					; \ If Player
+		sta PlayerInvincible,x	; / Disable invincibility
+		@ApplyObjectAction:
+			lda ObjectAction,x	; \
+			and #BBtn			; | B button
+			bne @BPressed		; /
+			lda ObjectAction,x	; \
+			and #ABtn			; | A button
+			bne @APressed		; /
+			lda #0				; \
+			sta ABtnCooldown,x	; | Mark the A button as lifted
+			beq :+				; / Return
+		@APressed:
+			lda ABtnCooldown,x	; \ Return if the A Button was already being pressed
+			bne :+				; /
+		@BPressed:
+		lda ObjectStatus,x
+		cmp #2
+		bcc lec75
+		dec ObjectYPosInt,x
+		dec ObjectYPosInt,x
+		lda #0
+		sta ObjectYVelFrac,x
+		sta ObjectYVelInt,x
+		beq lec7e
+		lec75:
+			cmp #1
+			beq lec7e
+			lda ObjectAnimFrame,x
+			bne :+	; Return
+		lec7e:
+			lda #0
+			sta ObjectStatus,x
+			lda #1
+			sta ObjectAnimFrame,x
+			lda #1
+			sta ABtnCooldown,x
+			ldy #0
+			cpx #2
+			bcc lec93
+			iny
+			lec93:
+			lda SFX1Req,y
+			ora #$10
+			sta SFX1Req,y
+			lda ObjectYVelFrac,x
+			sec
+			ldy ObjectType,x
+			sbc ObjectFlapAccelData,y
+			sta ObjectYVelFrac,x
+			bcs :+
+			dec ObjectYVelInt,x
+			:rts
 
 lecae:
 	.BYTE $01,$02,$02,$03
@@ -4499,7 +4497,7 @@ lecae:
 
 lecba:
 	lda ObjectStatus,x	; \ If Object(x).Status != 0
-	bne :+	; / then don't do anything
+	bne :+				; / then don't do anything
 	jsr le7b1
 	jsr ObjectApplyXVelocity
 	lda ObjectYPosFrac,x
@@ -4513,7 +4511,7 @@ lecba:
 	bcc lecdb
 	lda #$ff
 	sta ObjectBalloons,x
-lecdb:
+	lecdb:
 	phx
 	ldy #1
 	@Loop:
@@ -4538,8 +4536,8 @@ lecdb:
 		sta ObjectCountdown,x
 		lda #120
 		sta ScrollLockTimer
-		lda #2
-		sta SFX1Req
+		lda #$02	; \ Play Pop SFX
+		sta SFX1Req	; /
 		lda #50
 		sty TargetUpdateScore
 		jsr AddScore
@@ -4652,7 +4650,7 @@ ledc1:
 	lda ObjectYVelInt,x
 	bmi ledd6
 	lda (TopPointer),y
-	sbc #$18
+	sbc #24
 	sta ObjectYPosInt,x
 	inc ObjectYPosInt,x
 	lda #1
@@ -4698,15 +4696,15 @@ lee08:
 	sta $f1
 	:rts
 
-lee25_collision:
-	ldx #7	; Seems to compare balloons from objects
+CheckObjectPairCollision:
+	ldx #7
 	@LoopX:
-		stx Temp12
-		ldy Temp12
-		dey
-		bpl @LoopY
-		@NextYLocal:
-		jmp @NextY
+		stx Temp12	; \ For each X, start Y at the value just before
+		ldy Temp12	; | That way, duplicate pairs are not considered
+		dey			; /
+		bpl @LoopY	;If Y goes negative (because X was 0) then finish
+		@NextYLocal:	;A local, branchable way to jump to the bottom of the Y loop from the top
+			jmp @NextY
 		@LoopY:
 			lda ObjectBalloons,x	; \
 			bmieq @NextYLocal		; | Skip this pair if either object 
@@ -4714,15 +4712,15 @@ lee25_collision:
 			bmieq @NextYLocal		; /
 			lda #0				; \
 			sta CollisionFlags	; / Clear collision flags
+
 			lda ObjectYPosInt,y		; \
-			sec						; | 
-			sbc ObjectYPosInt,x		; | If abs(Object(y).Y - Object(x).Y)
-			jsr GetAbsoluteValue	; | <= #$18
+			ssbcx ObjectYPosInt		; | If abs(Object(y).Y - Object(x).Y)
+			jsr GetAbsoluteValue	; | <= 24
 			cmp #24					; | then
 			bcs @leec0				; /
 			lda ObjectYPosInt,x		; \ If
 			cadc #24				; | abs((Object(y).Y + 7)
-			sta Temp12				; |   - (Object(x).Y + #$18))
+			sta Temp12				; |   - (Object(x).Y + 24))
 			lda ObjectYPosInt,y		; | >= 4 then
 			cadc #7					; |
 			ssbc Temp12				; |
@@ -4784,15 +4782,15 @@ lee25_collision:
 			jsr ObjectYVelSbcYX	; |
 			bmi @leef1			; /
 			@leed6:
-			jsr lf0bd	; \ Do both object X and Y exist?
-			bcs @leeed	; /
+			jsr CheckGroundedBird			; \ 
+			bcs @SkipYBounce	; /
 			jsr ObjectBounceY	; \
 			jsr ReduceYVelocity	; | Bounce both objects and reduce velocity vertically
 			jsr SwapXY			; |
 			jsr ObjectBounceY	; |
 			jsr ReduceYVelocity	; |
 			jsr SwapXY			; /
-			@leeed:
+			@SkipYBounce:
 			lda #1
 			sta $4b
 			@leef1:
@@ -4806,15 +4804,15 @@ lee25_collision:
 			jsr ObjectXVelSbcYX	; |
 			bmi @lef1e			; /
 			@lef03:
-			jsr lf0bd	; \ Do both object X and Y exist?
-			bcs @lef1a	; /
+			jsr CheckGroundedBird			; \
+			bcs @SkipXBounce	; /
 			jsr ObjectBounceX	; \
 			jsr ReduceXVelocity	; | Bounce both objects and reduce velocity horizontally
 			jsr SwapXY			; |
 			jsr ObjectBounceX	; |
 			jsr ReduceXVelocity	; |
 			jsr SwapXY			; /
-			@lef1a:
+			@SkipXBounce:
 			lda #1
 			sta $4b
 			@lef1e:
@@ -4837,24 +4835,24 @@ lef37:
 	bcc lef42	; |
 	cpy #2		; | Is Object Y a player?
 	bcc lef42	; /
-	jmp lf043	; Skip
+	jmp lf043	; Skip if both enemies
 	lef42:
 	lda #0
 	sta $0487
 	lda ObjectUnknown4,x
 	beq lef4f
 	jmp lf043	; Skip
-lef4f:
+	lef4f:
 	lda $4b
 	bne lef56
 	jmp lf043	; Skip
-lef56:
+	lef56:
 	cpx #2
 	bcs lef61
 	lda PlayerInvincible,x
 	beq lef72
 	jmp lf043	; Skip
-lef61:
+	lef61:
 	lda ObjectBalloons,x
 	cmp #1
 	bne lef72
@@ -4863,13 +4861,13 @@ lef61:
 	bcs lef7f
 	lda #1
 	sta $0487
-lef72:
+	lef72:
 	lda ObjectYPosInt,y
 	cadc #4
 	cmp ObjectYPosInt,x
 	bcc lef7f
 	jmp lf043	; Skip
-lef7f:
+	lef7f:
 	lda #20
 	sta ObjectUnknown4,x
 	lda #0
@@ -4880,7 +4878,7 @@ lef7f:
 	cmp #2
 	beq lef97
 	jmp lf043	; Skip
-lef97:
+	lef97:
 	lda SFX1Req
 	ora #2
 	sta SFX1Req
@@ -4897,19 +4895,19 @@ lef97:
 	pla
 	bne lefb7
 	jmp lf043	; Skip
-lefb7:
+	lefb7:
 	sta ObjectStatus,x
 	lda #0
 	sta ObjectAnimFrame,x
 	beq lefea
-lefc0:
+	lefc0:
 	dec ObjectBalloons,x
 	bne lefce
 	lda #$ff
 	sta ObjectYVelInt,x
 	lda #0
 	sta ObjectYVelFrac,x
-lefce:
+	lefce:
 	lda #0
 	sta ObjectStatus,x
 	sta ObjectXVelFrac,x
@@ -4918,13 +4916,13 @@ lefce:
 	bmi lefe0
 	lda #$ff
 	bne lefe2
-lefe0:
+	lefe0:
 	lda #0
-lefe2:
+	lefe2:
 	sta ObjectUnknown3,x
 	lda #$80
 	sta ObjectUnknown2,x
-lefea:
+	lefea:
 	sty Temp12
 	ldy ObjectType,x
 	lda lf05e,y
@@ -4939,10 +4937,10 @@ lefea:
 	beq lf011
 	cmp #8
 	bcc lf011
-	lda $f1
+	lda SFX2Req
 	ora #$80
-	sta $f1
-lf011:
+	sta SFX2Req
+	lf011:
 	ldy ObjectType,x
 	lda lf06a,y
 	sta Temp13
@@ -4950,7 +4948,7 @@ lf011:
 	beq lf023
 	lda lf076,y
 	sta Temp13
-lf023:
+	lf023:
 	lda lf082,y
 	cadc $0487
 	sta Temp14
@@ -4966,7 +4964,7 @@ lf023:
 	jsr AddScore
 	plx
 	ply
-lf043:
+	lf043:
 	lda ObjectType,x	; \ If Object X is not dead
 	cmp #11				; | then don't play any SFX
 	bne :+				; /
@@ -5019,22 +5017,23 @@ SwapXY:
 	ldy Temp12
 	rts
 
-lf0bd:
-	cpx #2	; \
-	bcc :+	; /
+CheckGroundedBird:	; Return with Carry set if object pair contains a grounded Balloon Bird
+	cpx #2	; \ If Object X is player,
+	bcc :+	; / Return with Carry clear
 	lda ObjectStatus,x	; \ If Object(x).Status < 2
-	cmp #2				; |
+	cmp #2				; | Return with Carry clear
 	bcc :+				; /
-	lda #1					; \ If 1 - Object(x).Balloons >= 0
-	cmp ObjectBalloons,x	; |
-	bcs :+					; |
-	cpy #2					; | If 1 - Object(x).Balloons - 2 < 0
-	bcc :+					; /
+	lda #1					; \ 
+	cmp ObjectBalloons,x	; | If Object(x).Balloons <= 1
+	bcs :+					; / Return with Carry set
+
+	cpy #2	; \ If Object Y is player,
+	bcc :+	; / Return with Carry clear
 	lda ObjectStatus,y	; \ If Object(y).Status < 2
 	cmp #2				; |
 	bcc :+				; /
 	lda #1					; \ If 1 - Object(y).Balloons
-	cmp ObjectBalloons,y	; /
+	cmp ObjectBalloons,y	; / Return result in Carry
 	:rts
 
 ObjectBounceX:

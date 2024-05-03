@@ -180,25 +180,24 @@ EnemyAnimUpper:
 .HIBYTES EnemyAnims
 
 le34c:
-.BYTE $44,$2c,$00
-.BYTE $00,$00,$04
+	.BYTE $44,$2c,$00
+	.BYTE $00,$00,$04
 le352:
-    ;50 bytes
-.BYTE $24,$08,$00
+	.BYTE $24,$08,$00
 FishSpr0:
-.BYTE $00,$fc,$fc,$fe,$fc
+	.BYTE $00,$fc,$fc,$fe,$fc
 FishSpr1:
-.BYTE $00,$7b,$fc,$fc,$7c,$fc,$fc
+	.BYTE $00,$7b,$fc,$fc,$7c,$fc,$fc
 FishSpr2:
-.BYTE $00,$7d,$7e,$fc,$7f,$80,$fc
+	.BYTE $00,$7d,$7e,$fc,$7f,$80,$fc
 FishSpr3:
-.BYTE $00,$81,$82,$83,$84,$85,$86
+	.BYTE $00,$81,$82,$83,$84,$85,$86
 FishSpr4:
-.BYTE $00,$87,$88,$fc,$89,$8a,$fc
+	.BYTE $00,$87,$88,$fc,$89,$8a,$fc
 FishSpr5:
-.BYTE $00,$8b,$8c,$fc,$8d,$8e,$fc
+	.BYTE $00,$8b,$8c,$fc,$8d,$8e,$fc
 FishSpr6:
-.BYTE $00,$8f,$90,$fc,$fc,$fc,$fc
+	.BYTE $00,$8f,$90,$fc,$fc,$fc,$fc
 
 .define FishSprPointers FishSpr0, FishSpr1, FishSpr2, FishSpr3, FishSpr4, FishSpr5, FishSpr6
 FishSprPointersLower:

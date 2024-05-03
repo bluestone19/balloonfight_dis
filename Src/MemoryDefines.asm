@@ -130,11 +130,11 @@ TempVel				.set $2B
 TempVelFrac			.set TempWord
 TempVelInt			.set $2C
 
-VelMult				.set $2d
+VelMult				.set $2D
 
-PreciseVel			.set $2e
+PreciseVel			.set $2E
 PreciseVelSub		.set PreciseVel
-PreciseVelFrac		.set $2f
+PreciseVelFrac		.set $2F
 PreciseVelInt		.set $30
 
 ; Sound:
