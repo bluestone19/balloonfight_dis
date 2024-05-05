@@ -1174,9 +1174,9 @@ FishManage:
 		cmp #$40			; | then don't do anything
 		bcc :+				; | If not equal to 64
 		bne lc856			; / then don't play SFX
-		lda $f1		; \
+		lda SFX2Req	; \
 		ora #$08	; | Play Sound Effect
-		sta $f1		; /
+		sta SFX2Req	; /
 	lc856:
 		and #$03
 		tax
@@ -1664,7 +1664,7 @@ lcc2f:
 
 PlayBumpSFX:
 	lda SFX2Req
-	ora #2
+	ora #$02
 	sta SFX2Req
 	rts
 
@@ -2020,22 +2020,22 @@ CheckBalloonXCollision:
 ;----------------------
 
 lcf13:
-	lda #$20
-	sta MusicReq
+	lda #$20		; \ Play Bonus Phase music
+	sta MusicReq	; /
 	jsr SetBonusPhase
 	jsr InitBalloons
 	ldx TwoPlayerFlag
-lcf1f:
-	lda P1Lives,x
-	bmi lcf26
-	jsr InitPlayerType
-lcf26:
-	dex
-	bpl lcf1f
+	@Loop:
+		lda P1Lives,x		; \
+		bmi @SkipInit		; | 
+		jsr InitPlayerType	; |
+		@SkipInit:			; /
+		dex
+		bpl @Loop
 	ldx #0
-	stx $bd
-	stx $be
-	lda #$14
+	stx PlayerInvincible
+	stx PlayerInvincible+1
+	lda #20
 	sta $05cb
 lcf34:
 	jsr Pause
@@ -2051,7 +2051,7 @@ lcf47:
 	bne lcf34
 	ldx #9
 lcf51:
-	lda $055d,x
+	lda BalloonStatus,x
 	bpl lcf34
 	dex
 	bpl lcf51
@@ -2059,19 +2059,19 @@ lcf51:
 	bne lcf34
 	jsr ClearPPU
 	ldx #2
-	stx $46
+	stx StatusUpdateFlag
 	jsr WaitYFrames
 	lday BonusEndScreenPalette
 	jsr CopyPPUBlock
-	lday ld15a
+	lday SuperBonusTextAttribute
 	jsr CopyPPUBlock
-	lday ld165
+	lday BonusStatusAttribute
 	jsr CopyPPUBlock
 	ldx TwoPlayerFlag
 lcf7e:
-	lda #$20
+	lda #32
 	sta ObjectXPosInt,x
-	lda ld19e,x
+	lda PlayerBonusYPos,x
 	sta ObjectYPosInt,x
 	lda #3
 	sta ObjectStatus,x
@@ -2081,16 +2081,16 @@ lcf7e:
 	jsr le3a4
 	dex
 	bpl lcf7e
-	lda #$44
-	sta $0567
-	sta $0568
-	lda #$54
-	sta $057b
-	lda #$74
-	sta $057c
+	lda #68
+	sta BalloonXPos
+	sta BalloonXPos+1
+	lda #84
+	sta BalloonYPos
+	lda #116
+	sta BalloonYPos+1
 	lda #1
-	sta $055d
-	sta $055e
+	sta BalloonStatus
+	sta BalloonStatus+1
 	ldx TwoPlayerFlag
 lcfb5:
 	jsr ManageBalloonXSprite
@@ -2160,12 +2160,12 @@ ld02e:
 	sta SFX1Req
 	jsr CheckTotalBonusBalloons
 	bne ld068
-	lday ld170
+	lday PerfectText
 	jsr CopyPPUBlock
 	jsr FinishFrame
 	ldx #$1a
 ld04f:
-	lda ld184,x
+	lda SuperBonusText,x
 	sta $57,x
 	dex
 	bpl ld04f
@@ -2195,8 +2195,8 @@ ld070:
 	ldy #0
 	jsr CopyPPUBlock
 ld08e:
-	lda #1
-	sta $f1
+	lda #$01
+	sta SFX2Req
 	ldx #2
 	jsr WaitYFrames
 	lda $5d
@@ -2222,8 +2222,8 @@ ld0c0:
 	jsr UpdateScore
 	dec TargetUpdateScore
 	bpl ld0c0
-	lda #1
-	sta $f1
+	lda #$01
+	sta SFX2Req
 	jsr Wait20Frames
 ld0ce:
 	lda #0
@@ -2279,30 +2279,35 @@ BonusEndScreenPalette:
 	.BYTE $0f,$30,$27,$15	;White, 	Orange, 	Magenta
 	.BYTE $0f,$30,$02,$21	;White,		Blue,		Cyan
 	.BYTE $0f,$16,$16,$16	;Red,		Red,		Red
-
-ld13e:
-.BYTE $21,$73,$0b,$29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26
-ld14c:
-.BYTE $21,$f3,$0b,$29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26
-ld15a:
-.BYTE $23,$e8,$08,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
-ld165:
-.BYTE $23,$c0,$08,$40,$50,$50,$50,$50,$90,$a0,$a0
-ld170:
-.BYTE $22,$88,$11,$19,$24,$0e,$24,$1b,$24,$0f,$24,$0e,$24,$0c,$24,$1d,$24,$2c,$2c,$2c
-ld184:
-.BYTE $22,$c6,$17,$1c,$1e,$19,$0e,$1b,$24,$0b,$18,$17,$1e,$1c,$24
-.BYTE $24,$24,$01,$00,$00,$00,$00,$19,$1d,$1c,$2c
-ld19e:
-.BYTE $50,$70
+BonusTotalText:
+	;P1 Bonus Total Text
+	.BYTE $21,$73,11	; 11 Bytes to 0x2173
+	.BYTE $29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26	; "=00000 PTS."
+	;P2 Bonus Total Text
+	.BYTE $21,$f3,11	; 11 Bytes to 0x21F3
+	.BYTE $29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26	; "=00000 PTS."
+SuperBonusTextAttribute:
+	.BYTE $23,$e8,8		; 8 Bytes to 0x23E8
+	.BYTE $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff	; Set attributes for the SUPER BONUS text
+BonusStatusAttribute:
+	.BYTE $23,$c0,8		; 8 Bytes to 0x23C0
+	.BYTE $40,$50,$50,$50,$50,$90,$a0,$a0
+PerfectText:
+	.BYTE $22,$88,17	; 17 Bytes to 0x2288
+	.BYTE $19,$24,$0e,$24,$1b,$24,$0f,$24,$0e,$24,$0c,$24,$1d,$24,$2c,$2c,$2c ; "P E R F E C T !!!"
+SuperBonusText:
+	.BYTE $22,$c6,23	; 23 Bytes to 0x22C6
+	.BYTE $1c,$1e,$19,$0e,$1b,$24,$0b,$18,$17,$1e,$1c,$24,$24,$24,$01,$00,$00,$00,$00,$19,$1d,$1c,$2c ; "SUPER BONUS   10000PTS."
+PlayerBonusYPos:
+	.BYTE $50,$70
 
 ld1a0:
 	ldx #28
-ld1a2:
-	lda ld13e,x
-	sta $57,x
-	dex
-	bpl ld1a2
+	@Loop:
+		lda BonusTotalText,x
+		sta $57,x
+		dex
+		bpl @Loop
 	ldx #4
 	ldy P1BonusBalloons
 	jsr ld1dc
@@ -2330,10 +2335,11 @@ ld1d5:
 	sty $5a
 	sta $5b
 	jmp UploadPPU
+
 ld1dc:
 	dey
 	bmi ld1fe
-	lda $0559
+	lda BalloonPts
 	cadcx $59
 	cmp #10
 	bcc ld1ed
@@ -2367,17 +2373,17 @@ ld208:
 
 ld213:
 	lda $59,x
-	cmp #$24
+	cmp #36
 	beq ld243
 	tay
 	bne ld238
 	lda $58,x
-	cmp #$24
+	cmp #36
 	beq ld243
 	lda $58,x
 	bne ld232
 	lda $57,x
-	cmp #$24
+	cmp #36
 	beq ld243
 	lda #10
 	sta $58,x
@@ -3567,8 +3573,8 @@ le553:
 	sta ObjectBalloons,x
 	lda #$f0
 	sta ObjectYPosInt,x
-	lda #4
-	sta $f1
+	lda #$04
+	sta SFX2Req
 	le584:
 	plx
 	rts
@@ -4121,7 +4127,7 @@ le9b6:
 	sta ObjectUnknown2,x
 	sta ObjectUnknown3,x
 	lda #$40	; \ Play SFX
-	sta $f1		; /
+	sta SFX2Req	; /
 	:rts
 le9f3:
 	lda #0
@@ -4691,9 +4697,9 @@ lee08:
 	lda ObjectDirection,x
 	eor #1
 	sta ObjectDirection,x
-	lda $f1
-	ora #2
-	sta $f1
+	lda SFX2Req
+	ora #$02
+	sta SFX2Req
 	:rts
 
 CheckObjectPairCollision:
