@@ -267,8 +267,8 @@ ObjectXVelInt		.set $042D	;$042D-$0435
 
 ;Extra Attributes
 ObjectCountdown		.set $045A	;$045A-$0462 Used for Auto-Input and spark death delay before falling
-ObjectUnknown2		.set $0463	;$0463-$046B
-ObjectUnknown3		.set $046C	;$046C-$0474
+ObjectDriftXVelFrac	.set $0463	;$0463-$046B
+ObjectDriftXVelInt	.set $046C	;$046C-$0474
 ObjectUnknown4		.set $0475	;$0475-$047D
 ObjectUnknown5		.set $047E	;$047E-$0486
 
@@ -324,11 +324,11 @@ PropellerYPos		.set $05DC	; $05DC-$05E5
 ; $05E6-$05EF
 ; $05F0-$05F9
 PropellerType		.set $05FA	; $05FA-$0603
-; $0604-$060D
-; $060E-$0617
+PropellerState		.set $0604	; $0604-$060D
+PropellerCountdown	.set $060E	; $060E-$0617
 
-; $0618-$0619 = ?
-; $061A-$061B = ?
+PopupCountdown		.set $0618	; $0618-$0619
+PopupState			.set $061A	; $061A-$061B
 
 ; $0620-$0628 = ???
 ABtnCooldown		.set $0620

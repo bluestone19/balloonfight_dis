@@ -1571,7 +1571,7 @@ PropellerManage:
 	bmi :+
 	@Loop:
 		jsr lcba8
-		lda $0604,x
+		lda PropellerState,x
 		beq @Next
 		txa
 		eor FrameCounter
@@ -1586,9 +1586,9 @@ PropellerManage:
 		lda PropellerType,x
 		cmp #1
 		bne @Next
-		dec $060e,x
+		dec PropellerCountdown,x
 		bne @Next
-		dec $0604,x
+		dec PropellerState,x
 	@Next:
 		dex
 		bpl @Loop
@@ -1596,70 +1596,68 @@ PropellerManage:
 
 lcba8:
 	ldy #7
-	lda $0604,x
-	bne lcbb2
+	lda PropellerState,x
+	bne @Loop
 	jmp lcc3a
-lcbb2:
-	lda ObjectBalloons,y
-	bmi lcc2f
-	beq lcc2f
-	cpy #2
-	bcc lcbc1
-	cmp #1
-	beq lcc2f
-lcbc1:
-	lda ObjectXPosInt,y
-	cadc #8
-	sec
-	sbc PropellerXPos,x
-	sta Temp12
-	jsr GetAbsoluteValue
-	cmp #18
-	bcs lcc2f
-	lda ObjectYPosInt,y
-	cadc #12
-	sec
-	sbc PropellerYPos,x
-	sta Temp13
-	jsr GetAbsoluteValue
-	cmp #18
-	bcs lcc2f
-	lda Temp12
-	bmi lcbfc
-	cmp #3
-	bcc lcc0b
-	lda #2
-	sta ObjectYVelInt,y
-	jsr PlayBumpSFX
-	jsr ObjectYApplyYVelocity
-	bne lcc0b
-lcbfc:
-	cmp #$fd
-	bcs lcc0b
-	lda #$fe
-	sta ObjectYVelInt,y
-	jsr ObjectYApplyYVelocity
-	jsr PlayBumpSFX
-lcc0b:
-	lda Temp13
-	bmi lcc20
-	cmp #3
-	bcc lcc2f
-	lda #2
-	sta ObjectXVelInt,y
-	jsr ObjectYApplyXVelocity
-	jsr PlayBumpSFX
-	bne lcc2f
-lcc20:
-	cmp #$fd
-	bcs lcc2f
-	lda #$fe
-	sta ObjectXVelInt,y
-	jsr ObjectYApplyXVelocity
-	jsr PlayBumpSFX
-lcc2f:
-	dey
-	bpl lcbb2
+	@Loop:
+		lda ObjectBalloons,y	; \ If Object Y has <=0 Balloons,
+		bmieq @Next				; / Skip
+		cpy #2				; \ If Object Y is player,
+		bcc @ValidObject	; / continue
+		cmp #1		; \ If Object Y is enemy with Balloons == 1,
+		beq @Next	; / Skip
+		@ValidObject:
+		lda ObjectXPosInt,y		; \
+		cadc #8					; | |Object(y).XPos + 8 - Propeller(x).XPos| >= 18
+		ssbcx PropellerXPos		; | Then skip (Too far horizontally)
+		sta Temp12				; |	Temp12 = X Offset
+		jsr GetAbsoluteValue	; |
+		cmp #18					; |
+		bcs @Next				; /
+		lda ObjectYPosInt,y		; \
+		cadc #12				; | |Object(y).YPos + 12 - Propeller(x).YPos| >= 18
+		ssbcx PropellerYPos		; | Then skip (Too far vertically)
+		sta Temp13				; | Temp13 = Y Offset
+		jsr GetAbsoluteValue	; |
+		cmp #18					; |
+		bcs @Next				; /
+
+		lda Temp12			; \ If X offset is negative, 
+		bmi @LeftSideHit	; / then the left side of the propeller was hit
+		cmp #3				; \ If X offset is between 0 and 2 then
+		bcc @CheckYOffset	; / Don't bounce them vertically
+		lda #2						; \ Set Object(y).YVelInt to 2
+		sta ObjectYVelInt,y			; | (Send them flying downward if they hit the right side)
+		jsr PlayBumpSFX				; | Also play Bump SFX
+		jsr ObjectYApplyYVelocity	; /
+		bne @CheckYOffset	; Always go on to Check Y
+		@LeftSideHit:
+			cmp #<-3			; \ If X offset is between -3 and 0 then
+			bcs @CheckYOffset	; / Don't bounce them vertically
+			lda #<-2					; \ Set Object(y).YVelInt to -2
+			sta ObjectYVelInt,y			; | (Send them flying upward if they hit the left side)
+			jsr ObjectYApplyYVelocity	; |
+			jsr PlayBumpSFX				; / Also play Bump SFX
+		@CheckYOffset:
+			lda Temp13		; \ If Y offset is negative, 
+			bmi @TopSideHit	; / then the top side of the propeller was hit
+			cmp #3		; \ If Y offset is between 0 and 2 then
+			bcc @Next	; / Don't bounce them horizontally
+			lda #2						; \ Set Object(y).XVelInt to 2
+			sta ObjectXVelInt,y			; | (Send them flying rightward if they hit the bottom side)
+			jsr ObjectYApplyXVelocity	; |
+			jsr PlayBumpSFX				; / Also play Bump SFX
+			bne @Next
+		@TopSideHit:
+			cmp #<-3	; \ If Y offset is between -3 and 0 then
+			bcs @Next	; / Don't bounce them horizontally
+			lda #<-2					; \ Set Object(y).XVelInt to -2
+			sta ObjectXVelInt,y			; | (Send them flying leftward if they hit the top side)
+			jsr ObjectYApplyXVelocity	; |
+			jsr PlayBumpSFX				; / Also play Bump SFX
+		@Next:
+		dey
+		bpl @Loop
 	rts
 
 PlayBumpSFX:
@@ -1719,9 +1717,9 @@ lcc3a:
 	cmp #11
 	bcs lccb8
 	lda #1
-	sta $0604,x
+	sta PropellerState,x
 	lda #$32
-	sta $060e,x
+	sta PropellerCountdown,x
 	lccb8:
 	dey
 	bmi :+
@@ -2516,87 +2514,87 @@ InitGameMode:
 		sta PPUBlockAddrHi			; |
 		jsr GetByteFromLoadPointer	; |
 		sta PropellerType,x			; /
-		lda PPUBlockAddrLo
-		aslr 3
-		adc #12
-		sta PropellerXPos,x
-		lda PPUBlockAddrHi
-		aslr 3
-		adc #12
-		sta PropellerYPos,x
-		lda #0
-		sta $0604,x
+		lda PPUBlockAddrLo	; \
+		aslr 3				; | X Pos = (Tile X Pos * 8) + 12
+		adc #12				; |
+		sta PropellerXPos,x	; /
+		lda PPUBlockAddrHi	; \
+		aslr 3				; | Y Pos = (Tile Y Pos * 8) + 12
+		adc #12				; |
+		sta PropellerYPos,x	; /
+		lda #0					; \ Set propeller state to 0 (not spinning)
+		sta PropellerState,x	; /
 		jsr ld4fb_setppuaddr_render
 		sta $05e6,x
 		lda Temp13
 		sta $05f0,x
 		jsr ld56c
-		jsr ld53c
+		jsr SetPropellerAttribute
 		incr 2, PPUBlockAddrLo
-		jsr ld53c
+		jsr SetPropellerAttribute
 		incr 2, PPUBlockAddrHi
-		jsr ld53c
+		jsr SetPropellerAttribute
 		decr 2, PPUBlockAddrLo
-		jsr ld53c
+		jsr SetPropellerAttribute
 		inx
 		jmp @PropellerLoop	; Load another propeller data
 	@FinishPropellers:
-	dex			; \ Write amount of propellers to RAM
-	stx $05d1	; /
+	dex					; \ Write amount of propellers to RAM
+	stx PropellerCount	; /
 	jsr GetByteFromLoadPointer	; \
-	sta DataPointerLo					; | Load Enemy Data Pointer
+	sta DataPointerLo			; | Load Enemy Data Pointer
 	jsr GetByteFromLoadPointer	; |
-	sta DataPointerHi					; /
+	sta DataPointerHi			; /
 	ldy #0				; \
 	lda (DataPointer),y	; | Load Enemy Amount
 	tax					; |
 	dex					; |
-	bpl LoadEnemy		; /
+	bpl @LoadEnemy		; /
 	inc PhaseType		; If No Enemies then it's a Bonus Phase Type
-	jmp LoadCollision	; Skip Enemy Loading
-LoadEnemy:
-	iny
-	@LoadLoop:
-		lda (DataPointer),y		; \ Load Enemy X Position
-		iny						; |
-		sta ObjectXPosInt+2,x	; /
-		lda (DataPointer),y		; \ Load Enemy Y Position
-		iny						; |
-		sta ObjectYPosInt+2,x	; /
-		lda (DataPointer),y	; \ Load Enemy Type
-		iny					; |
-		sta ObjectType+2,x	; /
-		lda #2					; \ Initialize Enemy Status
-		sta ObjectStatus+2,x	; / (02 = Sitting)
-		lda #1					; \ Initialize Enemy Balloons
-		sta ObjectBalloons+2,x	; / (01 = Sitting/Parachute)
-		lda EnemyStartDelay		; \ Initialize Enemy Anim Timer
-		sta ObjectAnimTimer+2,x	; /
-		dex
-		bpl @LoadLoop	; Load another enemy data
-LoadCollision:
-	jsr GetByteFromLoadPointer	; \ Load Amount of Platforms
-	sta PlatformCount			; /
-	jsr GetByteFromLoadPointer	; \
-	sta LeftPointerLo			; | Load Platform Collision Pointer
-	jsr GetByteFromLoadPointer	; | Left Side
-	tay							; |
-	sta LeftPointerHi			; /
-	lda LeftPointerLo			; \
-	jsr NextPlatformPointer	; | Load Right Side Platform Collision Pointer
-	sta RightPointerLo			; |
-	sty RightPointerHi			; /
-	jsr NextPlatformPointer	; \
-	sta TopPointerLo			; | Load Top Side Platform Collision Pointer
-	sty TopPointerHi			; /
-	jsr NextPlatformPointer	; \
-	sta BottomPointerLo			; | Load Bottom Side Platform Collision Pointer
-	sty BottomPointerHi			; /
-ld3e1:
-	jsr ld5d9
-	jsr LoadPalette
-	jsr EnableNMI
-	jmp UploadPPUAndMask
+	jmp @LoadCollision	; Skip Enemy Loading
+	@LoadEnemy:
+		iny
+		@LoadLoop:
+			lda (DataPointer),y		; \ Load Enemy X Position
+			iny						; |
+			sta ObjectXPosInt+2,x	; /
+			lda (DataPointer),y		; \ Load Enemy Y Position
+			iny						; |
+			sta ObjectYPosInt+2,x	; /
+			lda (DataPointer),y	; \ Load Enemy Type
+			iny					; |
+			sta ObjectType+2,x	; /
+			lda #2					; \ Initialize Enemy Status
+			sta ObjectStatus+2,x	; / (02 = Sitting)
+			lda #1					; \ Initialize Enemy Balloons
+			sta ObjectBalloons+2,x	; / (01 = Sitting/Parachute)
+			lda EnemyStartDelay		; \ Initialize Enemy Anim Timer
+			sta ObjectAnimTimer+2,x	; /
+			dex
+			bpl @LoadLoop	; Load another enemy data
+	@LoadCollision:
+		jsr GetByteFromLoadPointer	; \ Load Amount of Platforms
+		sta PlatformCount			; /
+		jsr GetByteFromLoadPointer	; \
+		sta LeftPointerLo			; | Load Platform Collision Pointer
+		jsr GetByteFromLoadPointer	; | Left Side
+		tay							; |
+		sta LeftPointerHi			; |
+		lda LeftPointerLo			; /
+		jsr NextPlatformPointer	; \
+		sta RightPointerLo		; | Load Right Side Platform Collision Pointer
+		sty RightPointerHi		; /
+		jsr NextPlatformPointer	; \
+		sta TopPointerLo		; | Load Top Side Platform Collision Pointer
+		sty TopPointerHi		; /
+		jsr NextPlatformPointer	; \
+		sta BottomPointerLo		; | Load Bottom Side Platform Collision Pointer
+		sty BottomPointerHi		; /
+	ld3e1:
+		jsr ld5d9
+		jsr LoadPalette
+		jsr EnableNMI
+		jmp UploadPPUAndMask
 
 LoadPalette:
 	ldx #34					; \
@@ -2726,19 +2724,19 @@ ld4db:
 	:rts
 
 GetByteFromLoadPointer:
-	ldy #0
-	lda (LoadPointer),y
-	inc LoadPointerLo
-	bne :+
-	inc LoadPointerHi
+	ldy #0				; \ (No offset)
+	lda (LoadPointer),y	; / Load Byte from LoadPointer into A
+	inc LoadPointerLo	; \
+	bne :+				; | Increment LoadPointer
+	inc LoadPointerHi	; /
 	:rts
 
 GetByteFromDataPointer:
-	ldy #0
-	lda (DataPointer),y
-	inc DataPointerLo
-	bne :+
-	inc DataPointerHi
+	ldy #0				; \ (No offset)
+	lda (DataPointer),y	; / Load Byte from DataPointer into A
+	inc DataPointerLo	; \
+	bne :+				; | Increment DataPointer
+	inc DataPointerHi	; /
 	:rts
 
 ld4fb_setppuaddr_render:
@@ -2778,15 +2776,15 @@ ld51c:
 	pla
 	rts
 
-ld53c:
-	lda #$23
-	sta PPUADDR
+SetPropellerAttribute:
+	lda #$23	; \ Nametable 0's Attributes all have
+	sta PPUADDR	; / Addresses like $23XX
 	jsr ld51c
 	sta PPUADDR
 	lda PPUDATA
 	lda PPUDATA
-	and ld564,y
-	ora ld568,y
+	and PropellerAttrAnd,y
+	ora PropellerAttrOr,y
 	pha
 	lda #$23
 	sta PPUADDR
@@ -2796,10 +2794,17 @@ ld53c:
 	sta PPUDATA
 	rts
 
-ld564:	;This is attribute related
-.BYTE $fc,$f3,$cf,$3f
-ld568:
-.BYTE $01,$04,$10,$40
+PropellerAttrAnd:
+	.BYTE %11111100
+	.BYTE %11110011
+	.BYTE %11001111
+	.BYTE %00111111
+PropellerAttrOr:
+	.BYTE %00000001
+	.BYTE %00000100
+	.BYTE %00010000
+	.BYTE %01000000
+
 ld56c:
 	jsr lcccb
 	jmp UploadPPUAndMaskBuffer
@@ -2815,24 +2820,25 @@ InitBalloonTrip:	; Initialize Balloon Trip Game Mode
 	jsr ld5b8
 	inc PhaseType
 	jmp ld3e1
+
 ld593:
 	styappuaddr
 	ldx #0
-ld59b:
-	lda BGAttributes,x
-	sta PPUDATA
-	inx
-	cpx #8
-	bne ld59b
+	@Loop:
+		lda BGAttributes,x
+		sta PPUDATA
+		inx
+		cpx #8
+		bne @Loop
 	lda #0
 	ldx #$28
-	jsr ld5b1
+	jsr @Loop2
 	lda #$aa
 	ldx #$10
-ld5b1:
-	sta PPUDATA
-	dex
-	bne ld5b1
+	@Loop2:
+		sta PPUDATA
+		dex
+		bne @Loop2
 	rts
 
 ld5b8:
@@ -2842,45 +2848,45 @@ ld5b8:
 	jsr ld5c9
 	ldx #$40
 	lda #$5c
-ld5c9:
-	sta Temp12
-ld5cb:
-	txa
-	and #3
-	eor #3
-	ora Temp12
-	sta PPUDATA
-	dex
-	bne ld5cb
+	ld5c9:
+		sta Temp12
+		@Loop:
+			txa
+			and #3
+			eor #3
+			ora Temp12
+			sta PPUDATA
+			dex
+			bne @Loop
 	rts
 
 ld5d9:
 	ldx #0
-ld5db:
-	jsr ld651
-	jsr ld5f1
-	lda PPUAddressLo
-	ora #$04
-	sta PPUAddressLo
-	jsr ld5f1
-	inxr 2
-	cpx #$80
-	bne ld5db
+	@Loop:
+		jsr LoadStarXAddr
+		jsr ld5f1
+		lda PPUAddressLo
+		ora #$04
+		sta PPUAddressLo
+		jsr ld5f1
+		inxr 2
+		cpx #$80
+		bne @Loop
 	rts
 
 ld5f1:
-	lda PPUAddressLo
-	sta PPUADDR
-	lda PPUAddressHi
-	sta PPUADDR
-	lda PPUDATA
-	lda PPUDATA
-	cmp #$24
-	bne :+
+	lda PPUAddressLo	; \
+	sta PPUADDR			; | Set PPU Address
+	lda PPUAddressHi	; |
+	sta PPUADDR			; /
+	lda PPUDATA	; \
+	lda PPUDATA	; / Get Star Tile at position
+	cmp #$24	; \ Return if tile was not blank
+	bne :+		; /
 	txa
 	and #3
 	tay
-	jmp ld63b
+	jmp SetStarTile
 	:rts
 
 UpdateStarBG:
@@ -2892,7 +2898,7 @@ UpdateStarBG:
 	and #$3f	; | Star ID
 	sta $4f		; |
 	tax			; /
-	jsr ld651			; \
+	jsr LoadStarXAddr	; \
 	lda PPUAddressLo	; |
 	sta PPUADDR			; | Set PPU Address for Star Tile
 	lda PPUAddressHi	; |
@@ -2902,12 +2908,12 @@ UpdateStarBG:
 	ldy #3					; | Check if Tile is part of
 	@Loop:
 		cmp StarAnimTiles,y	; | Star Animation tiles
-		beq ld63b			; | If not: Stop
+		beq SetStarTile		; | If not: Stop
 		dey					; |
 		bpl @Loop			; /
 	:rts
 
-ld63b:
+SetStarTile:
 	lda PPUAddressLo		; \
 	sta PPUADDR				; |
 	lda PPUAddressHi		; | Write Next Star Tile
@@ -2919,7 +2925,7 @@ ld63b:
 StarAnimTiles:	;Star Tile Animation Frames
 	.BYTE $24,$ed,$ee,$ef,$24	;Empty, Low, middle, high, empty
 
-ld651:
+LoadStarXAddr:
 	lda StarPositions,x
 	sta PPUAddressHi
 	lda StarPositions+1,x
@@ -2974,27 +2980,27 @@ AddScore:
 	clc
 	lda P1Score0,x	; \ Add Score 0000X
 	adc ScoreDigit1	; | Lock Score between 0 and 9
-	jsr ld78f		; | First Digit
+	jsr ScoreModulo	; | First Digit
 	sta P1Score0,x	; /
 
 	lda P1Score1,x	; \ Add Score 000X0
 	adc ScoreDigit2	; | Lock Score between 0 and 9
-	jsr ld78f		; | Second Digit
+	jsr ScoreModulo	; | Second Digit
 	sta P1Score1,x	; /
 	
 	lda P1Score2,x	; \ Add Score 00X00
 	adc ScoreDigit3	; | Lock Score between 0 and 9
-	jsr ld78f		; | Third Digit
+	jsr ScoreModulo	; | Third Digit
 	sta P1Score2,x	; /
 	
 	lda P1Score3,x	; \ Add Score 0X000
 	adc ScoreDigit4	; | Lock Score between 0 and 9
-	jsr ld78f		; | Fourth Digit
+	jsr ScoreModulo	; | Fourth Digit
 	sta P1Score3,x	; /
 	
 	lda P1Score4,x	; \ Add Score X0000
 	adc #0			; | Lock Score between 0 and 9
-	jsr ld78f		; | Fifth Digit
+	jsr ScoreModulo	; | Fifth Digit
 	sta P1Score4,x	; /
 
 	inxr 4
@@ -3050,13 +3056,12 @@ ld782:
 	txa			; A and X = Result
 	rts
 
-ld78f:
-	cmp #10		; \ Check if Score Digit >= 10
-	bcs ld794	; | Then ...
-	rts			; / Else return
-	ld794:
-		sec			; \ Then subtract 10
-		sbc #10		; / from digit
+ScoreModulo:
+	cmp #10			; \ Check if Score Digit >= 10
+	bcs @Subtract	; | Then ...
+	rts				; / Else return
+	@Subtract:
+		ssbc #10	; Then subtract 10 from digit
 		rts
 
 UpdateStatusBar:
@@ -3177,50 +3182,49 @@ DrawRankText:
 RankText:	;RANK-
 	.BYTE $fb,$fa,$f9,$f8,$f7
 
-ld871:
-	sta Temp12
-	stx Temp13
-	sty Temp14
-	ldx #$01
-ld879:
-	lda $061a,x
-	bmi ld88c
-	dex
-	bpl ld879
+CreateScorePopup:
+	sta Temp12	; \
+	stx Temp13	; | Preserve A, X, and Y
+	sty Temp14	; /
 	ldx #1
-	lda $0619
-	cmp $0618
-	bcc ld88c
-	dex
-ld88c:
-	lda #$64
-	sta $0618,x
-	lda Temp12
-	sta $061a,x
-	tay
-	txa
-	aslr 3
-	tax
-	lda ScorePopupLeft,y
-	sta $02f1,x
-	lda ScorePopupRight,y
-	sta $02f5,x
-	ldy Temp13
-	lda $009a,y
-	sec
-	sbc #8
-	sta $02f0,x
-	sta $02f4,x
-	lda $0091,y
-	sta $02f3,x
-	cadc #8
-	sta $02f7,x
-	lda TargetUpdateScore
-	sta $02f2,x
-	sta $02f6,x
-	ldy Temp14
-	ldx Temp13
-	lda Temp12
+	@Loop:
+		lda PopupState,x	; \ If slot X is empty,
+		bmi @SelectPopup	; / perfect! Use this one
+		dex	;If that slot was full, try the next
+		bpl @Loop
+	ldx #1	; If both were full,
+	lda PopupCountdown+1	; \ Compare their countdowns.
+	cmp PopupCountdown		; /
+	bcc @SelectPopup	; If Popup[1].countdown < Popup[0].Countdown, select slot 1
+	dex	; Otherwise, select slot 0. (Select the one that's closer to disappearing to overwrite, or slot 0 if both are equal)
+	@SelectPopup:	;X is set to the index of the Score Popup Slot to fill
+	lda #100				; \ Set new popup's countdown to 100 frames
+	sta PopupCountdown,x	; /
+	lda Temp12			; \ The value of A when the function was called represents the score value.
+	sta PopupState,x	; | Store this into the Popup State
+	tay					; / then also put it in Y for indexing
+	txa		; \ Multiply X by 8
+	aslr 3	; | Because 2 objects per popup * 4 bytes per object in OAM
+	tax		; /
+	lda ScorePopupLeft,y	; \
+	sta OAM+$f1,x			; | Set the graphics of each object in the popup sprite
+	lda ScorePopupRight,y	; |
+	sta OAM+$f5,x			; /
+	ldy Temp13			; \ Original X was the index of object that got hit
+	lda ObjectYPosInt,y	; | Get the Y position of that object
+	ssbc #8				; | Put popup 8 pixels above it
+	sta OAM+$f0,x		; |
+	sta OAM+$f4,x		; /
+	lda ObjectXPosInt,y	; \ Get the X position of the object
+	sta OAM+$f3,x		; | Set the popup's X position to match
+	cadc #8				; | Offset the right side of popup by 8 px
+	sta OAM+$f7,x		; /
+	lda TargetUpdateScore	; \
+	sta OAM+$f2,x			; | Set popup sprite attributes
+	sta OAM+$f6,x			; /
+	ldy Temp14	; \
+	ldx Temp13	; | Restore A, X, and Y
+	lda Temp12	; /
 	rts
 
 ; Score popup options: 300, 500, 750, 1000, 1500, 2000
@@ -3251,15 +3255,15 @@ ManageScorePopup:
 		bpl @Loop
 	rts
 
-ld8ff:
+ClearScorePopups:
 	ldx #1
-ld901:
-	lda #0
-	sta $0618,x
-	lda #$ff
-	sta $061a,x
-	dex
-	bpl ld901
+	@Loop:
+		lda #0					; \ Set both countdowns to 0
+		sta PopupCountdown,x	; /
+		lda #<-1			; \ Set both Popup States to -1
+		sta PopupState,x	; /
+		dex
+		bpl @Loop
 	rts
 
 DisplayTitleScreen:
@@ -3279,32 +3283,32 @@ GotoTitleScreen:	; Manage Title Screen
 	jsr DisplayTitleScreen
 	lda #0				; \ Reset Frame Counter
 	sta FrameCounter	; /
-TitleScreenLoop:
-	jsr FinishFrame
-	lda FrameCounter	; \ Start demo if Frame Counter overflows
-	beq StartDemo		; / 
-	jsr ManageMenu	; Set Modes & Cursor
-	jsr PollController0
-	tax
-	and #StartBtn	; \ If Start button is pressed
-	bne :+			; / then exit Title Screen loop
-	txa
-	and #SelectBtn	; \ If Select button is NOT pressed
-	beq ldaed		; / then loop again
-	lda #0				; \ Reset Frame Counter
-	sta FrameCounter	; /
-	ldx MainMenuCursor	; \
-	lda TSNextOption,x	; | Select Next Mode
-	sta MainMenuCursor	; /
-ldaed:
-	jmp TitleScreenLoop	; Loop
+	TitleScreenLoop:
+		jsr FinishFrame
+		lda FrameCounter	; \ Start demo if Frame Counter overflows
+		beq StartDemo		; / 
+		jsr ManageMenu	; Set Modes & Cursor
+		jsr PollController0
+		tax
+		and #StartBtn	; \ If Start button is pressed
+		bne :+			; / then exit Title Screen loop
+		txa
+		and #SelectBtn	; \ If Select button is NOT pressed
+		beq @Next		; / then loop again
+		lda #0				; \ Reset Frame Counter
+		sta FrameCounter	; /
+		ldx MainMenuCursor	; \
+		lda TSNextOption,x	; | Select Next Mode
+		sta MainMenuCursor	; /
+		@Next:
+		jmp TitleScreenLoop	; Loop
 	:rts
 
 StartDemo:
 	inc DemoFlag		; Set Demo Flag
 	inc TwoPlayerFlag		; Set to 2 Players
 	lda #0		; \ Disable All Sound Channels
-	sta $4015	; /
+	sta SND_CHN	; /
 	sta GameMode		; Set Game Mode to 00 (Balloon Fight)
 	jsr StartDemoGame
 	lda #0
@@ -3350,7 +3354,7 @@ le3a4:
 	sta DataPointerHi	; / (OAM)
 	lda ObjectBalloons,x	; \ If Object X Balloons >= 0
 	bpl le3cf				; /
-	cmp #$ff	; \ If Object X Balloons == -1
+	cmp #<-1	; \ If Object X Balloons == -1
 	beq le3c2	; /
 	jmp le4d5
 	le3c2:
@@ -3827,33 +3831,33 @@ PollControllerX:
 
 le796:
 	lda ObjectBalloons,x	; \ If object has balloons
-	bne le7a3				; / then continue
-le79a:
-	lda #0					; \ If no balloons:
-	sta ObjectXVelFrac,x	; | X Velocity = 0
-	sta ObjectXVelInt,x		; /
-	rts	; Return
-le7a3:
+	bne @Continue			; / then continue
+	@ClearXVel:
+		lda #0					; \ If no balloons:
+		sta ObjectXVelFrac,x	; | X Velocity = 0
+		sta ObjectXVelInt,x		; /
+		rts	; Return
+	@Continue:
 	cmp #2		; \ If 2 balloons
 	beq le7e8	; /
 	cpx #2		; \ If object is a player
 	bcc le7e8	; /
 	lda ObjectStatus,x	; \ If Object Status >= 2
 	cmp #2				; | then zero X velocity
-	bcs le79a			; /
+	bcs @ClearXVel		; /
 le7b1:
 	lda ObjectXVelFrac,x
 	sta Temp12
 	lda ObjectXVelInt,x
 	sta Temp13
 	jsr lf1a6
-	lda ObjectUnknown2,x
+	lda ObjectDriftXVelFrac,x
 	cadc Temp12
-	sta ObjectUnknown2,x
+	sta ObjectDriftXVelFrac,x
 	sta Temp12
-	lda ObjectUnknown3,x
+	lda ObjectDriftXVelInt,x
 	adc Temp13
-	sta ObjectUnknown3,x
+	sta ObjectDriftXVelInt,x
 	sta Temp13
 	jsr lf1a6
 	lda ObjectXVelFrac,x
@@ -4124,8 +4128,8 @@ le9b6:
 	lda #0
 	sta ObjectXVelFrac,x
 	sta ObjectXVelInt,x
-	sta ObjectUnknown2,x
-	sta ObjectUnknown3,x
+	sta ObjectDriftXVelFrac,x
+	sta ObjectDriftXVelInt,x
 	lda #$40	; \ Play SFX
 	sta SFX2Req	; /
 	:rts
@@ -4549,7 +4553,7 @@ lecba:
 		jsr AddScore
 		lda #1
 		ldx TargetUpdateScore
-		jsr ld871
+		jsr CreateScorePopup
 		plx
 		rts
 		@Next:
@@ -4925,9 +4929,9 @@ lef37:
 	lefe0:
 	lda #0
 	lefe2:
-	sta ObjectUnknown3,x
+	sta ObjectDriftXVelInt,x
 	lda #$80
-	sta ObjectUnknown2,x
+	sta ObjectDriftXVelFrac,x
 	lefea:
 	sty Temp12
 	ldy ObjectType,x
@@ -4965,7 +4969,7 @@ lef37:
 	lda Temp13
 	pha
 	lda Temp14
-	jsr ld871
+	jsr CreateScorePopup
 	pla
 	jsr AddScore
 	plx
@@ -5051,12 +5055,11 @@ ObjectBounceX:
 	sbc ObjectXVelInt,x		; |
 	sta ObjectXVelInt,x		; /
 	lda #0					; \
-	sec						; | ?
-	sbc ObjectUnknown2,x	; |
-	sta ObjectUnknown2,x	; /
+	ssbcx ObjectDriftXVelFrac	; | ?
+	sta ObjectDriftXVelFrac,x	; /
 	lda #0					; \
-	sbc ObjectUnknown3,x	; | ?
-	sta ObjectUnknown3,x	; /
+	sbc ObjectDriftXVelInt,x	; | ?
+	sta ObjectDriftXVelInt,x	; /
 	lda ObjectAction,x	; \
 	and #BBtn			; | Clear player's held left & right inputs
 	sta ObjectAction,x	; /
@@ -5247,8 +5250,8 @@ LoadPhase:
 		sta ObjectXVelInt,x		; | - X Velocity (Int)
 		sta ObjectYVelFrac,x	; | - Y Velocity (Frac)
 		sta ObjectYVelInt,x		; | - Y Velocity (Int)
-		sta ObjectUnknown2,x	; |
-		sta ObjectUnknown3,x	; |
+		sta ObjectDriftXVelFrac,x	; |
+		sta ObjectDriftXVelInt,x	; |
 		sta ObjectXPosFrac,x	; | - X Positions (Frac)
 		sta ObjectYPosFrac,x	; | - Y Positions (Frac)
 		lda #1					; |
@@ -5278,7 +5281,7 @@ LoadPhase:
 	sta EnemyStartDelay
 	lf28e:
 	jsr InitializeFish
-	jsr ld8ff
+	jsr ClearScorePopups
 	lda GameMode
 	beq lf29b	; Balloon Fight Game Mode
 	jmp BalloonTripInit	; Balloon Trip Game Mode

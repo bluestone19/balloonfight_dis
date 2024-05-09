@@ -1,10 +1,10 @@
 # Balloon Fight NES Disassembly
 
 This is based off of the initial work of LuigiBlood, expanding it out and trying to put easy to understand labels and comments on everything. The end goal is to have a thorough and complete understanding of everything in this game. Some of the key sub-goals include:
--Search for glitches, and understand the causes of known glitches
--See if any information about the game's development can be deduced by analyzing the structure of the code
--Outline the small handful of differences between the Japanese, European, and North American versions of the game.
--Document the structure of the game and its data to allow players to create patches to add features, fix glitches, and so on.
+* Search for glitches, and understand the causes of known glitches
+* See if any information about the game's development can be deduced by analyzing the structure of the code
+* Outline the small handful of differences between the Japanese, European, and North American versions of the game.
+* Document the structure of the game and its data to allow players to create patches to add features, fix glitches, and so on.
 
 The reason for the change from LuigiBlood's original choice of bass as an assembler to CC65 was mostly arbitrary. However, I'm trying to make use of CC65's features to hopefully make the code easier to understand and read, with things like macros and defining names for memory addresses. Maybe in the future when the assembly version is completely documented, I might want to try converting it to C, since CC65 can do that too. We'll see!
 
