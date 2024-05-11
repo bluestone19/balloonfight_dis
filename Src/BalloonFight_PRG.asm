@@ -509,7 +509,7 @@ BTPhysics:
 	jsr BTSetBalloonPoints
 	dec PhaseType	; Reset to Normal Phase
 	ldx #100				; \ Wait for 100 frames
-	jsr WaitYFrames	; /
+	jsr WaitXFrames	; /
 	lda #$20		; \ Play Balloon Trip Music
 	sta MusicReq	; /
 	@DrawBTPlatform:
@@ -543,7 +543,7 @@ BalloonTripGameOver:
 	jsr FinishFrame
 	lda #$02		; \ Play Stage Clear jingle
 	sta MusicReq	; /
-	jmp lf36a	; Put Game Over on Screen
+	jmp EndGameNoJingle	; Put Game Over on Screen
 
 DoBTScreenRoutine:
 	jmp (RightPointer)
@@ -2058,7 +2058,7 @@ lcf51:
 	jsr ClearPPU
 	ldx #2
 	stx StatusUpdateFlag
-	jsr WaitYFrames
+	jsr WaitXFrames
 	lday BonusEndScreenPalette
 	jsr CopyPPUBlock
 	lday SuperBonusTextAttribute
@@ -2146,7 +2146,7 @@ ld01d:
 	lda #2
 	sta SFX1Req
 	ldx #2
-	jsr WaitYFrames
+	jsr WaitXFrames
 	ldx TwoPlayerFlag
 ld02e:
 	jsr ManageBalloonXSprite
@@ -2176,7 +2176,7 @@ ld04f:
 	sta MusicReq
 ld068:
 	ldx #$78
-	jsr WaitYFrames
+	jsr WaitXFrames
 	jsr ld1a0
 ld070:
 	lda #0
@@ -2196,7 +2196,7 @@ ld08e:
 	lda #$01
 	sta SFX2Req
 	ldx #2
-	jsr WaitYFrames
+	jsr WaitXFrames
 	lda $5d
 	cmp #$24
 	bne ld070
@@ -2206,8 +2206,8 @@ ld08e:
 	cmp #$24
 	bne ld070
 ld0a8:
-	ldx #$0a
-	jsr WaitYFrames
+	ldx #10
+	jsr WaitXFrames
 	jsr CheckTotalBonusBalloons
 	bne ld0ce
 	lda SuperBonusPtsUpper
@@ -4199,9 +4199,9 @@ ObjectUpdateAnim:
 	:rts
 
 ManageObjectVelocity:
-	lda ObjectUnknown4,x
+	lda ObjectHitCooldown,x
 	beq @SkipDec
-	dec ObjectUnknown4,x
+	dec ObjectHitCooldown,x
 	@SkipDec:
 	cpx #2			; \ If Object X is not player
 	bcs @ManageYVel	; /
@@ -4780,51 +4780,51 @@ CheckObjectPairCollision:
 			ora CollisionFlags
 			sta CollisionFlags
 			@leec0:
-			lda #0	; \
-			sta $4b	; /
+			lda #0					; \
+			sta CollisionUnknown	; /
 			lsr CollisionFlags	; \ [$CC].bit0 = Velocity Y related
 			bcc @leecd			; |
 			jsr ObjectYVelSbcYX	; | 
-			bmi @leed6			; /
+			bmi @DoYBounce		; /
 			@leecd:
 			lsr CollisionFlags	; \ [$CC].bit1 = Velocity Y related
 			bcc @leef1			; |
 			jsr ObjectYVelSbcYX	; |
 			bmi @leef1			; /
-			@leed6:
-			jsr CheckGroundedBird			; \ 
-			bcs @SkipYBounce	; /
-			jsr ObjectBounceY	; \
-			jsr ReduceYVelocity	; | Bounce both objects and reduce velocity vertically
-			jsr SwapXY			; |
-			jsr ObjectBounceY	; |
-			jsr ReduceYVelocity	; |
-			jsr SwapXY			; /
+			@DoYBounce:
+				jsr CheckGroundedBird	; \ Don't bounce off of a grounded bird
+				bcs @SkipYBounce		; /
+				jsr ObjectBounceY	; \
+				jsr ReduceYVelocity	; | Bounce both objects and reduce velocity vertically
+				jsr SwapXY			; |
+				jsr ObjectBounceY	; |
+				jsr ReduceYVelocity	; |
+				jsr SwapXY			; /
 			@SkipYBounce:
 			lda #1
-			sta $4b
+			sta CollisionUnknown
 			@leef1:
 			lsr CollisionFlags	; \ [$CC].bit2 = Velocity X related
 			bcc @leefa			; |
 			jsr ObjectXVelSbcYX	; |
-			bmi @lef03			; /
+			bmi @DoXBounce		; /
 			@leefa:
 			lsr CollisionFlags	; \ [$CC].bit3 = Velocity X related
 			bcc @lef1e			; |
 			jsr ObjectXVelSbcYX	; |
 			bmi @lef1e			; /
-			@lef03:
-			jsr CheckGroundedBird			; \
-			bcs @SkipXBounce	; /
-			jsr ObjectBounceX	; \
-			jsr ReduceXVelocity	; | Bounce both objects and reduce velocity horizontally
-			jsr SwapXY			; |
-			jsr ObjectBounceX	; |
-			jsr ReduceXVelocity	; |
-			jsr SwapXY			; /
+			@DoXBounce:
+				jsr CheckGroundedBird	; \ Don't bounce off of a grounded bird
+				bcs @SkipXBounce		; /
+				jsr ObjectBounceX	; \
+				jsr ReduceXVelocity	; | Bounce both objects and reduce velocity horizontally
+				jsr SwapXY			; |
+				jsr ObjectBounceX	; |
+				jsr ReduceXVelocity	; |
+				jsr SwapXY			; /
 			@SkipXBounce:
 			lda #1
-			sta $4b
+			sta CollisionUnknown
 			@lef1e:
 			jsr lef37
 			jsr SwapXY
@@ -4841,98 +4841,98 @@ CheckObjectPairCollision:
 	:rts
 
 lef37:
-	cpx #2		; \ Is Object X a player?
-	bcc lef42	; |
-	cpy #2		; | Is Object Y a player?
-	bcc lef42	; /
-	jmp lf043	; Skip if both enemies
-	lef42:
-	lda #0
-	sta $0487
-	lda ObjectUnknown4,x
-	beq lef4f
-	jmp lf043	; Skip
-	lef4f:
-	lda $4b
-	bne lef56
-	jmp lf043	; Skip
-	lef56:
+	cpx #2				; \ Is Object X a player?
+	bcc @IncludesPlayer	; |
+	cpy #2				; | Is Object Y a player?
+	bcc @IncludesPlayer	; /
+	jmp @Skip	; Skip if both enemies
+	@IncludesPlayer:
+	lda #0				; \ Reset ColScoreOffset
+	sta ColScoreOffset	; /
+	lda ObjectHitCooldown,x	; \
+	beq @ColReady			; | If the object has a hit cooldown active, skip
+	jmp @Skip				; /
+	@ColReady:
+	lda CollisionUnknown	; \
+	bne @FlagSet			; | Skip if CollisionUnknown isn't set
+	jmp @Skip				; /
+	@FlagSet:
 	cpx #2
-	bcs lef61
+	bcs @XIsEnemy
 	lda PlayerInvincible,x
-	beq lef72
-	jmp lf043	; Skip
-	lef61:
+	beq @lef72
+	jmp @Skip	; Skip
+	@XIsEnemy:
 	lda ObjectBalloons,x
 	cmp #1
-	bne lef72
+	bne @lef72
 	lda ObjectStatus,x
 	cmp #2
-	bcs lef7f
+	bcs @lef7f
 	lda #1
-	sta $0487
-	lef72:
+	sta ColScoreOffset
+	@lef72:
 	lda ObjectYPosInt,y
 	cadc #4
 	cmp ObjectYPosInt,x
-	bcc lef7f
-	jmp lf043	; Skip
-	lef7f:
+	bcc @lef7f
+	jmp @Skip	; Skip
+	@lef7f:
 	lda #20
-	sta ObjectUnknown4,x
+	sta ObjectHitCooldown,x
 	lda #0
 	sta ObjectAnimFrame,x
 	cpy #2
-	bcc lef97
+	bcc @lef97
 	lda ObjectBalloons,y
 	cmp #2
-	beq lef97
-	jmp lf043	; Skip
-	lef97:
+	beq @lef97
+	jmp @Skip	; Skip
+	@lef97:
 	lda SFX1Req
 	ora #2
 	sta SFX1Req
 	lda ObjectBalloons,x
 	cmp #2
-	bne lefc0
+	bne @lefc0
 	cpx #2
-	bcs lefc0
+	bcs @lefc0
 	sty Temp12
 	ldy ObjectStatus,x
 	lda lf053,y
 	ldy Temp12
 	pha
 	pla
-	bne lefb7
-	jmp lf043	; Skip
-	lefb7:
+	bne @lefb7
+	jmp @Skip	; Skip
+	@lefb7:
 	sta ObjectStatus,x
 	lda #0
 	sta ObjectAnimFrame,x
-	beq lefea
-	lefc0:
+	beq @lefea
+	@lefc0:
 	dec ObjectBalloons,x
-	bne lefce
+	bne @lefce
 	lda #$ff
 	sta ObjectYVelInt,x
 	lda #0
 	sta ObjectYVelFrac,x
-	lefce:
+	@lefce:
 	lda #0
 	sta ObjectStatus,x
 	sta ObjectXVelFrac,x
 	sta ObjectXVelInt,x
 	lda ObjectXPosInt,x
-	bmi lefe0
+	bmi @lefe0
 	lda #$ff
-	bne lefe2
-	lefe0:
+	bne @lefe2
+	@lefe0:
 	lda #0
-	lefe2:
+	@lefe2:
 	sta ObjectDriftXVelInt,x
 	lda #$80
 	sta ObjectDriftXVelFrac,x
-	lefea:
+	@lefea:
 	sty Temp12
 	ldy ObjectType,x
 	lda lf05e,y
@@ -4941,26 +4941,26 @@ lef37:
 	sta ObjectUnknown5,x
 	ldy Temp12
 	cpy #2
-	bcs lf043	; Skip
+	bcs @Skip	; Skip
 	lda ObjectType,x
 	cmp #7
-	beq lf011
+	beq @lf011
 	cmp #8
-	bcc lf011
+	bcc @lf011
 	lda SFX2Req
 	ora #$80
 	sta SFX2Req
-	lf011:
+	@lf011:
 	ldy ObjectType,x
 	lda lf06a,y
 	sta Temp13
-	lda $0487
-	beq lf023
+	lda ColScoreOffset
+	beq @lf023
 	lda lf076,y
 	sta Temp13
-	lf023:
+	@lf023:
 	lda lf082,y
-	cadc $0487
+	cadc ColScoreOffset
 	sta Temp14
 	lda Temp12
 	sta TargetUpdateScore
@@ -4974,7 +4974,7 @@ lef37:
 	jsr AddScore
 	plx
 	ply
-	lf043:
+	@Skip:
 	lda ObjectType,x	; \ If Object X is not dead
 	cmp #11				; | then don't play any SFX
 	bne :+				; /
@@ -5054,11 +5054,11 @@ ObjectBounceX:
 	lda #0					; |
 	sbc ObjectXVelInt,x		; |
 	sta ObjectXVelInt,x		; /
-	lda #0					; \
-	ssbcx ObjectDriftXVelFrac	; | ?
-	sta ObjectDriftXVelFrac,x	; /
-	lda #0					; \
-	sbc ObjectDriftXVelInt,x	; | ?
+	lda #0						; \
+	ssbcx ObjectDriftXVelFrac	; |
+	sta ObjectDriftXVelFrac,x	; | Also reverse the drifting velocity
+	lda #0						; | (Used for parachuting birds)
+	sbc ObjectDriftXVelInt,x	; |
 	sta ObjectDriftXVelInt,x	; /
 	lda ObjectAction,x	; \
 	and #BBtn			; | Clear player's held left & right inputs
@@ -5240,27 +5240,27 @@ LoadPhase:
 	sta EnemyStartDelay		; | Set enemy start delay to 3 (Very short! They get going almost immediately)
 	sta EnemyInflateSpeed	; / Set inflate speed to 3 (Moderate)
 	@FinishSetDifficulty:
-	ldx #7						; \
+	ldx #7							; \
 	@ClearLoop:
-		lda #0					; | Initialize variables for each object (except Fish?)
-		sta ObjectDirection,x	; | - Direction (0 = Left, 1 = Right)
-		sta ObjectUnknown4,x	; |
-		sta ObjectUnknown5,x	; |
-		sta ObjectXVelFrac,x	; | - X Velocity (Frac)
-		sta ObjectXVelInt,x		; | - X Velocity (Int)
-		sta ObjectYVelFrac,x	; | - Y Velocity (Frac)
-		sta ObjectYVelInt,x		; | - Y Velocity (Int)
+		lda #0						; | Initialize variables for each object (except Fish?)
+		sta ObjectDirection,x		; | - Direction (0 = Left, 1 = Right)
+		sta ObjectHitCooldown,x		; |
+		sta ObjectUnknown5,x		; |
+		sta ObjectXVelFrac,x		; | - X Velocity (Frac)
+		sta ObjectXVelInt,x			; | - X Velocity (Int)
+		sta ObjectYVelFrac,x		; | - Y Velocity (Frac)
+		sta ObjectYVelInt,x			; | - Y Velocity (Int)
 		sta ObjectDriftXVelFrac,x	; |
 		sta ObjectDriftXVelInt,x	; |
-		sta ObjectXPosFrac,x	; | - X Positions (Frac)
-		sta ObjectYPosFrac,x	; | - Y Positions (Frac)
-		lda #1					; |
-		sta ObjectAnimTimer,x	; |
-		sta ObjectCountdown,x	; |
-		lda #3					; |
-		sta ObjectAnimFrame,x	; | - Animation Frame
-		dex						; |
-		bpl @ClearLoop			; /
+		sta ObjectXPosFrac,x		; | - X Positions (Frac)
+		sta ObjectYPosFrac,x		; | - Y Positions (Frac)
+		lda #1						; |
+		sta ObjectAnimTimer,x		; |
+		sta ObjectCountdown,x		; |
+		lda #3						; |
+		sta ObjectAnimFrame,x		; | - Animation Frame
+		dex							; |
+		bpl @ClearLoop				; /
 	ldx #5						; \
 	@EnemyClearLoop:
 		lda #$ff				; | Initialize Enemies
@@ -5269,7 +5269,7 @@ LoadPhase:
 		bpl @EnemyClearLoop		; /
 	ldx TwoPlayerFlag				; \
 	@PlayerInitLoop:
-		jsr lf386_initializeplayerx	; | Initialize Players
+		jsr InitializePlayerX	; | Initialize Players
 		dex							; |
 		bpl @PlayerInitLoop			; /
 	jsr ClearPPU
@@ -5336,17 +5336,17 @@ lf2e4:
 	dec P1Lives,x	; Decrement Player X Lives
 	sty $46		; Update Status Bar
 	bmi lf30d	; If Player X has no more lives then don't respawn
-	jsr lf386_initializeplayerx
+	jsr InitializePlayerX
 	jsr InitPlayerType
 	lda #$80		; \ Play Respawn Jingle
 	sta MusicReq	; /
 lf30d:
 	dex			; \ Loop with Player 1
 	bpl lf2e4	; /
-	lda P1Lives		; \ If Player 1 has lives
+	lda P1Lives	; \ If Player 1 has lives
 	bpl lf318	; / continue
-	lda P2Lives		; \ If Player 1 & 2 have 0 lives
-	bmi lf366	; / then game over
+	lda P2Lives	; \ If Player 1 & 2 have 0 lives
+	bmi EndGameToTitle	; / then game over
 lf318:
 	lda DemoFlag	; \ If Demo Play
 	beq lf327		; / then skip joypad read
@@ -5384,55 +5384,56 @@ lf34c:
 	lda #$02		; \ Play Stage Clear jingle
 	sta MusicReq	; /
 lf353:
-	ldx #$96				; \ Wait 150 frames
-	jsr WaitYFrames	; /
-	ldx $3b		; \
-	inx			; | Get to next level
-	cpx #16		; | if past level ID #16
-	bne lf361	; |
-	ldx #4		; | then loop back to level ID 4
-lf361:
-	stx $3b		; /
+	ldx #150		; \ Wait 150 frames
+	jsr WaitXFrames	; /
+	ldx CurrentPhaseHeader	; \
+	inx						; | Get to next level
+	cpx #16					; | if past level ID #16
+	bne @SetHeader			; |
+	ldx #4					; | then loop back to level ID 4
+	@SetHeader:
+	stx CurrentPhaseHeader	; /
 	jmp LoadPhase	; Load Next Level
-lf366:		; Manage Game Over
+
+EndGameToTitle:	; Manage Game Over
 	lda #$01		; \ Play Game Over jingle
 	sta MusicReq	; /
-lf36a:
+EndGameNoJingle:
 	lda #0
 	sta BTXScroll		; Reset PPUSCROLL Shadow
 	sta PPUCTRLShadowBT	; Reset PPUCTRL Shadow
-	sta Temp15		; Set time
+	sta Temp15	; Use Temp15 as delay timer
 	jsr DrawGameOverText
-lf375:
-	jsr FinishFrame
-	jsr PollController0	; \ Press START or SELECT
-	and #$30				; | to come back to Title Screen
-	bne lf383				; /
-	dec Temp15		; \ Wait for 256 frames
-	bne lf375	; / to come back to Title Screen
-lf383:
+	@WaitLoop:
+		jsr FinishFrame
+		jsr PollController0			; \ Press START or SELECT
+		and #SelectBtn | StartBtn	; | to come back to Title Screen
+		bne @BackToTitle			; /
+		dec Temp15		; \ Wait for 256 frames
+		bne @WaitLoop	; / to come back to Title Screen
+	@BackToTitle:
 	jmp StartGame	; Back to Title Screen
 
-lf386_initializeplayerx:
+InitializePlayerX:
 	lda P1Lives,x	; \ If Player X has negative lives
 	bmi :+			; / Then don't do anything
 	lda PlayerStartingX,x	; \ Set up X coordinate for Player X
 	sta ObjectXPosInt,x		; /
-	lda #$b8			; \ Set up Y coordinate for Player X
+	lda #184			; \ Set up Y coordinate for Player X
 	sta ObjectYPosInt,x	; /
-	sta $bd,x	; Set up invincibility for Player X
-	lda #$c8	; \ Set up invincibility time
-	sta $bf,x	; / for Player X
-	lda #$5a	; \
-	ldy P1Lives,x	; | If Player X has lives
-	bpl lf3a1	; | Then set respawn delay to #$5A
-	lda #1		; | Else set respawn delay to #$01
-lf3a1:
-	sta $c3,x	; /
+	sta PlayerInvincible,x	; Set up invincibility for Player X
+	lda #200				; \ Set up invincibility time
+	sta PlayerInvTimer,x	; / for Player X
+	lda #90					; \
+	ldy P1Lives,x			; | If Player X has lives
+	bpl @SetDelay			; | Then set respawn delay to #$5A
+	lda #1					; | Else set respawn delay to #$01
+	@SetDelay:
+	sta PlayerSpawnDelay,x	; /
 	lda #0
-	sta $c1,x	; Clear Player X Freeze Flag
-	sta ObjectXVelInt,x	; \ Set up Player X's X Velocity to $00
-	sta ObjectXVelFrac,x ; /
+	sta PlayerFreeze,x	; Clear Player X Freeze Flag
+	sta ObjectXVelInt,x		; \ Set up Player X's X Velocity to $00
+	sta ObjectXVelFrac,x	; /
 	:rts
 
 PlayerStartingX:
@@ -5523,10 +5524,10 @@ lf455:	; Tile Attributes?
 
 Wait20Frames:
 	ldx #20
-WaitYFrames:
+WaitXFrames:
 	jsr FinishFrame
 	dex
-	bne WaitYFrames
+	bne WaitXFrames
 	rts
 
 FinishFrame:

@@ -61,6 +61,7 @@ ScoreDigit5			.set $48
 
 BTRankLo			.set $49
 BTRankHi			.set $4A
+CollisionUnknown	.set $4B
 ; $004B = ?
 
 CloudCount			.set $A3	; Amount of Clouds (zero-based) (-1 if none)
@@ -269,7 +270,7 @@ ObjectXVelInt		.set $042D	;$042D-$0435
 ObjectCountdown		.set $045A	;$045A-$0462 Used for Auto-Input and spark death delay before falling
 ObjectDriftXVelFrac	.set $0463	;$0463-$046B
 ObjectDriftXVelInt	.set $046C	;$046C-$0474
-ObjectUnknown4		.set $0475	;$0475-$047D
+ObjectHitCooldown	.set $0475	;$0475-$047D
 ObjectUnknown5		.set $047E	;$047E-$0486
 
 PlayerInvincible	.set $BD	;$00BD-$00BE
@@ -277,7 +278,7 @@ PlayerInvTimer		.set $BF	;$00BF-$00C0
 PlayerFreeze		.set $C1	;$00C1-$00C2
 PlayerSpawnDelay	.set $C3	;$00C3-$00C4
 
-;$0487 = ???
+ColScoreOffset		.set $0487
 BTPlatformX			.set $0488	;Balloon Trip Starting Platform X Position
 
 ;Fish
