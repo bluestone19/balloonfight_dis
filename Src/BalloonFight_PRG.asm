@@ -861,27 +861,24 @@ lc5c3:
 	ldx FishTargetID	; X = Fish Target
 	lda FishFrameTime		; \
 	cmp #32					; |
-	bne lc5f4				; | If Fish Frame Time == $20
-	lda #$ff				; | then target is eaten
+	bne lc5f4				; | If Fish Frame Time == 32
+	lda #<-1				; | then target is eaten
 	sta ObjectBalloons,x	; | (Balloons = -1)
 	bmi lc610				; /
 	lc5f4:
 	bcs :+	; If Fish Frame Time < $20
 	lda ObjectDirection+8	; \ Depending on Fish Direction
 	bne @MoveLeft			; /
-	lda ObjectXPosInt+8	; \
-	clc					; | Move Fish 4 pixels to the right
-	adc #4				; /
+	lda ObjectXPosInt+8	; \ Move Fish 4 pixels to the right
+	cadc #4				; /
 	bne @FinishMove
 	@MoveLeft:
-	lda ObjectXPosInt+8	; \ or
-	sec					; | Move Fish 4 pixels to the left
-	sbc #4				; /
+	lda ObjectXPosInt+8	; \ Move Fish 4 pixels to the left
+	ssbc #4				; /
 	@FinishMove:
 	sta ObjectXPosInt,x
-	lda ObjectYPosInt+8	; \
-	sec					; | Fish Target's Y position =
-	sbc #10				; | (Fish Y - $0A)
+	lda ObjectYPosInt+8	; \ Fish Target's Y position =
+	ssbc #10			; | (Fish Y - 10)
 	sta ObjectYPosInt,x	; /
 	lc610:
 	jsr le3a4
@@ -926,12 +923,12 @@ FishMove:
 	sta ObjectXPosInt+8	; /
 	:rts
 
-lc658:
+ManageFishEat:
 	lda FishYDirection	; \ If Fish Y Direction == Up
 	bne @FishDescend	; /
 	dec ObjectYPosInt+8	; Fish Y goes up by 1 pixel
 	lda ObjectYPosInt+8	; \
-	cmp #$c4			; | If Fish Y Position is about
+	cmp #196			; | If Fish Y Position is about
 	bcs @FinishYMove	; | to go above $C4
 	inc ObjectYPosInt+8	; | then
 	inc FishAnimation	; | Set Fish Animation? to 1
@@ -1020,7 +1017,7 @@ FishManage:
 		sta SFX3Req	; /
 	ContinueFishAttack:
 		jsr FishFollowTarget	; Handle Fish Teleport to Target
-		jsr lc658	; Handle Fish Target Eating
+		jsr ManageFishEat	; Handle Fish Target Eating
 		jmp lc5c3	; Handle Fish Target Eating Movement & Return
 
 
@@ -2175,7 +2172,7 @@ ld04f:
 	lda #$10
 	sta MusicReq
 ld068:
-	ldx #$78
+	ldx #120
 	jsr WaitXFrames
 	jsr ld1a0
 ld070:
@@ -2303,7 +2300,7 @@ ld1a0:
 	ldx #28
 	@Loop:
 		lda BonusTotalText,x
-		sta $57,x
+		sta PPUTempBlock,x
 		dex
 		bpl @Loop
 	ldx #4
@@ -2349,20 +2346,20 @@ ld1ed:
 	cmp #10
 	bcc ld1fb
 	sbc #10
-	inc $57,x
+	inc PPUTempBlock,x
 	sta $58,x
 ld1fb:
 	jmp ld1dc
 ld1fe:
 	ldy #0
 ld200:
-	lda $57,x
+	lda PPUTempBlock,x
 	beq ld208
 	cmp #36
 	bne :+
 ld208:
 	lda #36
-	sta $57,x
+	sta PPUTempBlock,x
 	inx
 	iny
 	cpy #4
@@ -2380,12 +2377,12 @@ ld213:
 	beq ld243
 	lda $58,x
 	bne ld232
-	lda $57,x
+	lda PPUTempBlock,x
 	cmp #36
 	beq ld243
 	lda #10
 	sta $58,x
-	dec $57,x
+	dec PPUTempBlock,x
 ld232:
 	lda #10
 	sta $59,x
@@ -3350,7 +3347,7 @@ le3a4:
 	lda OAMObjectOrder2,x	; |
 	sta DataPointerLo		; /
 	@Skip:
-	lda #$02			; \ Set Pointer to $02xx
+	lda #>OAM			; \ Set Pointer to $02xx
 	sta DataPointerHi	; / (OAM)
 	lda ObjectBalloons,x	; \ If Object X Balloons >= 0
 	bpl le3cf				; /
@@ -3684,7 +3681,7 @@ ObjectMinYVelDataInt:
 
 ObjectManage:
 	jsr CheckObjectPairCollision
-	ldx #7					; \
+	ldx #7						; \
 	@Loop:
 		lda ObjectBalloons,x	; | Check all Object's Balloons
 		bpl @le6a4				; | If >= 0 then proceed
@@ -4450,10 +4447,10 @@ lebc4:
 		sta PlayerInvincible,x	; / Disable invincibility
 		@ApplyObjectAction:
 			lda ObjectAction,x	; \
-			and #BBtn			; | B button
+			and #BBtn			; | Check B button
 			bne @BPressed		; /
 			lda ObjectAction,x	; \
-			and #ABtn			; | A button
+			and #ABtn			; | Check A button
 			bne @APressed		; /
 			lda #0				; \
 			sta ABtnCooldown,x	; | Mark the A button as lifted
@@ -5482,30 +5479,30 @@ PhaseTextEmpty:
 
 DrawGameOverText:
 	jsr FinishFrame
-	ldx #1				; \
+	ldx #1					; \
 	@Loop:
 		lda lf43b,x			; | Prepare Game Over
 		ldy lf43b+2,x		; | PPU blocks
 		jsr CopyPPUBlock	; | to upload
 		dex					; |
 		bpl @Loop			; /
-	ldx #$0f	; \
-lf41e:
-	lda #$24	; | Prepare 16 empty tiles
-	sta $5a,x	; | to upload
-	dex			; |
-	bpl lf41e	; /
-	lda #16	; \ Size: 16 bytes
-	sta $59	; /
-	lda #$21	; \ PPUADDR = $21xx
-	sta $57		; /
-	ldx #$02				; \
-lf42f:
-	lda lf43f,x				; | Prepare uploading
-	sta $58					; | empty tiles to nametable
-	jsr CopyPPUTempBlock	; | ($2188, $21A8, $21E8)
-	dex						; | to PPU Buffer
-	bpl lf42f				; /
+	ldx #15				; \
+	@EmptyLoop:
+		lda #$24		; | Prepare 16 empty tiles
+		sta $5a,x		; | to upload
+		dex				; |
+		bpl @EmptyLoop	; /
+	lda #16				; \ Size: 16 bytes
+	sta PPUTempBlock+2	; /
+	lda #$21			; \ PPUADDR = $21xx
+	sta PPUTempBlock	; /
+	ldx #2						; \
+	@AddrLoop:
+		lda lf43f,x				; | Prepare uploading
+		sta $58					; | empty tiles to nametable
+		jsr CopyPPUTempBlock	; | ($2188, $21A8, $21E8)
+		dex						; | to PPU Buffer
+		bpl @AddrLoop			; /
 	rts
 
 .define PPUBlockPointers lf442, lf455
@@ -5525,9 +5522,10 @@ lf455:	; Tile Attributes?
 Wait20Frames:
 	ldx #20
 WaitXFrames:
-	jsr FinishFrame
-	dex
-	bne WaitXFrames
+	@Loop:
+		jsr FinishFrame
+		dex
+		bne @Loop
 	rts
 
 FinishFrame:
