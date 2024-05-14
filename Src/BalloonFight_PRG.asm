@@ -3364,12 +3364,12 @@ le3a4:
 	rts
 	le3cf:
 	cpx #8			; \ If Object is Fish
-	beq AnimateFish	; /
+	beq @AnimateFish	; /
 	lda ObjectStatus,x		; \
 	aslr 2					; | (Object Status * 4) + Animation Frame
 	adc ObjectAnimFrame,x	; /
-	cpx #2			; \ If Object is a player
-	bcs @IsEnemy	; /
+	cpx #2				; \ If Object is a enemy
+	bcs @AnimateEnemy	; / Otherwise, it's a player
 	ldy ObjectBalloons,x			; \ 
 	adc PlayerAnimBalloonOffset,y	; | Y = (Object Status * 4) + Animation Frame
 	tay								; / + [PlayerAnimBalloonOffset + Balloons]
@@ -3380,15 +3380,15 @@ le3a4:
 	lda PlayerInvincible,x	; \ If Player X is invincible
 	beq le429				; /
 	ldy ObjectBalloons,x	; Y = Player X Balloons
-	lda PlayerFlashAnimBalloonOffset,y				; \
-	adc ObjectAnimFrame,x	; | Y = [PlayerFlashAnimBalloonOffset+Balloons]+Frame
-	tay						; /
+	lda PlayerFlashAnimBalloonOffset,y	; \
+	adc ObjectAnimFrame,x				; | Y = [PlayerFlashAnimBalloonOffset+Balloons]+Frame
+	tay									; /
 	lda PlayerFlashAnimLower,y	; \
 	sta LoadPointerLo			; | Set pointer
 	lda PlayerFlashAnimUpper,y	; |
 	sta LoadPointerHi			; /
 	jmp le429
-	@IsEnemy:
+	@AnimateEnemy:
 	ldy ObjectBalloons,x
 	cadcy EnemyAnimBalloonOffset
 	tay
@@ -3397,7 +3397,7 @@ le3a4:
 	lda EnemyAnimUpper,y
 	sta LoadPointerHi
 	bne le429
-	AnimateFish:
+	@AnimateFish:
 	ldy ObjectStatus,x
 	bmi le3c2
 	lda FishSprPointersLower,y
@@ -3684,39 +3684,39 @@ ObjectManage:
 	ldx #7						; \
 	@Loop:
 		lda ObjectBalloons,x	; | Check all Object's Balloons
-		bpl @le6a4				; | If >= 0 then proceed
-		cmp #$ff				; | else if == -1 then go to next object
+		bpl @IsAlive			; | If >= 0 then proceed
+		cmp #<-1				; | else if == -1 then go to next object
 		beq @Next				; | else ? and go to next object
 		jsr lecba				; |
 		jmp @Next				; /
-		@le6a4:
-		cpx #2		; \ Object is Player
-		bcc @le6b8	; /
-		cmp #1		; \ One balloon
-		bne @le6b8	; /
-		lda ObjectStatus,x	; \ Object Status >= 2
+		@IsAlive:
+		cpx #2			; \ Skip if Object is Player
+		bcc @SkipJingle	; /
+		cmp #1			; \ Skip if doesn't have exactly 1 balloon
+		bne @SkipJingle	; /
+		lda ObjectStatus,x	; \ Skip if Object Status >= 2
 		cmp #2				; |
-		bcs @le6b8			; /
+		bcs @SkipJingle		; /
 		lda SFX2Req	; \
 		ora #$20	; | Play Enemy Parachute Jingle
 		sta SFX2Req	; /
-		@le6b8:
+		@SkipJingle:
 		dec ObjectAnimTimer,x	; \ Object's Anim Timer != 0
-		bne @le6d9				; /
-		lda #3					; \ Object's ? = 3
+		bne @EveryFrameUpd		; /
+		lda #3					; \ Object's Anim Timer = 3
 		sta ObjectAnimTimer,x	; /
-		cpx #2		; \ Object is not Player
-		bcs @le6ce	; /
+		cpx #2				; \ Object is not Player
+		bcs @SkipTimerDec	; /
 		dec PlayerInvTimer,x	; \ Player Invincibility Timer Handle
-		bne @le6ce				; | Decrease Time until 0
+		bne @SkipTimerDec		; | Decrease Time until 0
 		lda #0					; | Then disable invincibility
 		sta PlayerInvincible,x	; /
-		@le6ce:
+		@SkipTimerDec:
 		jsr ObjectUpdateAnim
 		stx TargetUpdateScore
 		jsr lebc4
 		jsr le796
-		@le6d9:
+		@EveryFrameUpd:
 		jsr ManageObjectVelocity
 		jsr led28
 		jsr le983
@@ -4388,7 +4388,7 @@ lebc4:
 	@Players:	; Player
 		lda ObjectStatus,x	; \ If Player Status < 6
 		cmp #6				; | Then check input
-		bcc lec38			; /
+		bcc @CheckInput		; /
 		lda #1				; \ Else Status = 1
 		sta ObjectStatus,x	; /
 		dec ObjectBalloons,x	; Decrease one balloon
@@ -4396,7 +4396,7 @@ lebc4:
 	@Enemies:	; Enemy
 		lda ObjectBalloons,x	; \ If Enemy Balloons == 2
 		cmp #2					; | Then check input
-		beq lec38				; /
+		beq @CheckInput				; /
 		lda ObjectAnimFrame,x	; \ If enemy animation frames != 0
 		bne :+					; / Then
 		lda ObjectBalloons,x	; \ If Enemy Status != 0
@@ -4406,10 +4406,10 @@ lebc4:
 		rts
 		@EnemyAlive:
 			lda ObjectStatus,x	; \ If Enemy Status != 0
-			bne lebfe			; / Then
+			bne @EnemyCont		; / Then
 			inc ObjectStatus,x	; Increase Enemy Status
 			:rts
-		lebfe:
+			@EnemyCont:
 			cmp #2	; \ If Player
 			bcc :-	; / then return
 			dec ObjectCountdown,x
@@ -4427,16 +4427,16 @@ lebc4:
 			ldy ObjectType,x
 			lda lecae,y
 			ldy ObjectUnknown5,x
-			bne lec2f
+			bne @EnemyCont2
 			dec ObjectUnknown5,x
 			lda ObjectType,x
 			and #3
-			lec2f:
+			@EnemyCont2:
 			sta ObjectType,x
 			lda #$fe
 			sta ObjectYVelInt,x
 			:rts
-	lec38:
+	@CheckInput:
 		jsr ObjectUpdateAction
 		lda ObjectAction,x	; Limit action to valid inputs
 		and #ABtn | BBtn | LeftDPad | RightDPad
