@@ -103,6 +103,10 @@ DataPointer			.set $1F
 DataPointerLo		.set DataPointer
 DataPointerHi		.set $20
 
+OAMPointer			.set $1F
+OAMPointerLo		.set OAMPointer
+OAMPointerHi		.set $20
+
 ScorePointer		.set $21
 ScorePointerLo		.set ScorePointer
 ScorePointerHi		.set $22

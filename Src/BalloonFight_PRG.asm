@@ -3340,15 +3340,15 @@ MenuCursorYOptions:
 
 le3a4:
 	lda OAMObjectOrder1,x	; \ Set Pointer from the first table
-	sta DataPointerLo		; /
+	sta OAMPointerLo		; /
 	lda FrameCounter		; \
 	lsr						; | Every 2 frames
 	bcc @Skip				; | Set Pointer from the second table
-	lda OAMObjectOrder2,x	; |
-	sta DataPointerLo		; /
+	lda OAMObjectOrder2,x	; | (Shuffles order in OAM to prevent sprites from being totally blocked)
+	sta OAMPointerLo		; /
 	@Skip:
 	lda #>OAM			; \ Set Pointer to $02xx
-	sta DataPointerHi	; / (OAM)
+	sta OAMPointerHi	; / (OAM)
 	lda ObjectBalloons,x	; \ If Object X Balloons >= 0
 	bpl le3cf				; /
 	cmp #<-1	; \ If Object X Balloons == -1
@@ -3358,21 +3358,21 @@ le3a4:
 	ldy #20					; \
 	@ClearLoop:
 		lda #$f0			; |
-		sta (DataPointer),y	; |
+		sta (OAMPointer),y	; |
 		deyr 4				; |
 		bpl @ClearLoop		; /
 	rts
 	le3cf:
-	cpx #8		; \ If Object is Fish
-	beq le41b	; /
+	cpx #8			; \ If Object is Fish
+	beq AnimateFish	; /
 	lda ObjectStatus,x		; \
 	aslr 2					; | (Object Status * 4) + Animation Frame
 	adc ObjectAnimFrame,x	; /
-	cpx #2		; \ If Object is a player
-	bcs le408	; /
-	ldy ObjectBalloons,x	; \ 
-	adc le34c,y				; | Y = (Object Status * 4) + Animation Frame
-	tay						; / + [le34c + Balloons]
+	cpx #2			; \ If Object is a player
+	bcs @IsEnemy	; /
+	ldy ObjectBalloons,x			; \ 
+	adc PlayerAnimBalloonOffset,y	; | Y = (Object Status * 4) + Animation Frame
+	tay								; / + [PlayerAnimBalloonOffset + Balloons]
 	lda PlayerAnimLower,y	; \
 	sta LoadPointerLo		; | Set pointer
 	lda PlayerAnimUpper,y	; |
@@ -3380,24 +3380,24 @@ le3a4:
 	lda PlayerInvincible,x	; \ If Player X is invincible
 	beq le429				; /
 	ldy ObjectBalloons,x	; Y = Player X Balloons
-	lda le34c+3,y			; \
-	adc ObjectAnimFrame,x	; | Y = [le34c+3+Balloons+Frame]
+	lda PlayerFlashAnimBalloonOffset,y				; \
+	adc ObjectAnimFrame,x	; | Y = [PlayerFlashAnimBalloonOffset+Balloons]+Frame
 	tay						; /
 	lda PlayerFlashAnimLower,y	; \
 	sta LoadPointerLo			; | Set pointer
 	lda PlayerFlashAnimUpper,y	; |
 	sta LoadPointerHi			; /
 	jmp le429
-	le408:
+	@IsEnemy:
 	ldy ObjectBalloons,x
-	cadcy le352
+	cadcy EnemyAnimBalloonOffset
 	tay
 	lda EnemyAnimLower,y
 	sta LoadPointerLo
 	lda EnemyAnimUpper,y
 	sta LoadPointerHi
 	bne le429
-	le41b:
+	AnimateFish:
 	ldy ObjectStatus,x
 	bmi le3c2
 	lda FishSprPointersLower,y
@@ -3441,10 +3441,10 @@ le3a4:
 	ora #$20
 	le465:
 	sta Temp14
-	tpa le043, ScorePointer
+	tpa SpriteLeftXOffsets, ScorePointer
 	lda ObjectDirection,x
 	beq le47c
-	tpa le079, ScorePointer
+	tpa SpriteRightXOffsets, ScorePointer
 	le47c:
 	ldy #0
 	lda (LoadPointer),y
@@ -3465,9 +3465,9 @@ le3a4:
 	ldx #5
 	ldy #0
 	@Loop:
-		lda Temp12
-		cadcx le03d
-		sta (DataPointer),y
+		lda Temp12	; Object's Y Position
+		cadcx SpriteYOffsets
+		sta (OAMPointer),y
 		sta Temp12
 		iny
 		sty Temp13
@@ -3478,10 +3478,10 @@ le3a4:
 		inc LoadPointerHi
 		@le4b1:
 		ldy Temp13
-		sta (DataPointer),y
+		sta (OAMPointer),y
 		iny
 		lda Temp14
-		sta (DataPointer),y
+		sta (OAMPointer),y
 		iny
 		sty Temp13
 		ldy #0
@@ -3492,7 +3492,7 @@ le3a4:
 		inc ScorePointerHi
 		@le4ca:
 		ldy Temp13
-		sta (DataPointer),y
+		sta (OAMPointer),y
 		iny
 		dex
 		bpl @Loop
@@ -3501,7 +3501,7 @@ le3a4:
 
 le4d5:
 	phx
-	ldy DataPointerLo
+	ldy OAMPointerLo
 	lda ObjectYPosInt,x
 	sta OAM+0,y
 	sta OAM+4,y
