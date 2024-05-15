@@ -57,7 +57,7 @@ ScoreDigit3			.set $45
 ScoreDigit4			.set $47
 ScoreDigit5			.set $48
 
-; $0043 = Division Dividend & Modulo Result
+DivisionRemainder	.set $43	;Division Dividend & Modulo Result
 
 BTRankLo			.set $49
 BTRankHi			.set $4A

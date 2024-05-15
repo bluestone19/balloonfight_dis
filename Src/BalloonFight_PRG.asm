@@ -2946,8 +2946,8 @@ AddScore:
 
 	; Check for cases where score should not be added
 	lda DemoFlag	; \ If not Demo Play
-	beq @Continue	; | then go to @Continue
-	:rts				; / Else return
+	beq @Continue	; | then continue
+	:rts			; / Else return (Don't update score in demo mode)
 	@Continue:
 	ldx TargetUpdateScore	; \ If [TargetUpdateScore] >= 2
 	cpx #2					; | Then return
@@ -3001,16 +3001,16 @@ AddScore:
 	sta P1Score4,x	; /
 
 	inxr 4
-	ldy #4					; \ From highest digit
-ld746:
-	lda P1Score,x			; | If this score digit is
-	cmp (ScorePointer),y	; | under Highest Top Score Digit
-	bcc ld765				; | then Top Score was not beaten
-	bne ld752				; | so go to ld765 (stop checking)
-	dex						; | if not equal then Top score is beaten
-	dey						; | if equal then check the lower digit
-	bpl ld746				; / until the last.
-ld752:
+	ldy #4						; \ From highest digit
+	@HiCheckLoop:
+		lda P1Score,x			; | If this score digit is
+		cmp (ScorePointer),y	; | under Highest Top Score Digit
+		bcc @SkipHiCheck		; | then Top Score was not beaten
+		bne @@HiScoreBeaten		; | so go to @SkipHiCheck (stop checking)
+		dex						; | if not equal then Top score is beaten
+		dey						; | if equal then check the lower digit
+		bpl @HiCheckLoop		; / until the last.
+	@@HiScoreBeaten:
 	ldy #0
 	lda TargetUpdateScore	; \
 	aslr 2					; | X = [TargetUpdateScore] * 5
@@ -3023,14 +3023,14 @@ ld752:
 		iny						; |
 		cpy #5					; |
 		bne @CopyLoop			; /
-ld765:
+	@SkipHiCheck:
 	ldy #4						; \
 	@CopyLoop:
 		lda (ScorePointer),y	; | Copy Highest Top Score
 		sta TopScore,y			; | back to Current Top Score
 		dey						; | 
 		bpl @CopyLoop			; /
-	inc $46		; Status Bar Update Flag
+	inc StatusUpdateFlag	; Set flag to update status bar
 	lda GameMode		; \
 	beq :+				; | If Balloon Trip Mode then
 	jsr UpdateBTRank	; / Ranking Update
@@ -3039,17 +3039,16 @@ ld765:
 TopScoreAddrLo:	;Lower byte for each of the static top score memory locations
 	.BYTE <GameATopScore,<GameBTopScore,<GameCTopScore
 
-DivideByY:	; Divide [$43] by Y
+DivideByY:	; Divide DivisionRemainder by Y
 	sty Temp12
-	ldx #$ff
-	lda $43
-ld782:
-	sec			; \
-	sbc Temp12	; | Subtract Y 
-	inx			; | X + 1
-	bcs ld782	; / If it doesn't overflow then continue
+	ldx #<-1	; Set X to -1
+	lda DivisionRemainder
+	@Loop:
+		ssbc Temp12	; \ Subtract Y 
+		inx			; | X + 1
+		bcs @Loop	; / If A >= 0 still then continue
 	cadc Temp12	; Add Y value again to cancel overflow
-	sta $43		; [$43] = Reminder
+	sta DivisionRemainder	; DivisionRemainder = Remainder
 	txa			; A and X = Result
 	rts
 
@@ -3065,7 +3064,7 @@ UpdateStatusBar:
 	ldy StatusUpdateFlag	; \ Check status bar update flag
 	dey						; | (Do operation to update registers)
 	beq DrawStatusBar		; | If flag was 1, redraw status bar
-	bpl ld805				; | If flag was >1, 
+	bpl UpdateStatusLives	; | If flag was >1, also update lives
 	rts						; / If flag was empty, do nothing
 
 DrawStatusBar:
@@ -3123,30 +3122,30 @@ DrawStatusBar:
 	dec StatusUpdateFlag	;Reset status update flag when done
 	rts
 
-ld805:
+UpdateStatusLives:
 	dec StatusUpdateFlag
 	stppuaddr $2062	; PPUADDR = $2062 GAME OVER Player 1 Status Bar
-	lda P1Lives	; \ If Player 1 Lives is negative
-	jsr ld826	; / Then upload GAME OVER
+	lda P1Lives		; \ Draw P1 life count or game over text
+	jsr @DrawLives	; / 
 	lda TwoPlayerFlag	; \ If Single Player
 	beq :+				; / then return
 	stppuaddr $2075
-	lda P2Lives			; \ If Player 2 Lives is negative
-ld826:
-	bmi DrawGameOverB	; / Then upload GAME OVER
-	ReturnFromDGOB:
-	sta PPUAddressHi		; \
-	ldx #6					; | Draw up to 7 life icons
-	@Loop:
-		lda #$24			; | Upload amount of lives to PPU
-		cpx PPUAddressHi	; |
-		bcs @Skip			; |
-		lda #$2a			; | 0x2A = Life icon
-		@Skip:
-		sta PPUDATA			; |
-		dex					; |
-		bpl @Loop			; /
-	:rts
+	lda P2Lives			; Draw P2 life count or game over text, then return
+	@DrawLives:
+		bmi DrawGameOverB	; If lives are negative, then upload GAME OVER
+		ReturnFromDGOB:
+		sta PPUAddressHi		; \
+		ldx #6					; | Draw up to 7 life icons
+		@Loop:
+			lda #$24			; | Upload amount of lives to PPU
+			cpx PPUAddressHi	; |
+			bcs @Skip			; |
+			lda #$2a			; | 0x2A = Life icon
+			@Skip:
+			sta PPUDATA			; |
+			dex					; |
+			bpl @Loop			; /
+		:rts
 
 DrawGameOverB:	;Draw "GAME OVER" text for individual player if in game B
 	lda TwoPlayerFlag	; \ If Single Player
@@ -3500,7 +3499,7 @@ le3a4:
 	rts
 
 le4d5:
-	phx
+	phx	; Preserve X
 	ldy OAMPointerLo
 	lda ObjectYPosInt,x
 	sta OAM+0,y
@@ -3520,9 +3519,9 @@ le4d5:
 	lda ObjectYPosInt,x
 	cmp #$d0
 	lda #3
-	bcc le50d
+	bcc @le50d
 	lda #$23
-	le50d:
+	@le50d:
 	sta OAM+2,y
 	lda ObjectStatus,x
 	bne le553
@@ -3541,18 +3540,18 @@ le4d5:
 	ldx $1f
 	lda FrameCounter
 	and #$20
-	beq le550
+	beq @Finish
 	lda FrameCounter
 	and #$40
-	bne le54a
+	bne @le54a
 	inc OAM+0,x
 	inc OAM+4,x
-	bne le550
-	le54a:
+	bne @Finish
+	@le54a:
 	inc OAM+3,x
 	inc OAM+11,x
-	le550:
-	plx
+	@Finish:
+	plx	; Restore X
 	rts
 
 le553:
