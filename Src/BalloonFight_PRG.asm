@@ -3006,23 +3006,23 @@ AddScore:
 		lda P1Score,x			; | If this score digit is
 		cmp (ScorePointer),y	; | under Highest Top Score Digit
 		bcc @SkipHiCheck		; | then Top Score was not beaten
-		bne @@HiScoreBeaten		; | so go to @SkipHiCheck (stop checking)
+		bne @HiScoreBeaten		; | so go to @SkipHiCheck (stop checking)
 		dex						; | if not equal then Top score is beaten
 		dey						; | if equal then check the lower digit
 		bpl @HiCheckLoop		; / until the last.
-	@@HiScoreBeaten:
+	@HiScoreBeaten:
 	ldy #0
 	lda TargetUpdateScore	; \
 	aslr 2					; | X = [TargetUpdateScore] * 5
 	ora TargetUpdateScore	; |
 	tax						; /
-	@CopyLoop:
+	@CopyHiLoop:
 		lda P1Score,x			; \
 		sta (ScorePointer),y	; | Copy Current Score
 		inx						; | to Highest Top Score
 		iny						; |
 		cpy #5					; |
-		bne @CopyLoop			; /
+		bne @CopyHiLoop			; /
 	@SkipHiCheck:
 	ldy #4						; \
 	@CopyLoop:
@@ -3342,27 +3342,27 @@ le3a4:
 	sta OAMPointerLo		; /
 	lda FrameCounter		; \
 	lsr						; | Every 2 frames
-	bcc @Skip				; | Set Pointer from the second table
+	bcc @SelectOrder		; | Set Pointer from the second table
 	lda OAMObjectOrder2,x	; | (Shuffles order in OAM to prevent sprites from being totally blocked)
 	sta OAMPointerLo		; /
-	@Skip:
+	@SelectOrder:
 	lda #>OAM			; \ Set Pointer to $02xx
 	sta OAMPointerHi	; / (OAM)
 	lda ObjectBalloons,x	; \ If Object X Balloons >= 0
-	bpl le3cf				; /
-	cmp #<-1	; \ If Object X Balloons == -1
-	beq le3c2	; /
+	bpl @le3cf				; /
+	cmp #<-1			; \ If Object X Balloons == -1
+	beq @ClearSprite	; /
 	jmp le4d5
-	le3c2:
-	ldy #20					; \
-	@ClearLoop:
-		lda #$f0			; |
-		sta (OAMPointer),y	; |
-		deyr 4				; |
-		bpl @ClearLoop		; /
-	rts
-	le3cf:
-	cpx #8			; \ If Object is Fish
+	@ClearSprite:
+		ldy #20					; \
+		@ClearLoop:
+			lda #$f0			; | Set all 6 of this sprite's Object's
+			sta (OAMPointer),y	; | Y positions to $F0
+			deyr 4				; | Decrease Y by 4, 5 times
+			bpl @ClearLoop		; /
+		rts
+	@le3cf:
+	cpx #8				; \ If Object is Fish
 	beq @AnimateFish	; /
 	lda ObjectStatus,x		; \
 	aslr 2					; | (Object Status * 4) + Animation Frame
@@ -3398,7 +3398,7 @@ le3a4:
 	bne le429
 	@AnimateFish:
 	ldy ObjectStatus,x
-	bmi le3c2
+	bmi @ClearSprite
 	lda FishSprPointersLower,y
 	sta LoadPointerLo
 	lda FishSprPointersUpper,y
@@ -3448,54 +3448,54 @@ le3a4:
 	ldy #0
 	lda (LoadPointer),y
 	inc LoadPointerLo
-	bne le486
+	bne @le486
 	inc LoadPointerHi
-	le486:
+	@le486:
 	asl
 	sta Temp13
 	asl
 	adc Temp13
 	adc ScorePointerLo
 	sta ScorePointerLo
-	bcc le494
+	bcc @le494
 	inc ScorePointerHi
-	le494:
-	phx
-	ldx #5
-	ldy #0
-	@Loop:
-		lda Temp12	; Object's Y Position
-		cadcx SpriteYOffsets
-		sta (OAMPointer),y
-		sta Temp12
-		iny
-		sty Temp13
+	@le494:
+		phx	; Preserve X
+		ldx #5
 		ldy #0
-		lda (LoadPointer),y
-		inc LoadPointerLo
-		bne @le4b1
-		inc LoadPointerHi
-		@le4b1:
-		ldy Temp13
-		sta (OAMPointer),y
-		iny
-		lda Temp14
-		sta (OAMPointer),y
-		iny
-		sty Temp13
-		ldy #0
-		lda Temp15
-		cadcy (ScorePointer)
-		inc ScorePointerLo
-		bne @le4ca
-		inc ScorePointerHi
-		@le4ca:
-		ldy Temp13
-		sta (OAMPointer),y
-		iny
-		dex
-		bpl @Loop
-	plx
+		@Loop:
+			lda Temp12	; Object's Y Position
+			cadcx SpriteYOffsets
+			sta (OAMPointer),y
+			sta Temp12	; Store Y Position with offset for next piece of sprite
+			iny
+			sty Temp13
+			ldy #0
+			lda (LoadPointer),y
+			inc LoadPointerLo
+			bne @le4b1
+			inc LoadPointerHi
+			@le4b1:
+			ldy Temp13
+			sta (OAMPointer),y
+			iny
+			lda Temp14
+			sta (OAMPointer),y
+			iny
+			sty Temp13
+			ldy #0
+			lda Temp15
+			cadcy (ScorePointer)
+			inc ScorePointerLo
+			bne @le4ca
+			inc ScorePointerHi
+			@le4ca:
+			ldy Temp13
+			sta (OAMPointer),y
+			iny
+			dex
+			bpl @Loop
+		plx	; Restore X
 	rts
 
 le4d5:
