@@ -91,6 +91,10 @@ PlatformCount		.set $CD
 ; $00CE = Unused
 ; $00CF = Unused
 
+TempDriftVel		.set $12
+TempDriftVelLo		.set TempDriftVel
+TempDriftVelHi		.set $13
+
 RNGOutput			.set $1B
 RNGLower			.set RNGOutput
 RNGUpper			.set $1C
@@ -225,7 +229,7 @@ PPUBufferSize		.set $53
 PPUBlockAddrLo		.set $54
 PPUBlockAddrHi		.set $55
 
-TempBlockSize		.set $56
+UploadBlockSize		.set $56
 PPUTempBlock		.set $57
 
 ; $005A-$0079 = Palette
@@ -313,12 +317,18 @@ SuperBonusPtsUpper	.set $055B
 SuperBonusPtsLower	.set $055C
 
 BalloonStatus		.set $055D	; $055D-$0566 = Balloon GFX (Type? Status?)
-BalloonXPos			.set $0567	; $0567-$0570 = Balloon X positions
-	; $0571-$057A = Balloon?
-BalloonYPos			.set $057B	; $057B-$0584 = Balloon Y positions
+BalloonXPosInt		.set $0567	; $0567-$0570
+BalloonXPosFrac		.set $0571	; $0571-$057A
+BalloonYPosInt		.set $057B	; $057B-$0584
+BalloonYPosFrac		.set $0585	; $0585-$058E
+BalloonXVelInt		.set $058F	; $058F-$0598
+BalloonXVelFrac		.set $0599	; $0599-$05A2
 
-; $05CB = ?
-; $05CC = ?
+BalloonAccelFrac	.set $05B7	; $05B7-$05C0
+BalloonAccelInt		.set $05C1	; $05C1-$05CA
+
+BonusBalloonStock	.set $05CB
+BonusBalloonDelay	.set $05CC
 P1BonusBalloons		.set $05CD
 P2BonusBalloons		.set $05CE
 P1TripBalloons		.set $05CE
@@ -326,8 +336,8 @@ P1TripBalloons		.set $05CE
 PropellerCount		.set $05D1
 PropellerXPos		.set $05D2	; $05D2-$05DB
 PropellerYPos		.set $05DC	; $05DC-$05E5
-; $05E6-$05EF
-; $05F0-$05F9
+PropellerAddrLo		.set $05E6	; $05E6-$05EF
+PropellerAddrHi		.set $05F0	; $05F0-$05F9
 PropellerType		.set $05FA	; $05FA-$0603
 PropellerState		.set $0604	; $0604-$060D
 PropellerCountdown	.set $060E	; $060E-$0617
