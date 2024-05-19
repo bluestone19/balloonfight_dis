@@ -173,852 +173,849 @@ BRKLoop:
 
 ;----------------------
 ; NMI/PPU Management code
-;----------------------
 
-DisableNMI:
-	lda PPUCTRLShadow	; \
-	and #%01111111		; / Disable NMI
-WritePPUCTRL:
-	sta PPUCTRL			; \
-	sta PPUCTRLShadow	; | Update PPUCTRL
-	rts					; /
+	DisableNMI:
+		lda PPUCTRLShadow	; \
+		and #%01111111		; / Disable NMI
+	WritePPUCTRL:
+		sta PPUCTRL			; \
+		sta PPUCTRLShadow	; | Update PPUCTRL
+		rts					; /
 
-EnableNMI:
-	lda PPUCTRLShadow	; \
-	ora #%10000000		; | Enable NMI
-	bne WritePPUCTRL	; /
+	EnableNMI:
+		lda PPUCTRLShadow	; \
+		ora #%10000000		; | Enable NMI
+		bne WritePPUCTRL	; /
 
-ClearPPUMask:
-	lda #%00000000	; Clear PPUMASK
-WritePPUMask:
-	pha
-	jsr FinishFrame
-	pla
-	sta PPUMASK	; Update PPUMASK
-	rts
-
-UploadPPUAndMask:
-	lda PPUMASKShadow	; Write PPUMASK Shadow to PPUMASK
-	bne WritePPUMask
-UploadPPU:
-	jsr NewPPUBlock
-	ldy #0					; \
-	@Loop:
-		lda PPUTempBlock,y	; | Put PPU Data
-		sta PPUBuffer,x		; | to upload to Nametable 1
-		inx					; |
-		iny					; |
-		cpy UploadBlockSize	; |
-		bne @Loop			; /
-	stx PPUBufferSize		; Update PPU Buffer Size
-	rts
-
-CopyPPUTempBlock:
-	lday PPUTempBlock
-CopyPPUBlock:
-	sta ScorePointerLo	; \ Update Pointer
-	sty ScorePointerHi	; / [$21] = $YYAA
-	phx
-	ldy #2					; \
-	lda (ScorePointer),y	; | Get Data Size + 3
-	clc						; | to include Address and Size info
-	adc #3					; |
-	sta Temp12				; /
-	ldx PPUBufferSize	; Get PPU Buffer Size
-	ldy #0						; \
-	@Loop:
-		lda (ScorePointer),y	; | Copy PPU Upload Block
-		sta PPUBuffer,x			; |
-		inx						; |
-		iny						; |
-		cpy Temp12				; |
-		bne @Loop				; /
-	stx PPUBufferSize		; Update PPU Buffer Size
-	plx
-	rts
-
-NewPPUBlock:
-	ldx PPUBufferSize		; X = PPU Buffer Size
-	lda #0		; \
-	sta Temp12	; |
-	lda $55		; |
-	aslr 4		; | PPUADDR_H = 001000XX
-	rol Temp12	; | PPUADDR_L = DDD00000 | [$54]
-	asl			; |
-	rol Temp12	; |
-	ora $54		; |
-	pha			; /
-	lda Temp12		; \
-	ora #$20		; | Put PPUADDR High Byte
-	sta PPUBuffer,x	; / (From Nametable 1)
-	inx				; \
-	pla				; | Put PPUADDR Low Byte
-	sta PPUBuffer,x	; /
-	inx					; \
-	lda UploadBlockSize	; | Put Upload Size
-	sta PPUBuffer,x		; /
-	inx	; \ Return:
-	rts	; / X = Current PPU Buffer Address
-
-UploadPPUAndMaskBuffer:
-	phy	; \ Push Y & X
-	phx	; /
-	jsr ContinueBufferUpload 
-	plx	; \ Pull X & Y
-	ply	; /
-	rts
-	ContinueBufferUpload:
-		ldx PPUBufferPosition	; Get Current Position in PPU Upload Buffer
-		lda PPUBuffer,x		; \
-		inx					; |
-		sta PPUAddressHi	; |
-		sta PPUADDR			; | Get PPU Address
-		lda PPUBuffer,x		; | And Set PPUADDR
-		inx					; |
-		sta PPUADDR			; /
-		ldy PPUBuffer,x	; Get Upload Size to Y
-		inx
-		@Loop:
-			lda PPUBuffer,x	; \
-			inx				; |
-			sta PPUDATA		; | Upload Y bytes to PPU
-			dey				; |
-			bne @Loop		; /
-		lda PPUAddressHi	; \
-		cmp #$3f			; | If Upload Address != $3FXX (Palette Data)
-		bne @Skip			; / Then Skip this section
-		stppuaddr $3F00	; PPUADDR = $3F00
-		sta PPUADDR	; Write $00 to PPUADDR twice
-		sta PPUADDR
-		@Skip:
-		stx PPUBufferPosition		; \
-		cpx PPUBufferSize			; | If PPU Buffer Position != PPU Buffer Size
-		bne ContinueBufferUpload	; / Then Upload more data
+	ClearPPUMask:
+		lda #%00000000	; Clear PPUMASK
+	WritePPUMask:
+		pha
+		jsr FinishFrame
+		pla
+		sta PPUMASK	; Update PPUMASK
 		rts
+
+	UploadPPUAndMask:
+		lda PPUMASKShadow	; Write PPUMASK Shadow to PPUMASK
+		bne WritePPUMask
+	UploadPPU:
+		jsr NewPPUBlock
+		ldy #0					; \
+		@Loop:
+			lda PPUTempBlock,y	; | Put PPU Data
+			sta PPUBuffer,x		; | to upload to Nametable 1
+			inx					; |
+			iny					; |
+			cpy UploadBlockSize	; |
+			bne @Loop			; /
+		stx PPUBufferSize		; Update PPU Buffer Size
+		rts
+
+	CopyPPUTempBlock:
+		lday PPUTempBlock
+	CopyPPUBlock:
+		sta ScorePointerLo	; \ Update Pointer
+		sty ScorePointerHi	; / [$21] = $YYAA
+		phx
+		ldy #2					; \
+		lda (ScorePointer),y	; | Get Data Size + 3
+		clc						; | to include Address and Size info
+		adc #3					; |
+		sta Temp12				; /
+		ldx PPUBufferSize	; Get PPU Buffer Size
+		ldy #0						; \
+		@Loop:
+			lda (ScorePointer),y	; | Copy PPU Upload Block
+			sta PPUBuffer,x			; |
+			inx						; |
+			iny						; |
+			cpy Temp12				; |
+			bne @Loop				; /
+		stx PPUBufferSize		; Update PPU Buffer Size
+		plx
+		rts
+
+	NewPPUBlock:
+		ldx PPUBufferSize		; X = PPU Buffer Size
+		lda #0		; \
+		sta Temp12	; |
+		lda $55		; |
+		aslr 4		; | PPUADDR_H = 001000XX
+		rol Temp12	; | PPUADDR_L = DDD00000 | [$54]
+		asl			; |
+		rol Temp12	; |
+		ora $54		; |
+		pha			; /
+		lda Temp12		; \
+		ora #$20		; | Put PPUADDR High Byte
+		sta PPUBuffer,x	; / (From Nametable 1)
+		inx				; \
+		pla				; | Put PPUADDR Low Byte
+		sta PPUBuffer,x	; /
+		inx					; \
+		lda UploadBlockSize	; | Put Upload Size
+		sta PPUBuffer,x		; /
+		inx	; \ Return:
+		rts	; / X = Current PPU Buffer Address
+
+	UploadPPUAndMaskBuffer:
+		phy	; \ Push Y & X
+		phx	; /
+		jsr ContinueBufferUpload 
+		plx	; \ Pull X & Y
+		ply	; /
+		rts
+		ContinueBufferUpload:
+			ldx PPUBufferPosition	; Get Current Position in PPU Upload Buffer
+			lda PPUBuffer,x		; \
+			inx					; |
+			sta PPUAddressHi	; |
+			sta PPUADDR			; | Get PPU Address
+			lda PPUBuffer,x		; | And Set PPUADDR
+			inx					; |
+			sta PPUADDR			; /
+			ldy PPUBuffer,x	; Get Upload Size to Y
+			inx
+			@Loop:
+				lda PPUBuffer,x	; \
+				inx				; |
+				sta PPUDATA		; | Upload Y bytes to PPU
+				dey				; |
+				bne @Loop		; /
+			lda PPUAddressHi	; \
+			cmp #$3f			; | If Upload Address != $3FXX (Palette Data)
+			bne @Skip			; / Then Skip this section
+			stppuaddr $3F00	; PPUADDR = $3F00
+			sta PPUADDR	; Write $00 to PPUADDR twice
+			sta PPUADDR
+			@Skip:
+			stx PPUBufferPosition		; \
+			cpx PPUBufferSize			; | If PPU Buffer Position != PPU Buffer Size
+			bne ContinueBufferUpload	; / Then Upload more data
+			rts
 
 ;----------------------
 ; Balloon Trip Game Mode code
-;----------------------
 
-BalloonTripInit:
-	lda #$20		; \ Play Balloon Trip Music
-	sta MusicReq	; /
-	jsr BTSetBalloonPoints
-	jsr UpdateBTRank
-	lda #$ff			; \ No platforms
-	sta PlatformCount	; /
-	tpa BTStartLayout, LeftPointer
-	lda #128			; \ Set Player 1 X Position
-	sta ObjectXPosInt	; / to 128 (0x80, middle of screen)
-	sta BTPlatformX		; Set Balloon Trip Starting Platform X Position to #$80
-	lda #112			; \ Set Player 1 Y Position
-	sta ObjectYPosInt	; / to 112px (0x70, middle of screen)
-	jsr InitBalloons
-	lda #0
-	sta P1Lives		; 0 Lives to Player 1
-	sta TileScrollCount		; Init Tile Scroll Counter
-	sta ScreenScrollCount	; Init Screen Scroll Counter
-	sta SparkIntensity		; Init SparkIntensity
-	sta ScrollLockTimer	; Init Scrolling Lock Time
-	sta PhaseType		; Phase Type = 0
-	jsr InitializeFish
-	ldx #19
-	@SparkResetLoop:
-		lda #$ff			; \ Reset All 20 Sparks
-		sta SparkAnim,x		; | Animation Frame = -1
-		lda #240			; |
-		sta SparkYPosInt,x	; | Y Position = 240 (Offscreen)
-		dex					; |
-		bpl @SparkResetLoop	; /
-BalloonTripGameLoop:
-	jsr Pause
-	jsr ObjectManage
-	lda ScrollLockTimer	; If Screen is locked
-	bne @SkipFish		; then don't manage Fish
-	jsr FishManage
-	@SkipFish:
-	lda FrameCounter			; \ Manage Screen Scrolling and stuff
-	lsr							; | every 2 frames...
-	bcs @ContinueScrollUpdate	; /
-	jmp BTPhysics
-	@ContinueScrollUpdate:
-	lda ScrollLockTimer	; \ ...unless the scrolling
-	beq @SkipLockTimer	; | is locked
-	dec ScrollLockTimer	; /
-	jmp BTPhysics
-	@SkipLockTimer:
-	lda BTXScroll		; \ If the scrolling X position
-	bne @SkipPPUCTRL	; | is 0 then
-	lda PPUCTRLShadowBT	; | Toggle between
-	eor #1				; | nametable 0 and 1
-	sta PPUCTRLShadowBT	; /
-	@SkipPPUCTRL:
-	dec BTXScroll	; Scroll 1 pixel from the left
-	lda BTPlatformX		; \ Skip if starting platform
-	beq @SkipPlatform	; / does not exist
-	inc BTPlatformX	; Scroll starting platform 1px to the right
-	lda BTPlatformX		; \
-	cmp #240			; | If Starting Platform reaches
-	bcc @PlatformExists	; | X position #$F0
-	lda #0				; | then disappear
-	sta BTPlatformX		; /
-	@PlatformExists:
-		lda PlayerInvincible	; \ If Player is invincible
-		beq @SkipPlatform		; | (has not yet moved)
-		inc ObjectXPosInt		; / then scroll 1px to the right
-	@SkipPlatform:
-	ldx #7	; Max of 8 balloons on screen
-	@BalloonLoop:	; Scroll all the balloons
-		lda BalloonStatus,x	; \ If balloon doesn't exist
-		bmi @SkipBalloon	; / skip to the next one
-		inc BalloonXPosInt,x	; Scroll balloon 1px to the right
-		lda BalloonXPosInt,x	; \
-		cmp #248				; | If balloon's X position
-		bne @SkipBalloon		; | reaches #$F8
-		lda #$ff				; | then make it disappear
-		sta BalloonStatus,x		; |
-		lda #240				; |
-		sta BalloonYPosInt,x	; | And reset the balloon counter
-		lda #0					; |
-		sta P1TripBalloons		; /
-		@SkipBalloon:
-		dex					; \ Check next balloon
-		bpl @BalloonLoop	; /
-	ldx #19	; Max of 20 sparks on screen
-	@SparkLoop:	;Scroll all the sparks
-		lda SparkAnim,x	; \ If Lightning Bolt doesn't exist
-		bmi @SkipSpark	; / then skip to next one
-		inc SparkXPosInt,x	; Scroll Spark 1 pixel to the right
-		lda SparkXPosInt,x	; \
-		cmp #248			; | If bolt's X position
-		bcc @SkipSpark		; | reaches #$F8
-		lda #240			; | then make it disappear
-		sta SparkYPosInt,x	; |
-		sta SparkAnim,x		; /
-		@SkipSpark:
-		dex				; \ Check next bolt
-		bpl @SparkLoop	; /
-	lda BTXScroll	; \ Every 8 pixel scrolled
-	and #7			; |
-	bne BTPhysics	; /
-	ldx ObjectBalloons	; \ If Player still has balloons
-	dex					; |
-	bmi BTPhysics		; /
-	lda #0					; \
-	sta TargetUpdateScore	; | Add 10 to Player 1 Score
-	lda #1					; |
-	jsr AddScore			; /
-	inc TileScrollCount	; Increment Tile Scroll Counter
-	lda TileScrollCount		; \
-	and #31					; | If 32 tiles have been scrolled
-	bne @GenerateObstacles	; /
-	inc ScreenScrollCount	; Increment Screen Scroll Counter
-	lda ScreenScrollCount	; \
-	cmp #10					; | If 10 screens have been scrolled
-	bne @GenerateObstacles	; /
-	lda #2					; \ Then reset to Screen #$02
-	sta ScreenScrollCount	; /
-	ldy SparkIntensity	; \
-	iny					; | Increment
-	tya					; | Lightning Bolt Intensity Level
-	and #3				; |
-	sta SparkIntensity	; /
-	@GenerateObstacles:
-		ldx ScreenScrollCount		; \
-		lda ScreenLayoutOrder,x		; |
-		asl							; |
-		tay							; | Manage Screen Layout
-		lda BTScreenSubroutines,y	; | Jump to subroutines
-		sta RightPointerLo			; | dedicated to each screen layout
-		lda BTScreenSubroutines+1,y	; |
-		sta RightPointerHi			; |
-		jsr DoBTScreenRoutine		; /
-BTPhysics:
-	ldx #7
-	@BalloonLoop:
-		lda BalloonStatus,x	; \ If Balloon X does not exist
-		bmi @SkipBalloon	; / then skip collision check
-		jsr CheckBalloonXCollision
-		lda P1BonusBalloons	; \
-		beq @SkipBalloon	; | Every balloon touched
-		dec P1BonusBalloons	; | counts towards the
-		inc P1TripBalloons	; / main counter
-		phx
-		lda BalloonPts	; \ Add Score
-		jsr AddScore	; /
-		plx
-		@SkipBalloon:
-		jsr ManageBalloonXSprite
-		dex					; \ Check next balloon
-		bpl @BalloonLoop	; /
-	ldx #19
-	@SparkLoop:
-		lda SparkAnim,x	; \ If Lightning Bolt exists?
-		bmi @SparkEmpty	; /
-		lda ScrollLockTimer	; \ If Scrolling is locked
-		bne @SkipSparkMove	; /
-		jsr UpdateSparkPos	; Update Lightning Bolt Position
-		lda SparkYPosInt,x	; \
-		cmp #2				; | If Y pos < #$02
-		bcs @NoBounce		; | then
-		jsr SparkBounceYSFX	; / Bounce Lightning Bolt Vertically
-		@NoBounce:
-		cmp #216			; \ If Y pos >= #$D8
-		bcc @SkipSparkMove	; | then
-		jsr SparkBounceYSFX	; / Bounce Lightning Bolt Vertically
-		@SkipSparkMove:
-		jsr SparkPlayerCollision
-		@SparkEmpty:
-		lda FrameCounter	; \
-		and #7				; | Get Lightning Bolt
-		lsr					; | Animation Frame Tile
-		tay					; |
-		lda lc9dd,y			; | (Unused Note: Animation is 8 frames
-		pha					; / but only half of them are used.)
-		lda FrameCounter	; \
-		lsr					; | Every 2 frames...
-		txa					; |
-		bcc @SparkAddressX	; /
-		sta Temp12	; \
-		lda #19		; | ...count from the end
-		sbc Temp12	; /
-		@SparkAddressX:
-		aslr 2	; \ Get OAM Sprite Address
-		tay		; /
-		pla				; \ Update Lightning Bolt Sprite
-		sta OAM+$b1,y	; / Tile ID
-		lda SparkYPosInt,x	; \
-		sta OAM+$b0,y		; / Y position
-		lda SparkXPosInt,x	; \
-		sta OAM+$b3,y		; / X position
-		lda #0			; \
-		sta OAM+$b2,y	; / Use Sprite Palette 0
-		dex				; \ Loop to next bolt
-		bpl @SparkLoop	; /
-	lda P1TripBalloons	; \ If you touched
-	cmp #20				; | 20 balloons in a row...
-	bcc @DrawBTPlatform	; /
-	inc ScoreDigit4		; \ Add 10000
-	lda #0				; | to score
-	jsr AddScore		; /
-	dec ScoreDigit4		; Reset score to add
-	lda #$10		; \ Play Bonus Phase Perfect jingle
-	sta MusicReq	; /
-	inc PhaseType	; Set Bonus Phase Type
-	jsr LoadPalette	; Update Balloon Palette
-	jsr BTSetBalloonPoints
-	dec PhaseType	; Reset to Normal Phase
-	ldx #100				; \ Wait for 100 frames
-	jsr WaitXFrames	; /
-	lda #$20		; \ Play Balloon Trip Music
-	sta MusicReq	; /
-	@DrawBTPlatform:
-		ldx #$f0			; \ If Balloon Trip Starting Platform
-		lda BTPlatformX		; | X position is 0
-		beq @HideBTPlatform	; / then don't make it appear on screen
-		ldx #$88	; \ At Y position #$88:
-		@HideBTPlatform:
-		stx OAM+0	; | Display Left and Right
-		stx OAM+4	; / sides of Platform
-		sta OAM+3	; \
-		clc			; | Display Left and Right
-		adc #8		; | sides at current X position
-		sta OAM+7	; /
-		lda FrameCounter	; \
-		and #3				; | Switch between palettes
-		sta OAM+2			; | on platform
-		sta OAM+6			; /
-		ldx #$e3	; \
-		stx OAM+1	; | Display Tile #$E3 and #$E4
-		inx			; |
-		stx OAM+5	; /
-	lda ObjectBalloons		; \ If Player is dead (no balloons)
-	bmi BalloonTripGameOver	; / then game over
-	jmp BalloonTripGameLoop	; else game loop
-
-BalloonTripGameOver:
-	jsr RankScoreUpdate
-	lda #$01	; \ Play SFX
-	sta SFX1Req	; /
-	jsr FinishFrame
-	lda #$02		; \ Play Stage Clear jingle
-	sta MusicReq	; /
-	jmp EndGameNoJingle	; Put Game Over on Screen
-
-DoBTScreenRoutine:
-	jmp (RightPointer)
-
-BTScreenSubroutines:	; Screen Layout Subroutines
-	.WORD BTLoadLayout		;0: Place sparks and balloons in predefined layout
-	.WORD BTRandScreen		;1: Randomly place balloons and moving sparks
-	.WORD BTRandWBubble		;2: Same as 1 but with chance of a Bubble appearing
-	.WORD BTOncomingSparks	;3: Sparks come flying at player
-	.WORD BTRTS				;4: Empty screen
-
-ScreenLayoutOrder:	; The pattern for each screen
-	.BYTE 0,0		;First two screens, use predefined layout. Not repeated
-	.BYTE 2,2,2,2,2	;Five screens, standard randomly moving sparks, randomly placed balloons, chance for a bubble
-	.BYTE 4,3,1		;Empty screen, Fast sparks flying to right, normal screen but without bubble
-
-BTLoadLayout:
-	ldy #0				; \
-	lda (LeftPointer),y	; | Read Layout Data Byte
-	inc LeftPointerLo	; | at LeftPointer and Increment
-	bne @ParseByte		; | Bit format: BS0YYYYY
-	inc LeftPointerHi	; / B = Balloon, S = Spark, Y = Tile Y Position
-	@ParseByte:
-	tax		; Store loaded Layout Byte in X
-	beq :+	; If Layout Byte = 00 then return
-	aslr 3		; \ Set Y position
-	sta Temp15	; /
-	lda #0		; \ Clear Temp14
-	sta Temp14	; /
-	txa		;Load Layout Byte to A again
-	and #%11000000		; \ Cut out Y bits
-	cmp #%10000000		; | If bit B is set
-	bne @CheckSparkBit	; | then
-	jsr BTSpawnBalloon	; / Spawn Balloon
-	jmp BTLoadLayout	; Repeat
-	@CheckSparkBit:
-	cmp #0				; \ If bit S is set
-	bne :+				; | then
-	jsr BTSpawnSpark	; / Spawn Spark
-	jmp BTLoadLayout	; Repeat
-	:rts
-
-BTRandScreen:
-	jsr UpdateRNG		; Get random number in A
-	and #$7f				; \
-	cmp #4					; |
-	bcc BTRandomizeSpark	; | If RNG value is between
-	cmp #24					; | 4 and 23
-	bcs BTRandomizeSpark	; |
-	aslr 3					; | then spawn Balloon
-	sta Temp15				; | at Tile Y position value
-	jsr BTSpawnBalloon		; /
-BTRandomizeSpark:
-	jsr UpdateRNG			; \
-	and #$3f				; |
-	cmp #2					; | If RNG value is between
-	bcc :+					; | 2 and 23
-	cmp #24					; | then spawn Lightning Bolt
-	bcs :+					; | at Tile Y position value
-	aslr 3					; | and set Y velocity value
-	sta Temp15				; | using BTSparkVelOptions value
-	jsr UpdateRNG			; | (depending on full loop)
-	and #$3f				; | + RNG value up to 63
-	ldx SparkIntensity		; |
-	adc BTSparkVelOptions,x	; |
-	sta Temp14				; |
-	jsr BTSpawnSpark		; /
-	jsr UpdateRNG			; \
-	lsr						; | Make Y velocity value negative
-	bcc BTRandomizeSpark	; | 50% of the time
-	jsr SparkBounceYSFX		; |
-	jmp BTRandomizeSpark	; /
-	:rts
-
-BTSparkVelOptions:
-	.BYTE $20,$30,$40,$60
-
-BTRandWBubble:
-	jsr UpdateRNG		; \ Get a random number
-	and #%11001111		; | Discard two bits
-	bne BTRandScreen	; / If not 0, continue
-	ldy ObjectBalloons+1	; \ 
-	iny						; | 
-	bne BTRandScreen		; / If Bubble exists, continue
-	lda #230			; \ Otherwise, make a new Bubble
-	sta ObjectYPosInt+1	; / First set Bubble Y to 230 (0xE6)
-	lda RNGOutput		; \
-	and #127			; | Bubble X Position is random
-	adc #64				; | between 64 and 191
-	sta ObjectXPosInt+1	; /
-	lda #$80				; \ Set balloons to 0x80
-	sta ObjectBalloons+1	; / Which means it's a Bubble
-	lda #0				; \ Bubble Status = 00
-	sta ObjectStatus+1	; /
-BTRTS:
-	rts
-
-BTOncomingSparks:
-	jsr BTRandomizeSpark	; Randomly Spawn Spark
-	jsr UpdateRNG		; \
-	and #$7f			; | Set X Velocity (Frac)
-	sta SparkXVelFrac,x	; / RNG up to 127
-	rts
-
-BTSpawnBalloon:
-	ldx #7						; \
-	@SlotLoop:
-		lda BalloonStatus,x		; | Find Balloon that
-		bmi @BalloonSlotFound	; | hasn't spawned yet
-		dex						; |
-		bpl @SlotLoop			; /
-	rts
-	@BalloonSlotFound:
-		lda #1				; \ Set Balloon Type/GFX? to 01
-		sta BalloonStatus,x	; /
-		lda #0					; \ Set Balloon X position to 00
-		sta BalloonXPosInt,x	; /
-		lda Temp15				; \ Set Balloon Y position to [$15]
-		sta BalloonYPosInt,x	; /
-	rts
-
-BTSpawnSpark:
-	ldx #19					; \
-	@SlotLoop:
-		lda $0530,x			; | Find open slot
-		bmi SparkSlotFound	; | for a Spark
-		dex					; |
-		bpl @SlotLoop		; /
-	rts
-	SparkSlotFound:
+	BalloonTripInit:
+		lda #$20		; \ Play Balloon Trip Music
+		sta MusicReq	; /
+		jsr BTSetBalloonPoints
+		jsr UpdateBTRank
+		lda #$ff			; \ No platforms
+		sta PlatformCount	; /
+		tpa BTStartLayout, LeftPointer
+		lda #128			; \ Set Player 1 X Position
+		sta ObjectXPosInt	; / to 128 (0x80, middle of screen)
+		sta BTPlatformX		; Set Balloon Trip Starting Platform X Position to #$80
+		lda #112			; \ Set Player 1 Y Position
+		sta ObjectYPosInt	; / to 112px (0x70, middle of screen)
+		jsr InitBalloons
 		lda #0
-		sta $0530,x	; Set Animation Frame to 00
-		sta $0490,x	; Set X position to 00
-		sta $04f4,x	; Set Y velocity to 00
-		sta $0508,x	; \ Set X velocity to 00 (Int and Frac)
-		sta $04e0,x	; /
-		lda Temp14		; \ Set Y velocity (Frac) to [$14]
-		sta $051c,x		; /
-		lda Temp15		; \ Set Y position to [$15]
-		sta $04a4,x		; /
-	rts
+		sta P1Lives		; 0 Lives to Player 1
+		sta TileScrollCount		; Init Tile Scroll Counter
+		sta ScreenScrollCount	; Init Screen Scroll Counter
+		sta SparkIntensity		; Init SparkIntensity
+		sta ScrollLockTimer	; Init Scrolling Lock Time
+		sta PhaseType		; Phase Type = 0
+		jsr InitializeFish
+		ldx #19
+		@SparkResetLoop:
+			lda #$ff			; \ Reset All 20 Sparks
+			sta SparkAnim,x		; | Animation Frame = -1
+			lda #240			; |
+			sta SparkYPosInt,x	; | Y Position = 240 (Offscreen)
+			dex					; |
+			bpl @SparkResetLoop	; /
+	BalloonTripGameLoop:
+		jsr Pause
+		jsr ObjectManage
+		lda ScrollLockTimer	; If Screen is locked
+		bne @SkipFish		; then don't manage Fish
+		jsr FishManage
+		@SkipFish:
+		lda FrameCounter			; \ Manage Screen Scrolling and stuff
+		lsr							; | every 2 frames...
+		bcs @ContinueScrollUpdate	; /
+		jmp BTPhysics
+		@ContinueScrollUpdate:
+		lda ScrollLockTimer	; \ ...unless the scrolling
+		beq @SkipLockTimer	; | is locked
+		dec ScrollLockTimer	; /
+		jmp BTPhysics
+		@SkipLockTimer:
+		lda BTXScroll		; \ If the scrolling X position
+		bne @SkipPPUCTRL	; | is 0 then
+		lda PPUCTRLShadowBT	; | Toggle between
+		eor #1				; | nametable 0 and 1
+		sta PPUCTRLShadowBT	; /
+		@SkipPPUCTRL:
+		dec BTXScroll	; Scroll 1 pixel from the left
+		lda BTPlatformX		; \ Skip if starting platform
+		beq @SkipPlatform	; / does not exist
+		inc BTPlatformX	; Scroll starting platform 1px to the right
+		lda BTPlatformX		; \
+		cmp #240			; | If Starting Platform reaches
+		bcc @PlatformExists	; | X position #$F0
+		lda #0				; | then disappear
+		sta BTPlatformX		; /
+		@PlatformExists:
+			lda PlayerInvincible	; \ If Player is invincible
+			beq @SkipPlatform		; | (has not yet moved)
+			inc ObjectXPosInt		; / then scroll 1px to the right
+		@SkipPlatform:
+		ldx #7	; Max of 8 balloons on screen
+		@BalloonLoop:	; Scroll all the balloons
+			lda BalloonStatus,x	; \ If balloon doesn't exist
+			bmi @SkipBalloon	; / skip to the next one
+			inc BalloonXPosInt,x	; Scroll balloon 1px to the right
+			lda BalloonXPosInt,x	; \
+			cmp #248				; | If balloon's X position
+			bne @SkipBalloon		; | reaches #$F8
+			lda #<-1				; | then make it disappear
+			sta BalloonStatus,x		; |
+			lda #240				; |
+			sta BalloonYPosInt,x	; | And reset the balloon counter
+			lda #0					; |
+			sta P1TripBalloons		; /
+			@SkipBalloon:
+			dex					; \ Check next balloon
+			bpl @BalloonLoop	; /
+		ldx #19	; Max of 20 sparks on screen
+		@SparkLoop:	;Scroll all the sparks
+			lda SparkAnim,x	; \ If Lightning Bolt doesn't exist
+			bmi @SkipSpark	; / then skip to next one
+			inc SparkXPosInt,x	; Scroll Spark 1 pixel to the right
+			lda SparkXPosInt,x	; \
+			cmp #248			; | If bolt's X position
+			bcc @SkipSpark		; | reaches #$F8
+			lda #240			; | then make it disappear
+			sta SparkYPosInt,x	; |
+			sta SparkAnim,x		; /
+			@SkipSpark:
+			dex				; \ Check next bolt
+			bpl @SparkLoop	; /
+		lda BTXScroll	; \ Every 8 pixel scrolled
+		and #7			; |
+		bne BTPhysics	; /
+		ldx ObjectBalloons	; \ If Player still has balloons
+		dex					; |
+		bmi BTPhysics		; /
+		lda #0					; \
+		sta TargetUpdateScore	; | Add 10 to Player 1 Score
+		lda #1					; |
+		jsr AddScore			; /
+		inc TileScrollCount	; Increment Tile Scroll Counter
+		lda TileScrollCount		; \
+		and #31					; | If 32 tiles have been scrolled
+		bne @GenerateObstacles	; /
+		inc ScreenScrollCount	; Increment Screen Scroll Counter
+		lda ScreenScrollCount	; \
+		cmp #10					; | If 10 screens have been scrolled
+		bne @GenerateObstacles	; /
+		lda #2					; \ Then reset to Screen #$02
+		sta ScreenScrollCount	; /
+		ldy SparkIntensity	; \
+		iny					; | Increment
+		tya					; | Lightning Bolt Intensity Level
+		and #3				; |
+		sta SparkIntensity	; /
+		@GenerateObstacles:
+			ldx ScreenScrollCount		; \
+			lda ScreenLayoutOrder,x		; |
+			asl							; |
+			tay							; | Manage Screen Layout
+			lda BTScreenSubroutines,y	; | Jump to subroutines
+			sta RightPointerLo			; | dedicated to each screen layout
+			lda BTScreenSubroutines+1,y	; |
+			sta RightPointerHi			; |
+			jsr DoBTScreenRoutine		; /
+	BTPhysics:
+		ldx #7
+		@BalloonLoop:
+			lda BalloonStatus,x	; \ If Balloon X does not exist
+			bmi @SkipBalloon	; / then skip collision check
+			jsr CheckBalloonXCollision
+			lda P1BonusBalloons	; \
+			beq @SkipBalloon	; | Every balloon touched
+			dec P1BonusBalloons	; | counts towards the
+			inc P1TripBalloons	; / main counter
+			phx
+			lda BalloonPts	; \ Add Score
+			jsr AddScore	; /
+			plx
+			@SkipBalloon:
+			jsr ManageBalloonXSprite
+			dex					; \ Check next balloon
+			bpl @BalloonLoop	; /
+		ldx #19
+		@SparkLoop:
+			lda SparkAnim,x	; \ If Lightning Bolt exists?
+			bmi @SparkEmpty	; /
+			lda ScrollLockTimer	; \ If Scrolling is locked
+			bne @SkipSparkMove	; /
+			jsr UpdateSparkPos	; Update Lightning Bolt Position
+			lda SparkYPosInt,x	; \
+			cmp #2				; | If Y pos < #$02
+			bcs @NoBounce		; | then
+			jsr SparkBounceYSFX	; / Bounce Lightning Bolt Vertically
+			@NoBounce:
+			cmp #216			; \ If Y pos >= #$D8
+			bcc @SkipSparkMove	; | then
+			jsr SparkBounceYSFX	; / Bounce Lightning Bolt Vertically
+			@SkipSparkMove:
+			jsr SparkPlayerCollision
+			@SparkEmpty:
+			lda FrameCounter	; \
+			and #7				; | Get Lightning Bolt
+			lsr					; | Animation Frame Tile
+			tay					; |
+			lda lc9dd,y			; | (Unused Note: Animation is 8 frames
+			pha					; / but only half of them are used.)
+			lda FrameCounter	; \
+			lsr					; | Every 2 frames...
+			txa					; |
+			bcc @SparkAddressX	; /
+			sta Temp12	; \
+			lda #19		; | ...count from the end
+			sbc Temp12	; /
+			@SparkAddressX:
+			aslr 2	; \ Get OAM Sprite Address
+			tay		; /
+			pla				; \ Update Lightning Bolt Sprite
+			sta OAM+$b1,y	; / Tile ID
+			lda SparkYPosInt,x	; \
+			sta OAM+$b0,y		; / Y position
+			lda SparkXPosInt,x	; \
+			sta OAM+$b3,y		; / X position
+			lda #0			; \
+			sta OAM+$b2,y	; / Use Sprite Palette 0
+			dex				; \ Loop to next bolt
+			bpl @SparkLoop	; /
+		lda P1TripBalloons	; \ If you touched
+		cmp #20				; | 20 balloons in a row...
+		bcc @DrawBTPlatform	; /
+		inc ScoreDigit4		; \ Add 10000
+		lda #0				; | to score
+		jsr AddScore		; /
+		dec ScoreDigit4		; Reset score to add
+		lda #$10		; \ Play Bonus Phase Perfect jingle
+		sta MusicReq	; /
+		inc PhaseType	; Set Bonus Phase Type
+		jsr LoadPalette	; Update Balloon Palette
+		jsr BTSetBalloonPoints
+		dec PhaseType	; Reset to Normal Phase
+		ldx #100				; \ Wait for 100 frames
+		jsr WaitXFrames	; /
+		lda #$20		; \ Play Balloon Trip Music
+		sta MusicReq	; /
+		@DrawBTPlatform:
+			ldx #$f0			; \ If Balloon Trip Starting Platform
+			lda BTPlatformX		; | X position is 0
+			beq @HideBTPlatform	; / then don't make it appear on screen
+			ldx #$88	; \ At Y position #$88:
+			@HideBTPlatform:
+			stx OAM+0	; | Display Left and Right
+			stx OAM+4	; / sides of Platform
+			sta OAM+3	; \
+			clc			; | Display Left and Right
+			adc #8		; | sides at current X position
+			sta OAM+7	; /
+			lda FrameCounter	; \
+			and #3				; | Switch between palettes
+			sta OAM+2			; | on platform
+			sta OAM+6			; /
+			ldx #$e3	; \
+			stx OAM+1	; | Display Tile #$E3 and #$E4
+			inx			; |
+			stx OAM+5	; /
+		lda ObjectBalloons		; \ If Player is dead (no balloons)
+		bmi BalloonTripGameOver	; / then game over
+		jmp BalloonTripGameLoop	; else game loop
 
-BTStartLayout:	; Screen Premade Layout Data
-	.BYTE $00
-	.BYTE $00
-	.BYTE $09,$00
-	.BYTE $08,$8c,$00
-	.BYTE $07,$18,$00
-	.BYTE $18,$00
-	.BYTE $19,$00
-	.BYTE $1a,$00
-	.BYTE $84,$94,$1a,$00
-	.BYTE $1a,$00
-	.BYTE $1a,$00
-	.BYTE $0b,$12,$00
-	.BYTE $0c,$13,$00
-	.BYTE $0d,$14,$00
-	.BYTE $14,$00
-	.BYTE $00
-	.BYTE $90,$00
-	.BYTE $07,$00
-	.BYTE $07,$8c,$96,$00
-	.BYTE $08,$00
-	.BYTE $09,$00	; Not loaded
-	.BYTE $00
-	.BYTE $18,$00	;\
-	.BYTE $17,$00	;| Not loaded
-	.BYTE $16,$00	;/
-	.BYTE $00
-	.BYTE $00
-	.BYTE $00
-	.BYTE $00
-	.BYTE $00
-	.BYTE $8a,$90,$00
-	.BYTE $00
-	.BYTE $00
-	.BYTE $08,$00
-	.BYTE $09,$98,$00
-	.BYTE $0a,$00
-	.BYTE $00
-	.BYTE $00
-	.BYTE $86,$8a,$15,$00	;Balloons might not load
-	.BYTE $14,$00
-	.BYTE $8e,$13,$00
-	.BYTE $00
-	.BYTE $03,$0d,$00
-	.BYTE $0d,$0e,$00
-	.BYTE $0c,$0d,$00
-	.BYTE $0d,$19,$00
-	.BYTE $86,$92,$00	;Bottom Balloon can be blocked
-	.BYTE $00
-	.BYTE $98,$00
-	.BYTE $00
-	.BYTE $0a,$12,$00
-	.BYTE $09,$13,$00
-	.BYTE $08,$14,$00
-	.BYTE $07,$15,$00
-	.BYTE $07,$16,$00	;\ Not loaded
-	.BYTE $07,$00		;/ 
-	.BYTE $00
-	.BYTE $00
+	BalloonTripGameOver:
+		jsr RankScoreUpdate
+		lda #$01	; \ Play SFX
+		sta SFX1Req	; /
+		jsr FinishFrame
+		lda #$02		; \ Play Stage Clear jingle
+		sta MusicReq	; /
+		jmp EndGameNoJingle	; Put Game Over on Screen
 
-BTSetBalloonPoints:
-	jsr SetBonusPhase	; Set up Balloon Points
-	asl BalloonPts	; \
-	lda BalloonPts	; | Multiply Balloon Points
-	aslr 2			; | by 10
-	adc BalloonPts	; |
-	sta BalloonPts	; /
-	rts
+	DoBTScreenRoutine:
+		jmp (RightPointer)
 
-UpdateBTRank:
-	lda #0		; \ Set Balloon Trip Rank 01 (00 + 1)
-	sta Temp12	; /
-	@RankLoop:
+	BTScreenSubroutines:	; Screen Layout Subroutines
+		.WORD BTLoadLayout		;0: Place sparks and balloons in predefined layout
+		.WORD BTRandScreen		;1: Randomly place balloons and moving sparks
+		.WORD BTRandWBubble		;2: Same as 1 but with chance of a Bubble appearing
+		.WORD BTOncomingSparks	;3: Sparks come flying at player
+		.WORD BTRTS				;4: Empty screen
+
+	ScreenLayoutOrder:	; The pattern for each screen
+		.BYTE 0,0		;First two screens, use predefined layout. Not repeated
+		.BYTE 2,2,2,2,2	;Five screens, standard randomly moving sparks, randomly placed balloons, chance for a bubble
+		.BYTE 4,3,1		;Empty screen, Fast sparks flying to right, normal screen but without bubble
+
+	BTLoadLayout:
+		ldy #0				; \
+		lda (LeftPointer),y	; | Read Layout Data Byte
+		inc LeftPointerLo	; | at LeftPointer and Increment
+		bne @ParseByte		; | Bit format: BS0YYYYY
+		inc LeftPointerHi	; / B = Balloon, S = Spark, Y = Tile Y Position
+		@ParseByte:
+		tax		; Store loaded Layout Byte in X
+		beq :+	; If Layout Byte = 00 then return
+		aslr 3		; \ Set Y position
+		sta Temp15	; /
+		lda #0		; \ Clear Temp14
+		sta Temp14	; /
+		txa		;Load Layout Byte to A again
+		and #%11000000		; \ Cut out Y bits
+		cmp #%10000000		; | If bit B is set
+		bne @CheckSparkBit	; | then
+		jsr BTSpawnBalloon	; / Spawn Balloon
+		jmp BTLoadLayout	; Repeat
+		@CheckSparkBit:
+		cmp #0				; \ If bit S is set
+		bne :+				; | then
+		jsr BTSpawnSpark	; / Spawn Spark
+		jmp BTLoadLayout	; Repeat
+		:rts
+
+	BTRandScreen:
+		jsr UpdateRNG		; Get random number in A
+		and #$7f				; \
+		cmp #4					; |
+		bcc BTRandomizeSpark	; | If RNG value is between
+		cmp #24					; | 4 and 23
+		bcs BTRandomizeSpark	; |
+		aslr 3					; | then spawn Balloon
+		sta Temp15				; | at Tile Y position value
+		jsr BTSpawnBalloon		; /
+	BTRandomizeSpark:
+		jsr UpdateRNG			; \
+		and #$3f				; |
+		cmp #2					; | If RNG value is between
+		bcc :+					; | 2 and 23
+		cmp #24					; | then spawn Lightning Bolt
+		bcs :+					; | at Tile Y position value
+		aslr 3					; | and set Y velocity value
+		sta Temp15				; | using BTSparkVelOptions value
+		jsr UpdateRNG			; | (depending on full loop)
+		and #$3f				; | + RNG value up to 63
+		ldx SparkIntensity		; |
+		adc BTSparkVelOptions,x	; |
+		sta Temp14				; |
+		jsr BTSpawnSpark		; /
+		jsr UpdateRNG			; \
+		lsr						; | Make Y velocity value negative
+		bcc BTRandomizeSpark	; | 50% of the time
+		jsr SparkBounceYSFX		; |
+		jmp BTRandomizeSpark	; /
+		:rts
+
+	BTSparkVelOptions:
+		.BYTE $20,$30,$40,$60
+
+	BTRandWBubble:
+		jsr UpdateRNG		; \ Get a random number
+		and #%11001111		; | Discard two bits
+		bne BTRandScreen	; / If not 0, continue
+		ldy ObjectBalloons+1	; \ 
+		iny						; | 
+		bne BTRandScreen		; / If Bubble exists, continue
+		lda #230			; \ Otherwise, make a new Bubble
+		sta ObjectYPosInt+1	; / First set Bubble Y to 230 (0xE6)
+		lda RNGOutput		; \
+		and #127			; | Bubble X Position is random
+		adc #64				; | between 64 and 191
+		sta ObjectXPosInt+1	; /
+		lda #$80				; \ Set balloons to 0x80
+		sta ObjectBalloons+1	; / Which means it's a Bubble
+		lda #0				; \ Bubble Status = 00
+		sta ObjectStatus+1	; /
+	BTRTS:
+		rts
+
+	BTOncomingSparks:
+		jsr BTRandomizeSpark	; Randomly Spawn Spark
+		jsr UpdateRNG		; \
+		and #$7f			; | Set X Velocity (Frac)
+		sta SparkXVelFrac,x	; / RNG up to 127
+		rts
+
+	BTSpawnBalloon:
+		ldx #7						; \
+		@SlotLoop:
+			lda BalloonStatus,x		; | Find Balloon that
+			bmi @BalloonSlotFound	; | hasn't spawned yet
+			dex						; |
+			bpl @SlotLoop			; /
+		rts
+		@BalloonSlotFound:
+			lda #1				; \ Set Balloon Status to 1
+			sta BalloonStatus,x	; /
+			lda #0					; \ Set Balloon X position to 0
+			sta BalloonXPosInt,x	; /
+			lda Temp15				; \ Set Balloon Y position to [$15]
+			sta BalloonYPosInt,x	; /
+		rts
+
+	BTSpawnSpark:
+		ldx #19					; \
+		@SlotLoop:
+			lda $0530,x			; | Find open slot
+			bmi SparkSlotFound	; | for a Spark
+			dex					; |
+			bpl @SlotLoop		; /
+		rts
+		SparkSlotFound:
+			lda #0
+			sta $0530,x	; Set Animation Frame to 00
+			sta $0490,x	; Set X position to 00
+			sta $04f4,x	; Set Y velocity to 00
+			sta $0508,x	; \ Set X velocity to 00 (Int and Frac)
+			sta $04e0,x	; /
+			lda Temp14		; \ Set Y velocity (Frac) to [$14]
+			sta $051c,x		; /
+			lda Temp15		; \ Set Y position to [$15]
+			sta $04a4,x		; /
+		rts
+
+	BTStartLayout:	; Screen Premade Layout Data
+		.BYTE $00
+		.BYTE $00
+		.BYTE $09,$00
+		.BYTE $08,$8c,$00
+		.BYTE $07,$18,$00
+		.BYTE $18,$00
+		.BYTE $19,$00
+		.BYTE $1a,$00
+		.BYTE $84,$94,$1a,$00
+		.BYTE $1a,$00
+		.BYTE $1a,$00
+		.BYTE $0b,$12,$00
+		.BYTE $0c,$13,$00
+		.BYTE $0d,$14,$00
+		.BYTE $14,$00
+		.BYTE $00
+		.BYTE $90,$00
+		.BYTE $07,$00
+		.BYTE $07,$8c,$96,$00
+		.BYTE $08,$00
+		.BYTE $09,$00	; Not loaded
+		.BYTE $00
+		.BYTE $18,$00	;\
+		.BYTE $17,$00	;| Not loaded
+		.BYTE $16,$00	;/
+		.BYTE $00
+		.BYTE $00
+		.BYTE $00
+		.BYTE $00
+		.BYTE $00
+		.BYTE $8a,$90,$00
+		.BYTE $00
+		.BYTE $00
+		.BYTE $08,$00
+		.BYTE $09,$98,$00
+		.BYTE $0a,$00
+		.BYTE $00
+		.BYTE $00
+		.BYTE $86,$8a,$15,$00	;Balloons might not load
+		.BYTE $14,$00
+		.BYTE $8e,$13,$00
+		.BYTE $00
+		.BYTE $03,$0d,$00
+		.BYTE $0d,$0e,$00
+		.BYTE $0c,$0d,$00
+		.BYTE $0d,$19,$00
+		.BYTE $86,$92,$00	;Bottom Balloon can be blocked
+		.BYTE $00
+		.BYTE $98,$00
+		.BYTE $00
+		.BYTE $0a,$12,$00
+		.BYTE $09,$13,$00
+		.BYTE $08,$14,$00
+		.BYTE $07,$15,$00
+		.BYTE $07,$16,$00	;\ Not loaded
+		.BYTE $07,$00		;/ 
+		.BYTE $00
+		.BYTE $00
+
+	BTSetBalloonPoints:
+		jsr SetBonusPhase	; Set up Balloon Points
+		asl BalloonPts	; \
+		lda BalloonPts	; | Multiply Balloon Points
+		aslr 2			; | by 10
+		adc BalloonPts	; |
+		sta BalloonPts	; /
+		rts
+
+	UpdateBTRank:
+		lda #0		; \ Set Balloon Trip Rank 01 (00 + 1)
+		sta Temp12	; /
+		@RankLoop:
+			lda Temp12			; \
+			aslr 2				; | Setup Pointer to
+			adc Temp12			; | 0700 + (Rank)*5
+			sta LoadPointerLo	; |
+			lda #7				; |
+			sta LoadPointerHi	; /
+			ldy #4					; \
+			@ReadDigitLoop:
+				lda (LoadPointer),y	; | Check each digit
+				cmp P1Score,y		; | If P1 Score Digit < Rank Score
+				bcc @SetRank		; | then stop
+				bne @Continue		; | If >= then check next Rank Score
+				dey					; |
+				bpl @ReadDigitLoop	; / Else check next digit
+			bmi @SetRank	; When done, update current Rank
+			@Continue:
+			inc Temp12		; \
+			lda Temp12		; | If (Rank+1) != 50 (!)
+			cmp #50			; | then check the next rank
+			bne @RankLoop	; | else update current rank
+		dec Temp12			; /
+		@SetRank:
+			inc Temp12		; \
+			lda Temp12		; |
+			pha				; | Update Current Rank variable
+			sta ScoreDigits	; |
+			ldy #10			; |
+			jsr DivideByY	; | (Rank+1) / 10
+			sta BTRankHi	; | Write second digit
+			lda ScoreDigits	; |
+			sta BTRankLo	; | Write first digit (modulo)
+			pla				; |
+			sta Temp12		; /
+		rts
+
+	RankScoreUpdate:
+		jsr UpdateBTRank	; Update Balloon Trip Rank
+		dec Temp12	; \
+		lda #49		; | A = (Rank - 49)
+		sec			; |
+		sbc Temp12	; /
+		sta Temp13	; \
+		aslr 2		; | Y = A * 5
+		adc Temp13	; |
+		tay			; /
 		lda Temp12			; \
-		aslr 2				; | Setup Pointer to
-		adc Temp12			; | 0700 + (Rank)*5
+		aslr 2				; | [$1D] = Pointer to Score Rank
+		adc Temp12			; |
 		sta LoadPointerLo	; |
+		clc					; |
+		adc #5				; |
+		sta DataPointerLo	; | [$1F] = Pointer to Score Rank+1
 		lda #7				; |
-		sta LoadPointerHi	; /
+		sta LoadPointerHi	; |
+		sta DataPointerHi	; /
+		tya			; \ If Rank == 49 then
+		beq @Skip	; / only update one rank score.
+		dey						; \
+		@CopyLoop1:
+			lda (LoadPointer),y	; | Shift Balloon Trip
+			sta (DataPointer),y	; | Score Ranking
+			dey					; | by one rank above
+			bne @CopyLoop1		; |
+		lda (LoadPointer),y		; |
+		sta (DataPointer),y		; /
+		@Skip:
 		ldy #4					; \
-		@ReadDigitLoop:
-			lda (LoadPointer),y	; | Check each digit
-			cmp P1Score,y		; | If P1 Score Digit < Rank Score
-			bcc @SetRank		; | then stop
-			bne @Continue		; | If >= then check next Rank Score
+		@CopyLoop2:
+			lda P1Score,y		; | Copy current score
+			sta (LoadPointer),y	; | to current Score Rank
 			dey					; |
-			bpl @ReadDigitLoop	; / Else check next digit
-		bmi @SetRank	; When done, update current Rank
-		@Continue:
-		inc Temp12		; \
-		lda Temp12		; | If (Rank+1) != 50 (!)
-		cmp #50			; | then check the next rank
-		bne @RankLoop	; | else update current rank
-	dec Temp12			; /
-	@SetRank:
-		inc Temp12		; \
-		lda Temp12		; |
-		pha				; | Update Current Rank variable
-		sta ScoreDigits	; |
-		ldy #10			; |
-		jsr DivideByY	; | (Rank+1) / 10
-		sta BTRankHi	; | Write second digit
-		lda ScoreDigits	; |
-		sta BTRankLo	; | Write first digit (modulo)
-		pla				; |
-		sta Temp12		; /
-	rts
-
-RankScoreUpdate:
-	jsr UpdateBTRank	; Update Balloon Trip Rank
-	dec Temp12	; \
-	lda #49		; | A = (Rank - 49)
-	sec			; |
-	sbc Temp12	; /
-	sta Temp13	; \
-	aslr 2		; | Y = A * 5
-	adc Temp13	; |
-	tay			; /
-	lda Temp12			; \
-	aslr 2				; | [$1D] = Pointer to Score Rank
-	adc Temp12			; |
-	sta LoadPointerLo	; |
-	clc					; |
-	adc #5				; |
-	sta DataPointerLo	; | [$1F] = Pointer to Score Rank+1
-	lda #7				; |
-	sta LoadPointerHi	; |
-	sta DataPointerHi	; /
-	tya			; \ If Rank == 49 then
-	beq @Skip	; / only update one rank score.
-	dey						; \
-	@CopyLoop1:
-		lda (LoadPointer),y	; | Shift Balloon Trip
-		sta (DataPointer),y	; | Score Ranking
-		dey					; | by one rank above
-		bne @CopyLoop1		; |
-	lda (LoadPointer),y		; |
-	sta (DataPointer),y		; /
-	@Skip:
-	ldy #4					; \
-	@CopyLoop2:
-		lda P1Score,y		; | Copy current score
-		sta (LoadPointer),y	; | to current Score Rank
-		dey					; |
-		bpl @CopyLoop2		; /
-	rts
+			bpl @CopyLoop2		; /
+		rts
 
 ;----------------------
 ; Fish code
-;----------------------
 
-lc5b7:	; Fish Animation 0
-	.BYTE $01,$02,$03,$03
-lc5bb:	; Fish Animation 1
-	.BYTE $02,$01,$ff,$03,$04,$05,$06,$ff
+	lc5b7:	; Fish Animation 0
+		.BYTE $01,$02,$03,$03
+	lc5bb:	; Fish Animation 1
+		.BYTE $02,$01,$ff,$03,$04,$05,$06,$ff
 
-lc5c3:
-	lda FishFrameTime	; \
-	lsrr 3				; | X = FishFrameTime / 8
-	tax					; /
-	lda FishAnimation	; \
-	bne lc5d5			; | If Fish Animation? == 0
-	lda lc5b7,x			; / set Fish Status
-	jmp lc5d8
-	lc5d5:
-	lda lc5bb,x	; If Fish Animation? != 0
-	lc5d8:
-	sta ObjectStatus+8	; Update Fish Status
-	ldx #8
-	jsr le3a4
-	lda FishTargetEaten	; \ If Fish Target Eaten Flag
-	beq :+				; / is set
-	ldx FishTargetID	; X = Fish Target
-	lda FishFrameTime		; \
-	cmp #32					; |
-	bne lc5f4				; | If Fish Frame Time == 32
-	lda #<-1				; | then target is eaten
-	sta ObjectBalloons,x	; | (Balloons = -1)
-	bmi lc610				; /
-	lc5f4:
-	bcs :+	; If Fish Frame Time < $20
-	lda ObjectDirection+8	; \ Depending on Fish Direction
-	bne @MoveLeft			; /
-	lda ObjectXPosInt+8	; \ Move Fish 4 pixels to the right
-	cadc #4				; /
-	bne @FinishMove
-	@MoveLeft:
-	lda ObjectXPosInt+8	; \ Move Fish 4 pixels to the left
-	ssbc #4				; /
-	@FinishMove:
-	sta ObjectXPosInt,x
-	lda ObjectYPosInt+8	; \ Fish Target's Y position =
-	ssbc #10			; | (Fish Y - 10)
-	sta ObjectYPosInt,x	; /
-	lc610:
-	jsr le3a4
-	:rts
-
-FishSearchTarget:
-	lda #$ff			; \ Reset Target
-	sta FishTargetID	; / to none
-	ldx #7						; \
-	@Loop:
-		lda ObjectBalloons,x	; | Check each object
-		bmi @NextTarget			; | if it exists,
-		lda ObjectYPosInt,x		; | if Y pos >= #$9A
-		cmp #$b4				; | if X pos == Fish X pos
-		bcc @NextTarget			; | then the first one
-		lda ObjectXPosInt,x		; | that meets these conditions
-		cmp ObjectXPosInt+8		; | is the target
-		beq FishSetTarget		; |
-		@NextTarget:
-		dex						; | else check next object
-		bpl @Loop				; /
-	rts
-	FishSetTarget:
-		stx FishTargetID	; Update Target
-		lda ObjectDirection,x	; \ Update Fish Direction
-		sta ObjectDirection+8	; / with Target Object's Direction
-		lda #0
-		sta FishAnimation	; Reset Fish Animation?
-		sta FishFrameTime	; Reset Fish Frame Time
-		sta FishTargetEaten	; Reset Fish Target Eaten Flag
-		sta FishYDirection	; Reset Fish Y Direction to Up
-		lda #$dc			; \ Set Fish Y position to #$DC
-		sta ObjectYPosInt+8	; /
-		rts
-
-FishMove:
-	inc ObjectXPosInt+8	; Move Fish +1 pixel to the right
-	lda ObjectXPosInt+8	; \
-	cmp #177			; | If Fish X position >= 177px (0xB1)
-	bcc :+				; | then go back to X pos = 64 (0x40)
-	lda #64				; |
-	sta ObjectXPosInt+8	; /
-	:rts
-
-ManageFishEat:
-	lda FishYDirection	; \ If Fish Y Direction == Up
-	bne @FishDescend	; /
-	dec ObjectYPosInt+8	; Fish Y goes up by 1 pixel
-	lda ObjectYPosInt+8	; \
-	cmp #196			; | If Fish Y Position is about
-	bcs @FinishYMove	; | to go above $C4
-	inc ObjectYPosInt+8	; | then
-	inc FishAnimation	; | Set Fish Animation? to 1
-	inc FishYDirection	; | and Fish Y Direction to down
-	bne @FinishYMove	; /
-	@FishDescend:
-		inc ObjectYPosInt+8	; Fish Y goes down by 1 pixel
-	@FinishYMove:
-	inc FishFrameTime	; Increase Fish Frame Time
-	lda FishFrameTime	; \
-	cmp #24				; | If Fish Frame Time == 24
-	bne lc6a3			; /
-	ldx FishTargetID		; \
-	lda ObjectBalloons,x	; | If Target exists...
-	bmi lc6a3				; / (has balloons)
-	lda ObjectYPosInt,x	; \ If the target is above
-	cadc #16			; | the fish by 16 pixels
-	cmp ObjectYPosInt+8	; |
-	bcc lc6a3			; /
-	ldy ObjectType,x			; \
-	lda PostFishTargetType,y	; | Change Target Object Type
-	sta ObjectType,x			; /
-	lda #0					; \ Insta Kill
-	sta ObjectStatus,x		; | Target Object Status = 0
-	sta ObjectBalloons,x	; / Target Object Balloons = 0
-	lda MusicReq	; \
-	ora #$40		; | Play Fish Jingle
-	sta MusicReq	; /
-	inc FishTargetEaten	; Set Fish Target Eaten Flag
-	lc6a3:
-	lda FishAnimation	; \ Fish Animation? != 0
-	beq :+				; /
-	lda FishFrameTime	; \
-	cmp #40				; | If Fish Frame Time? == $28
-	beq lc6b3			; / OR
-	cmp #48	; \ If Fish Frame Time? == $30
-	bne :+	; /
-	lc6b3:
-	lda #204			; \ then
-	sta ObjectYPosInt+8	; / Fish Y Position = $CC
-	:rts
-
-PostFishTargetType:
-	.BYTE 8,9,10,11
-	.BYTE 8,9,10,11
-	.BYTE 8,9,10,11
-
-FishFollowTarget:
-	lda FishYDirection	; \ If Fish Direction is Up
-	bne :+				; /
-	ldx FishTargetID		; \
-	lda ObjectBalloons,x	; | Does target still exist?
-	bmi @FishRecede			; /
-	lda ObjectYPosInt,x	; \
-	cmp #$b4			; | Is target still below Y pos #$B4?
-	bcc @FishRecede		; /
-	lda ObjectXPosInt,x	; \
-	cmp #$40			; | Is target between
-	bcc @FishRecede		; | X positions #$40 and #$B1?
-	cmp #$b1			; | If so, teleport fish
-	bcc @MoveFish		; /
-	@FishRecede:
-		lda #$30			; \ Else
-		sec					; | Fish Frame Time = $30 - itself
-		sbc FishFrameTime	; |
-		sta FishFrameTime	; /
-		inc FishYDirection	; Set Fish Direction to Down
-		bne :+
-	@MoveFish:
-		lda ObjectXPosInt,x	; \ Teleport Fish
-		sta ObjectXPosInt+8	; / to Object's X position
-		lda ObjectDirection,x	; \ Change Fish Direction
-		sta ObjectDirection+8	; / to Object's Direction
+	lc5c3:
+		lda FishFrameTime	; \
+		lsrr 3				; | X = FishFrameTime / 8
+		tax					; /
+		lda FishAnimation	; \
+		bne lc5d5			; | If Fish Animation? == 0
+		lda lc5b7,x			; / set Fish Status
+		jmp lc5d8
+		lc5d5:
+		lda lc5bb,x	; If Fish Animation? != 0
+		lc5d8:
+		sta ObjectStatus+8	; Update Fish Status
+		ldx #8
+		jsr le3a4
+		lda FishTargetEaten	; \ If Fish Target Eaten Flag
+		beq :+				; / is set
+		ldx FishTargetID	; X = Fish Target
+		lda FishFrameTime		; \
+		cmp #32					; |
+		bne lc5f4				; | If Fish Frame Time == 32
+		lda #<-1				; | then target is eaten
+		sta ObjectBalloons,x	; | (Balloons = -1)
+		bmi lc610				; /
+		lc5f4:
+		bcs :+	; If Fish Frame Time < $20
+		lda ObjectDirection+8	; \ Depending on Fish Direction
+		bne @MoveLeft			; /
+		lda ObjectXPosInt+8	; \ Move Fish 4 pixels to the right
+		cadc #4				; /
+		bne @FinishMove
+		@MoveLeft:
+		lda ObjectXPosInt+8	; \ Move Fish 4 pixels to the left
+		ssbc #4				; /
+		@FinishMove:
+		sta ObjectXPosInt,x
+		lda ObjectYPosInt+8	; \ Fish Target's Y position =
+		ssbc #10			; | (Fish Y - 10)
+		sta ObjectYPosInt,x	; /
+		lc610:
+		jsr le3a4
 		:rts
 
-FishManage:
-	lda ObjectStatus+8		; \ If Fish Status >= 0
-	bpl ContinueFishAttack	; / then handle eating
-	jsr FishMove	
-	jsr FishSearchTarget
-	lda FishTargetID	; \ If Target found
-	bpl PlayFishSFX		; / then handle Fish attack
-	rts
-	PlayFishSFX:
-		lda #$40	; \ Play Fish Eating SFX
-		sta SFX3Req	; /
-	ContinueFishAttack:
-		jsr FishFollowTarget	; Handle Fish Teleport to Target
-		jsr ManageFishEat	; Handle Fish Target Eating
-		jmp lc5c3	; Handle Fish Target Eating Movement & Return
+	FishSearchTarget:
+		lda #$ff			; \ Reset Target
+		sta FishTargetID	; / to none
+		ldx #7						; \
+		@Loop:
+			lda ObjectBalloons,x	; | Check each object
+			bmi @NextTarget			; | if it exists,
+			lda ObjectYPosInt,x		; | if Y pos >= #$9A
+			cmp #$b4				; | if X pos == Fish X pos
+			bcc @NextTarget			; | then the first one
+			lda ObjectXPosInt,x		; | that meets these conditions
+			cmp ObjectXPosInt+8		; | is the target
+			beq FishSetTarget		; |
+			@NextTarget:
+			dex						; | else check next object
+			bpl @Loop				; /
+		rts
+		FishSetTarget:
+			stx FishTargetID	; Update Target
+			lda ObjectDirection,x	; \ Update Fish Direction
+			sta ObjectDirection+8	; / with Target Object's Direction
+			lda #0
+			sta FishAnimation	; Reset Fish Animation?
+			sta FishFrameTime	; Reset Fish Frame Time
+			sta FishTargetEaten	; Reset Fish Target Eaten Flag
+			sta FishYDirection	; Reset Fish Y Direction to Up
+			lda #$dc			; \ Set Fish Y position to #$DC
+			sta ObjectYPosInt+8	; /
+			rts
+
+	FishMove:
+		inc ObjectXPosInt+8	; Move Fish +1 pixel to the right
+		lda ObjectXPosInt+8	; \
+		cmp #177			; | If Fish X position >= 177px (0xB1)
+		bcc :+				; | then go back to X pos = 64 (0x40)
+		lda #64				; |
+		sta ObjectXPosInt+8	; /
+		:rts
+
+	ManageFishEat:
+		lda FishYDirection	; \ If Fish Y Direction == Up
+		bne @FishDescend	; /
+		dec ObjectYPosInt+8	; Fish Y goes up by 1 pixel
+		lda ObjectYPosInt+8	; \
+		cmp #196			; | If Fish Y Position is about
+		bcs @FinishYMove	; | to go above $C4
+		inc ObjectYPosInt+8	; | then
+		inc FishAnimation	; | Set Fish Animation? to 1
+		inc FishYDirection	; | and Fish Y Direction to down
+		bne @FinishYMove	; /
+		@FishDescend:
+			inc ObjectYPosInt+8	; Fish Y goes down by 1 pixel
+		@FinishYMove:
+		inc FishFrameTime	; Increase Fish Frame Time
+		lda FishFrameTime	; \
+		cmp #24				; | If Fish Frame Time == 24
+		bne @NoTarget		; /
+		ldx FishTargetID		; \
+		lda ObjectBalloons,x	; | If Target exists...
+		bmi @NoTarget			; / (has balloons)
+		lda ObjectYPosInt,x	; \ If the target is above
+		cadc #16			; | the fish by 16 pixels
+		cmp ObjectYPosInt+8	; |
+		bcc @NoTarget		; /
+		ldy ObjectType,x			; \
+		lda PostFishTargetType,y	; | Change Target Object Type
+		sta ObjectType,x			; /
+		lda #0					; \ Insta Kill
+		sta ObjectStatus,x		; | Target Object Status = 0
+		sta ObjectBalloons,x	; / Target Object Balloons = 0
+		lda MusicReq	; \
+		ora #$40		; | Play Fish Jingle
+		sta MusicReq	; /
+		inc FishTargetEaten	; Set Fish Target Eaten Flag
+		@NoTarget:
+		lda FishAnimation	; \ Fish Animation? != 0
+		beq :+				; /
+		lda FishFrameTime	; \
+		cmp #40				; | If Fish Frame Time == 40
+		beq @SetFishYMin	; | OR
+		cmp #48				; | If Fish Frame Time == 48
+		bne :+				; |
+		@SetFishYMin:
+		lda #204			; | then
+		sta ObjectYPosInt+8	; / Fish Y Position = 204
+		:rts
+
+	PostFishTargetType:
+		.BYTE 8,9,10,11
+		.BYTE 8,9,10,11
+		.BYTE 8,9,10,11
+
+	FishFollowTarget:
+		lda FishYDirection	; \ If Fish Direction is Up
+		bne :+				; /
+		ldx FishTargetID		; \
+		lda ObjectBalloons,x	; | Does target still exist?
+		bmi @FishRecede			; /
+		lda ObjectYPosInt,x	; \
+		cmp #$b4			; | Is target still below Y pos #$B4?
+		bcc @FishRecede		; /
+		lda ObjectXPosInt,x	; \
+		cmp #$40			; | Is target between
+		bcc @FishRecede		; | X positions #$40 and #$B1?
+		cmp #$b1			; | If so, teleport fish
+		bcc @MoveFish		; /
+		@FishRecede:
+			lda #$30			; \ Else
+			sec					; | Fish Frame Time = $30 - itself
+			sbc FishFrameTime	; |
+			sta FishFrameTime	; /
+			inc FishYDirection	; Set Fish Direction to Down
+			bne :+
+		@MoveFish:
+			lda ObjectXPosInt,x	; \ Teleport Fish
+			sta ObjectXPosInt+8	; / to Object's X position
+			lda ObjectDirection,x	; \ Change Fish Direction
+			sta ObjectDirection+8	; / to Object's Direction
+			:rts
+
+	FishManage:
+		lda ObjectStatus+8		; \ If Fish Status >= 0
+		bpl ContinueFishAttack	; / then handle eating
+		jsr FishMove	
+		jsr FishSearchTarget
+		lda FishTargetID	; \ If Target found
+		bpl PlayFishSFX		; / then handle Fish attack
+		rts
+		PlayFishSFX:
+			lda #$40	; \ Play Fish Eating SFX
+			sta SFX3Req	; /
+		ContinueFishAttack:
+			jsr FishFollowTarget	; Handle Fish Teleport to Target
+			jsr ManageFishEat	; Handle Fish Target Eating
+			jmp lc5c3	; Handle Fish Target Eating Movement & Return
 
 
 ;----------------------
@@ -1561,236 +1558,234 @@ FishManage:
 
 ;----------------------
 ; Propeller code
-;----------------------
 
-PropellerManage:
-	ldx PropellerCount
-	bmi :+
-	@Loop:
-		jsr lcba8
-		lda PropellerState,x
-		beq @Next
-		txa
-		eor FrameCounter
-		and #1
-		bne @Next
-		ldy PropellerType,x
-		iny
-		tya
-		and #3
-		sta PropellerType,x
-		jsr lcccb
-		lda PropellerType,x
-		cmp #1
-		bne @Next
-		dec PropellerCountdown,x
-		bne @Next
-		dec PropellerState,x
-	@Next:
-		dex
-		bpl @Loop
-	:rts
-
-lcba8:
-	ldy #7
-	lda PropellerState,x
-	bne @Loop
-	jmp lcc3a
-	@Loop:
-		lda ObjectBalloons,y	; \ If Object Y has <=0 Balloons,
-		bmieq @Next				; / Skip
-		cpy #2				; \ If Object Y is player,
-		bcc @ValidObject	; / continue
-		cmp #1		; \ If Object Y is enemy with Balloons == 1,
-		beq @Next	; / Skip
-		@ValidObject:
-		lda ObjectXPosInt,y		; \
-		cadc #8					; | |Object(y).XPos + 8 - Propeller(x).XPos| >= 18
-		ssbcx PropellerXPos		; | Then skip (Too far horizontally)
-		sta Temp12				; |	Temp12 = X Offset
-		jsr GetAbsoluteValue	; |
-		cmp #18					; |
-		bcs @Next				; /
-		lda ObjectYPosInt,y		; \
-		cadc #12				; | |Object(y).YPos + 12 - Propeller(x).YPos| >= 18
-		ssbcx PropellerYPos		; | Then skip (Too far vertically)
-		sta Temp13				; | Temp13 = Y Offset
-		jsr GetAbsoluteValue	; |
-		cmp #18					; |
-		bcs @Next				; /
-
-		lda Temp12			; \ If X offset is negative, 
-		bmi @LeftSideHit	; / then the left side of the propeller was hit
-		cmp #3				; \ If X offset is between 0 and 2 then
-		bcc @CheckYOffset	; / Don't bounce them vertically
-		lda #2						; \ Set Object(y).YVelInt to 2
-		sta ObjectYVelInt,y			; | (Send them flying downward if they hit the right side)
-		jsr PlayBumpSFX				; | Also play Bump SFX
-		jsr ObjectYApplyYVelocity	; /
-		bne @CheckYOffset	; Always go on to Check Y
-		@LeftSideHit:
-			cmp #<-3			; \ If X offset is between -3 and 0 then
-			bcs @CheckYOffset	; / Don't bounce them vertically
-			lda #<-2					; \ Set Object(y).YVelInt to -2
-			sta ObjectYVelInt,y			; | (Send them flying upward if they hit the left side)
-			jsr ObjectYApplyYVelocity	; |
-			jsr PlayBumpSFX				; / Also play Bump SFX
-		@CheckYOffset:
-			lda Temp13		; \ If Y offset is negative, 
-			bmi @TopSideHit	; / then the top side of the propeller was hit
-			cmp #3		; \ If Y offset is between 0 and 2 then
-			bcc @Next	; / Don't bounce them horizontally
-			lda #2						; \ Set Object(y).XVelInt to 2
-			sta ObjectXVelInt,y			; | (Send them flying rightward if they hit the bottom side)
-			jsr ObjectYApplyXVelocity	; |
-			jsr PlayBumpSFX				; / Also play Bump SFX
+	PropellerManage:
+		ldx PropellerCount
+		bmi :+
+		@Loop:
+			jsr PropellerObjectCollisionCheck
+			lda PropellerState,x
+			beq @Next
+			txa
+			eor FrameCounter
+			and #1
 			bne @Next
-		@TopSideHit:
-			cmp #<-3	; \ If Y offset is between -3 and 0 then
-			bcs @Next	; / Don't bounce them horizontally
-			lda #<-2					; \ Set Object(y).XVelInt to -2
-			sta ObjectXVelInt,y			; | (Send them flying leftward if they hit the top side)
-			jsr ObjectYApplyXVelocity	; |
-			jsr PlayBumpSFX				; / Also play Bump SFX
+			ldy PropellerAngle,x
+			iny
+			tya
+			and #3
+			sta PropellerAngle,x
+			jsr DrawPropellerX
+			lda PropellerAngle,x
+			cmp #1
+			bne @Next
+			dec PropellerCountdown,x
+			bne @Next
+			dec PropellerState,x
 		@Next:
-		dey
-		bpl @Loop
-	rts
-
-PlayBumpSFX:
-	lda SFX2Req
-	ora #$02
-	sta SFX2Req
-	rts
-
-lcc3a:
-	lda ObjectBalloons,y
-	bmieq lccb8
-	cpy #2
-	bcc lcc73
-	lda PropellerType,x
-	cmp #3
-	bne lcc73
-	lda PropellerXPos,x
-	ssbc #10
-	cmp ObjectXPosInt,y
-	bcs lcc73
-	adc #4
-	cmp ObjectXPosInt,y
-	bcc lcc73
-	lda PropellerYPos,x
-	ssbc #$1c
-	cmp ObjectYPosInt,y
-	bcs lcc73
-	adc #4
-	cmp ObjectYPosInt,y
-	bcc lcc73
-	jsr lccbf
-	lcc73:
-	lda ObjectXPosInt,y
-	cadc #8
-	ssbcx PropellerXPos
-	jsr GetAbsoluteValue
-	sta Temp12
-	lda ObjectYPosInt,y
-	cadc #12
-	ssbcx PropellerYPos
-	jsr GetAbsoluteValue
-	sta Temp13
-	lda PropellerType,x
-	cmp #3
-	beq lcca2
-	lda Temp12
-	pha
-	lda Temp13
-	sta Temp12
-	pla
-	sta Temp13
-	lcca2:
-	lda Temp12
-	cmp #20
-	bcs lccb8
-	lda Temp13
-	cmp #11
-	bcs lccb8
-	lda #1
-	sta PropellerState,x
-	lda #$32
-	sta PropellerCountdown,x
-	lccb8:
-	dey
-	bmi :+
-	jmp lcc3a
-	:rts
-
-lccbf:
-	phx
-	tya
-	tax
-	inc $cb
-	jsr le983
-	plx
-	rts
-
-lcccb:
-	lda PropellerAddrHi,x
-	sta $57
-	lda PropellerAddrLo,x
-	sta $58
-	lda #3
-	sta $59
-	ldy PropellerType,x
-	lda PropellerTileUL,y
-	sta $5a
-	lda PropellerTileUM,y
-	sta $5b
-	lda PropellerTileUR,y
-	sta $5c
-	jsr lcd0f
-	lda PropellerTileML,y
-	sta $5a
-	lda PropellerTileMM,y
-	sta $5b
-	lda PropellerTileMR,y
-	sta $5c
-	jsr lcd0f
-	lda PropellerTileLL,y
-	sta $5a
-	lda PropellerTileLM,y
-	sta $5b
-	lda PropellerTileLR,y
-	sta $5c
-	lcd0f:
-		phy
-		lda #$57
-		ldy #0
-		jsr CopyPPUBlock
-		ply
-		lda $58
-		cadc #32
-		sta $58
-		bcc :+
-		inc $57
+			dex
+			bpl @Loop
 		:rts
 
-PropellerTileUL:
-	.BYTE $a1,$24,$24,$24
-PropellerTileUM:
-	.BYTE $a2,$9e,$ab,$24
-PropellerTileUR:
-	.BYTE $24,$24,$ac,$24
-PropellerTileML:
-	.BYTE $a3,$24,$ad,$a8
-PropellerTileMM:
-	.BYTE $a4,$9f,$ae,$a9
-PropellerTileMR:
-	.BYTE $a5,$24,$af,$aa
-PropellerTileLL:
-	.BYTE $24,$24,$b0,$24
-PropellerTileLM:
-	.BYTE $a6,$a0,$b1,$24
-PropellerTileLR:
-	.BYTE $a7,$24,$24,$24
+	PropellerObjectCollisionCheck:
+		ldy #7
+		lda PropellerState,x
+		bne @Loop
+		jmp lcc3a
+		@Loop:
+			lda ObjectBalloons,y	; \ If Object Y has <=0 Balloons,
+			bmieq @Next				; / Skip
+			cpy #2				; \ If Object Y is player,
+			bcc @ValidObject	; / continue
+			cmp #1		; \ If Object Y is enemy with Balloons == 1,
+			beq @Next	; / Skip
+			@ValidObject:
+			lda ObjectXPosInt,y		; \
+			cadc #8					; | |Object(y).XPos + 8 - Propeller(x).XPos| >= 18
+			ssbcx PropellerXPos		; | Then skip (Too far horizontally)
+			sta Temp12				; |	Temp12 = X Offset
+			jsr GetAbsoluteValue	; |
+			cmp #18					; |
+			bcs @Next				; /
+			lda ObjectYPosInt,y		; \
+			cadc #12				; | |Object(y).YPos + 12 - Propeller(x).YPos| >= 18
+			ssbcx PropellerYPos		; | Then skip (Too far vertically)
+			sta Temp13				; | Temp13 = Y Offset
+			jsr GetAbsoluteValue	; |
+			cmp #18					; |
+			bcs @Next				; /
+
+			lda Temp12			; \ If X offset is negative, 
+			bmi @LeftSideHit	; / then the left side of the propeller was hit
+			cmp #3				; \ If X offset is between 0 and 2 then
+			bcc @CheckYOffset	; / Don't bounce them vertically
+			lda #2						; \ Set Object(y).YVelInt to 2
+			sta ObjectYVelInt,y			; | (Send them flying downward if they hit the right side)
+			jsr PlayBumpSFX				; | Also play Bump SFX
+			jsr ObjectYApplyYVelocity	; /
+			bne @CheckYOffset	; Always go on to Check Y
+			@LeftSideHit:
+				cmp #<-3			; \ If X offset is between -3 and 0 then
+				bcs @CheckYOffset	; / Don't bounce them vertically
+				lda #<-2					; \ Set Object(y).YVelInt to -2
+				sta ObjectYVelInt,y			; | (Send them flying upward if they hit the left side)
+				jsr ObjectYApplyYVelocity	; |
+				jsr PlayBumpSFX				; / Also play Bump SFX
+			@CheckYOffset:
+				lda Temp13		; \ If Y offset is negative, 
+				bmi @TopSideHit	; / then the top side of the propeller was hit
+				cmp #3		; \ If Y offset is between 0 and 2 then
+				bcc @Next	; / Don't bounce them horizontally
+				lda #2						; \ Set Object(y).XVelInt to 2
+				sta ObjectXVelInt,y			; | (Send them flying rightward if they hit the bottom side)
+				jsr ObjectYApplyXVelocity	; |
+				jsr PlayBumpSFX				; / Also play Bump SFX
+				bne @Next
+			@TopSideHit:
+				cmp #<-3	; \ If Y offset is between -3 and 0 then
+				bcs @Next	; / Don't bounce them horizontally
+				lda #<-2					; \ Set Object(y).XVelInt to -2
+				sta ObjectXVelInt,y			; | (Send them flying leftward if they hit the top side)
+				jsr ObjectYApplyXVelocity	; |
+				jsr PlayBumpSFX				; / Also play Bump SFX
+			@Next:
+			dey
+			bpl @Loop
+		rts
+
+	PlayBumpSFX:
+		lda SFX2Req
+		ora #$02
+		sta SFX2Req
+		rts
+
+	lcc3a:
+		lda ObjectBalloons,y
+		bmieq lccb8
+		cpy #2
+		bcc @Skip
+		lda PropellerAngle,x
+		cmp #3
+		bne @Skip
+		lda PropellerXPos,x
+		ssbc #10
+		cmp ObjectXPosInt,y
+		bcs @Skip
+		adc #4
+		cmp ObjectXPosInt,y
+		bcc @Skip
+		lda PropellerYPos,x
+		ssbc #$1c
+		cmp ObjectYPosInt,y
+		bcs @Skip
+		adc #4
+		cmp ObjectYPosInt,y
+		bcc @Skip
+		jsr lccbf
+		@Skip:
+		lda ObjectXPosInt,y
+		cadc #8
+		ssbcx PropellerXPos
+		jsr GetAbsoluteValue
+		sta Temp12
+		lda ObjectYPosInt,y
+		cadc #12
+		ssbcx PropellerYPos
+		jsr GetAbsoluteValue
+		sta Temp13
+		lda PropellerAngle,x
+		cmp #3
+		beq lcca2
+		lda Temp12
+		pha
+		lda Temp13
+		sta Temp12
+		pla
+		sta Temp13
+		lcca2:
+		lda Temp12
+		cmp #20
+		bcs lccb8
+		lda Temp13
+		cmp #11
+		bcs lccb8
+		lda #1
+		sta PropellerState,x
+		lda #$32
+		sta PropellerCountdown,x
+		lccb8:
+		dey
+		bmi :+
+		jmp lcc3a
+		:rts
+
+	lccbf:
+		phx	; Preserve X
+		tya
+		tax
+		inc $cb
+		jsr le983
+		plx	; Restore X
+		rts
+
+	DrawPropellerX:
+		lda PropellerAddrHi,x	; \
+		sta PPUTempBlock		; | Upload starting at Propeller's PPU Address 
+		lda PropellerAddrLo,x	; |
+		sta PPUTempBlock+1		; /
+		lda #3				; \ Upload 3 bytes at a time
+		sta PPUTempBlock+2	; /
+		ldy PropellerAngle,x	; Y = Propeller Angle
+		lda PropellerTileUL,y	; \
+		sta PPUTempBlock+3		; | Top row
+		lda PropellerTileUM,y	; |
+		sta PPUTempBlock+4		; |
+		lda PropellerTileUR,y	; |
+		sta PPUTempBlock+5		; /
+		jsr @UploadRow
+		lda PropellerTileML,y	; \
+		sta PPUTempBlock+3		; | Middle row
+		lda PropellerTileMM,y	; |
+		sta PPUTempBlock+4		; |
+		lda PropellerTileMR,y	; |
+		sta PPUTempBlock+5		; /
+		jsr @UploadRow
+		lda PropellerTileLL,y	; \
+		sta PPUTempBlock+3		; | Bottom row
+		lda PropellerTileLM,y	; |
+		sta PPUTempBlock+4		; |
+		lda PropellerTileLR,y	; |
+		sta PPUTempBlock+5		; /
+		@UploadRow:
+			phy	; Preserve Y
+			lday PPUTempBlock	; \ Upload the current row
+			jsr CopyPPUBlock	; /
+			ply	; Resore Y
+			lda PPUTempBlock+1	; \
+			cadc #32			; |
+			sta PPUTempBlock+1	; | Add 32 to PPU Address (Move 1 row down)
+			bcc :+				; |
+			inc PPUTempBlock	; /
+			:rts
+
+	PropellerTileUL:
+		.BYTE $a1,$24,$24,$24
+	PropellerTileUM:
+		.BYTE $a2,$9e,$ab,$24
+	PropellerTileUR:
+		.BYTE $24,$24,$ac,$24
+	PropellerTileML:
+		.BYTE $a3,$24,$ad,$a8
+	PropellerTileMM:
+		.BYTE $a4,$9f,$ae,$a9
+	PropellerTileMR:
+		.BYTE $a5,$24,$af,$aa
+	PropellerTileLL:
+		.BYTE $24,$24,$b0,$24
+	PropellerTileLM:
+		.BYTE $a6,$a0,$b1,$24
+	PropellerTileLR:
+		.BYTE $a7,$24,$24,$24
 
 ;----------------------
 ; Balloon code
@@ -2016,44 +2011,44 @@ CheckBalloonXCollision:
 ; Bonus Phase code
 ;----------------------
 
-lcf13:
+InitializeBonusPhase:
 	lda #$20		; \ Play Bonus Phase music
 	sta MusicReq	; /
 	jsr SetBonusPhase
 	jsr InitBalloons
-	ldx TwoPlayerFlag
-	@Loop:
-		lda P1Lives,x		; \
-		bmi @SkipInit		; | 
+	ldx TwoPlayerFlag		; \
+	@PlayerInitLoop:
+		lda P1Lives,x		; |
+		bmi @SkipInit		; | Init players that still have lives
 		jsr InitPlayerType	; |
 		@SkipInit:			; /
 		dex
-		bpl @Loop
-	ldx #0
-	stx PlayerInvincible
-	stx PlayerInvincible+1
-	lda #20
-	sta BonusBalloonStock
-lcf34:
-	jsr Pause
-	inc StarUpdateFlag
-	jsr ManageScorePopup
-	jsr ObjectManage
-	lda BonusBalloonStock
-	beq lcf47
-	jsr ManageBonusBalloonSpawn
-lcf47:
-	jsr ManageBonusBalloons
-	lda BonusBalloonStock
-	bne lcf34
-	ldx #9
-lcf51:
-	lda BalloonStatus,x
-	bpl lcf34
-	dex
-	bpl lcf51
-	lda FrameCounter
-	bne lcf34
+		bpl @PlayerInitLoop
+	ldx #0					; \
+	stx PlayerInvincible	; | Clear Player Invincibility
+	stx PlayerInvincible+1	; /
+	lda #20					; \ 20 Balloons per Bonus Phase
+	sta BonusBalloonStock	; /
+BonusPhaseGameLoop:
+		jsr Pause
+		inc StarUpdateFlag
+		jsr ManageScorePopup
+		jsr ObjectManage
+		lda BonusBalloonStock		; \
+		beq @OutOfBalloons			; | Manage spawning balloons if there are some left
+		jsr ManageBonusBalloonSpawn	; /
+		@OutOfBalloons:
+		jsr ManageBonusBalloons
+		lda BonusBalloonStock
+		bne BonusPhaseGameLoop
+		ldx #9
+		@BalloonCheckLoop:
+			lda BalloonStatus,x
+			bpl BonusPhaseGameLoop
+			dex
+			bpl @BalloonCheckLoop
+		lda FrameCounter
+		bne BonusPhaseGameLoop
 	jsr ClearPPU
 	ldx #2
 	stx StatusUpdateFlag
@@ -2065,19 +2060,19 @@ lcf51:
 	lday BonusStatusAttribute
 	jsr CopyPPUBlock
 	ldx TwoPlayerFlag
-lcf7e:
-	lda #32
-	sta ObjectXPosInt,x
-	lda PlayerBonusYPos,x
-	sta ObjectYPosInt,x
-	lda #3
-	sta ObjectStatus,x
-	lda #1
-	sta ObjectDirection,x
-	jsr InitPlayerType
-	jsr le3a4
-	dex
-	bpl lcf7e
+	@BonusEndPlayerLoop:
+		lda #32
+		sta ObjectXPosInt,x
+		lda PlayerBonusYPos,x
+		sta ObjectYPosInt,x
+		lda #3
+		sta ObjectStatus,x
+		lda #1
+		sta ObjectDirection,x
+		jsr InitPlayerType
+		jsr le3a4
+		dex
+		bpl @BonusEndPlayerLoop
 	lda #68
 	sta BalloonXPosInt
 	sta BalloonXPosInt+1
@@ -2512,7 +2507,7 @@ InitGameMode:
 		jsr GetByteFromLoadPointer	; |
 		sta PPUBlockAddrHi			; |
 		jsr GetByteFromLoadPointer	; |
-		sta PropellerType,x			; /
+		sta PropellerAngle,x			; /
 		lda PPUBlockAddrLo	; \
 		aslr 3				; | X Pos = (Tile X Pos * 8) + 12
 		adc #12				; |
@@ -2805,7 +2800,7 @@ PropellerAttrOr:
 	.BYTE %01000000
 
 ld56c:
-	jsr lcccb
+	jsr DrawPropellerX
 	jmp UploadPPUAndMaskBuffer
 
 InitBalloonTrip:	; Initialize Balloon Trip Game Mode
@@ -3687,7 +3682,7 @@ ObjectManage:
 		bpl @IsAlive			; | If >= 0 then proceed
 		cmp #<-1				; | else if == -1 then go to next object
 		beq @Next				; | else ? and go to next object
-		jsr lecba				; |
+		jsr ManageBubbleX				; |
 		jmp @Next				; /
 		@IsAlive:
 		cpx #2			; \ Skip if Object is Player
@@ -4085,13 +4080,13 @@ le983:
 	jsr GetAbsoluteValue
 	cmp #5
 	bcc le9b6
-le99a:
+	le99a:
 	cpx #2
 	bcc le9a4
 	lda ObjectBalloons,x
 	cmp #2
 	bne :+
-le9a4:
+	le9a4:
 	lda ObjectStatus,x
 	cmp #2
 	bcc :+
@@ -4101,7 +4096,7 @@ le9a4:
 	sta ObjectStatus,x
 	sta ObjectCountdown,x
 	rts
-le9b6:
+	le9b6:
 	lda #0
 	sta ObjectYVelFrac,x
 	sta ObjectYVelInt,x
@@ -4129,13 +4124,13 @@ le9b6:
 	lda #$40	; \ Play SFX
 	sta SFX2Req	; /
 	:rts
-le9f3:
+	le9f3:
 	lda #0
 	sta ObjectStatus,x
 	lda #1
 	sta ObjectCountdown,x
 	rts
-le9fd:
+	le9fd:
 	lda ObjectStatus,x
 	cmp #1
 	bne :+
@@ -4146,9 +4141,9 @@ le9fd:
 	bne lea13
 	lda #3
 	bne lea15
-lea13:
+	lea13:
 	lda #2
-lea15:
+	lea15:
 	sta ObjectStatus,x
 	:rts
 
@@ -4195,9 +4190,9 @@ ObjectUpdateAnim:
 	:rts
 
 ManageObjectVelocity:
-	lda ObjectHitCooldown,x
-	beq @SkipDec
-	dec ObjectHitCooldown,x
+	lda ObjectHitCooldown,x	; \
+	beq @SkipDec			; | Countdown object I-frames
+	dec ObjectHitCooldown,x	; /
 	@SkipDec:
 	cpx #2			; \ If Object X is not player
 	bcs @ManageYVel	; /
@@ -4262,88 +4257,88 @@ ManageObjectVelocity:
 			bcs @ManageXVel	; | Then go on to managing X Velocity
 			cmp #$e8		; |
 			bcc @ManageXVel	; / Otherwise, kill them
-			lda #$ff
-			sta ObjectBalloons,x
+			lda #<-1				; \ Balloons = -1
+			sta ObjectBalloons,x	; /
 			lda #4			; \ Do Water Plonk
 			sta SplashAnim	; / Animation
-			lda ObjectXPosInt,x
-			sta SplashXOffset
+			lda ObjectXPosInt,x	; \ Move Splash to object's position
+			sta SplashXOffset	; /
 			cpx #2			; \ If Object X is Player
 			bcc @PlayerSink	; /
-			lda #$80
-			sta ObjectBalloons,x
-			lda #0
-			sta ObjectStatus,x
+			lda #$80				; \ Set balloons to 0x80 (Bubble)
+			sta ObjectBalloons,x	; /
+			lda #0				; \ Status = 0
+			sta ObjectStatus,x	; /
 			lda #$01	; \ Play Bubble Rise SFX
 			sta SFX3Req	; /
-			bne @ManageXVel
+			bne @ManageXVel	; Always taken. Finish Managing Y Vel
 			@PlayerSink:
-			lda PhaseType
-			bne @ManageXVel
-			lda #$40
-			sta SFX1Req
+				lda PhaseType	; \ Don't do splash SFX if bonus phase
+				bne @ManageXVel	; /
+				lda #$40	; \ Play Splash SFX
+				sta SFX1Req	; /
 	@ManageXVel:
 		lda ObjectXVelInt,x
-		bmi @CheckXVelLeft
-		cmp ObjectMaxXVelDataInt,y
-		bcc @ApplyXVel
-		bne @LimitXVelRight
-		lda ObjectXVelFrac,x
-		cmp ObjectMaxXVelDataFrac,y
-		bcc @ApplyXVel
+		bmi @CheckXVelLeft	; If X Velocity is negative (Left) then impose lower limit
+		cmp ObjectMaxXVelDataInt,y	; \
+		bcc @ApplyXVel				; | If X Velocity is too high, limit it, otherwise go ahead and apply X Velocity
+		bne @LimitXVelRight			; |
+		lda ObjectXVelFrac,x		; | If XVelInt == Int portion of upper limit, then also check XVelFrac
+		cmp ObjectMaxXVelDataFrac,y	; |
+		bcc @ApplyXVel				; /
 		@LimitXVelRight:
-			lda ObjectMaxXVelDataFrac,y
-			sta ObjectXVelFrac,x
-			lda ObjectMaxXVelDataInt,y
-			sta ObjectXVelInt,x
+			lda ObjectMaxXVelDataFrac,y	; \
+			sta ObjectXVelFrac,x		; | If X Velocity was too high, set it back down to the maximum
+			lda ObjectMaxXVelDataInt,y	; |
+			sta ObjectXVelInt,x			; /
 			jmp @ApplyXVel
 		@CheckXVelLeft:
-			cmp ObjectMinXVelDataInt,y
-			bcc @LimitXVelLeft
-			bne @ApplyXVel
-			lda ObjectXVelFrac,x
-			cmp ObjectMinXVelDataFrac,y
-			bcs @ApplyXVel
+			cmp ObjectMinXVelDataInt,y	; \
+			bcc @LimitXVelLeft			; | If X Velocity is too negative, limit it, otherwise go ahead and apply X Velocity
+			bne @ApplyXVel				; |
+			lda ObjectXVelFrac,x		; | If XVelInt == Int portion of lower limit, then also check XVelFrac
+			cmp ObjectMinXVelDataFrac,y	; |
+			bcs @ApplyXVel				; /
 			@LimitXVelLeft:
-				lda ObjectMinXVelDataFrac,y
-				sta ObjectXVelFrac,x
-				lda ObjectMinXVelDataInt,y
-				sta ObjectXVelInt,x
+				lda ObjectMinXVelDataFrac,y	; \
+				sta ObjectXVelFrac,x		; | If X Velocity was too low, set it back up to the minimum
+				lda ObjectMinXVelDataInt,y	; |
+				sta ObjectXVelInt,x			; /
 		@ApplyXVel:
 			jsr ObjectApplyXVelocity
-			lda GameMode
-			beq leb62
+			lda GameMode		; \ If game mode A or B, don't limit X position
+			beq @SkipBTXLimit	; / In Balloon Trip, prevent wraparound by limiting X position
 			lda ObjectXPosInt,x
-			cmp #$10
-			bcs leb5a
-			lda #$10
-			leb5a:
-			cmp #$e0
-			bcc leb60
-			lda #$e0
-			leb60:
-			sta ObjectXPosInt,x
-			leb62:
-			lda PhaseType
-			beq :+
-			lda ObjectBalloons,x
-			bne :+
-			lda ObjectYPosInt,x
-			cmp #$c8
-			bcc :+
-			lda #$c7
-			sta ObjectYPosInt,x
-			lda ObjectType,x
-			cmp #$0b
-			bne leb84
-			dec ObjectType,x
-			jsr ObjectBounceY
-			jmp ReduceYVelocity
-			leb84:
-			lda #2
-			sta ObjectBalloons,x
-			lda #3
-			sta ObjectType,x
+			cmp #16			; \
+			bcs @SkipXMin	; | If X Pos < 16, set to 16
+			lda #16			; /
+			@SkipXMin:
+			cmp #224		; \
+			bcc @SkipXMax	; | If X Pos >= 224, set to 224
+			lda #224		; /
+			@SkipXMax:
+			sta ObjectXPosInt,x	; Store changes to X Position
+			@SkipBTXLimit:
+			lda PhaseType	; \ Return if it's a normal phase
+			beq :+			; /
+			lda ObjectBalloons,x	; \ Return if Object is still alive
+			bne :+					; /
+			lda ObjectYPosInt,x	; \ For falling players in bonus phases
+			cmp #200			; | If Y Pos < 200px return
+			bcc :+				; /
+			lda #199			; \ In bonus phases, players bounce on floor.
+			sta ObjectYPosInt,x	; / Set Y Pos back to 199px if they fell below 200px
+			lda ObjectType,x			; \
+			cmp #11						; | If type != 11 then restore them
+			bne @RestoreFallenPlayer	; /
+			dec ObjectType,x	; \ Decrement type,
+			jsr ObjectBounceY	; | Bounce the player back up,
+			jmp ReduceYVelocity	; / reduce their bounce velocity & return
+			@RestoreFallenPlayer:
+			lda #2					; \ Set Balloons to 2
+			sta ObjectBalloons,x	; /
+			lda #3				; \ Set Type to 3
+			sta ObjectType,x	; /
 			:rts
 
 ObjectApplyXVelocity:
@@ -4472,7 +4467,7 @@ lebc4:
 			beq lec7e
 			lda ObjectAnimFrame,x
 			bne :+	; Return
-		lec7e:
+			lec7e:
 			lda #0
 			sta ObjectStatus,x
 			lda #1
@@ -4501,61 +4496,58 @@ lecae:
 	.BYTE $01,$02,$02,$03
 	.BYTE $01,$02,$02,$03
 
-lecba:
+ManageBubbleX:
 	lda ObjectStatus,x	; \ If Object(x).Status != 0
 	bne :+				; / then don't do anything
 	jsr le7b1
 	jsr ObjectApplyXVelocity
-	lda ObjectYPosFrac,x
-	sec
-	sbc #$60
-	sta ObjectYPosFrac,x
-	lda ObjectYPosInt,x
-	sbc #0
-	sta ObjectYPosInt,x
-	cmp #$f1
-	bcc lecdb
-	lda #$ff
-	sta ObjectBalloons,x
-	lecdb:
-	phx
+	lda ObjectYPosFrac,x	; \
+	ssbc #96				; |
+	sta ObjectYPosFrac,x	; | Y Pos -= 0.375px (0x0.60)
+	lda ObjectYPosInt,x		; |
+	sbc #0					; |
+	sta ObjectYPosInt,x		; /
+	cmp #241			; \ If Y Pos < 241px then despawn
+	bcc @SkipDespawn	; /
+	lda #<-1				; \ Set Balloons to -1 (Despawn bubble)
+	sta ObjectBalloons,x	; /
+	@SkipDespawn:
+	phx	; Preserve X
 	ldy #1
 	@Loop:
-		lda ObjectBalloons,y
-		beq @Next
-		bmi @Next
-		lda ObjectYPosInt,x
-		sec
-		sbc ObjectYPosInt,y
-		jsr GetAbsoluteValue
-		cmp #24
-		bcs @Next
-		lda ObjectXPosInt,x
-		sec
-		sbc ObjectXPosInt,y
-		jsr GetAbsoluteValue
-		cmp #16
-		bcs @Next
-		lda #$ff
-		sta ObjectStatus,x
-		lda #3
-		sta ObjectCountdown,x
-		lda #120
-		sta ScrollLockTimer
+		lda ObjectBalloons,y	; \
+		beq @Next				; | Skip if Player[Y].Balloons <= 0
+		bmi @Next				; /
+		lda ObjectYPosInt,x		; \
+		ssbcy ObjectYPosInt		; |
+		jsr GetAbsoluteValue	; | Skip if |Object[X].YPos - Player[Y].YPos| >= 24
+		cmp #24					; |
+		bcs @Next				; /
+		lda ObjectXPosInt,x		; \
+		ssbcy ObjectXPosInt		; |
+		jsr GetAbsoluteValue	; | Skip if |Object[X].XPos - Player[Y].XPos| >= 16
+		cmp #16					; |
+		bcs @Next				; /
+		lda #<-1			; \ Object[X].Status = -1
+		sta ObjectStatus,x	; /
+		lda #3					; \ Object[X].Countdown = 3
+		sta ObjectCountdown,x	; /
+		lda #120			; \ Set Scroll Lock Timer to 120
+		sta ScrollLockTimer	; /
 		lda #$02	; \ Play Pop SFX
 		sta SFX1Req	; /
-		lda #50
-		sty TargetUpdateScore
-		jsr AddScore
-		lda #1
-		ldx TargetUpdateScore
-		jsr CreateScorePopup
-		plx
-		rts
+		lda #50					; \
+		sty TargetUpdateScore	; | Give 500 points to Player Y
+		jsr AddScore			; /
+		lda #1					; \ Update score bar
+		ldx TargetUpdateScore	; /
+		jsr CreateScorePopup	; Make score popup
+		plx	; \ Restore X and finish
+		rts	; /
 		@Next:
 		dey
 		bpl @Loop
-	plx
+	plx	; Restore X
 	:rts
 
 led28:
@@ -5263,48 +5255,48 @@ LoadPhase:
 		sta ObjectBalloons+2,x	; |
 		dex						; |
 		bpl @EnemyClearLoop		; /
-	ldx TwoPlayerFlag				; \
+	ldx TwoPlayerFlag			; \
 	@PlayerInitLoop:
 		jsr InitializePlayerX	; | Initialize Players
-		dex							; |
-		bpl @PlayerInitLoop			; /
+		dex						; |
+		bpl @PlayerInitLoop		; /
 	jsr ClearPPU
 	jsr InitGameMode
-	lda EnemyStartDelay
-	cmp #16
-	bcs lf28e
-	lda #$58
-	sta EnemyStartDelay
-	lf28e:
+	lda EnemyStartDelay	; \
+	cmp #16				; | If Enemy Start Delay < 16,
+	bcs @SkipDelaySet	; | 
+	lda #88				; | Set Enemy Start Delay to 88
+	sta EnemyStartDelay	; /
+	@SkipDelaySet:
 	jsr InitializeFish
 	jsr ClearScorePopups
 	lda GameMode
-	beq lf29b	; Balloon Fight Game Mode
+	beq @BalloonFightMode	; Balloon Fight Game Mode
 	jmp BalloonTripInit	; Balloon Trip Game Mode
-lf29b:
+	@BalloonFightMode:
 	lda PhaseType
-	beq lf2a2_balloonfight_load	; Normal Phase Type
-	jmp lcf13	; Bonus Phase Type
-lf2a2_balloonfight_load:
+	beq @NormalPhase	; Normal Phase Type
+	jmp InitializeBonusPhase	; Bonus Phase Type
+	@NormalPhase:
 	jsr InitializeSparks
-	lda CurrentPhaseHeader	; \ Level Header?
-	and #3					; |
-	bne lf2b3				; /
+	lda CurrentPhaseHeader	; \
+	and #3					; | Don't do start jingle if phase header index not divisible by 4
+	bne @SkipStartJingle	; /
 	lda #8			; \
 	sta MusicReq	; / Play Stage Start jingle
 	ldx DemoFlag				; \
-	bne lf2b9_balloonfight_loop	; / Demo Flag
-lf2b3:
+	bne BalloonFightGameLoop	; / Demo Flag
+	@SkipStartJingle:
 	lda #$ff				; \ Show Phase Number for
 	sta PhaseDisplayTimer	; / 255 frames
 	inc CurrentPhaseNum		; Increment Current Phase Number
-lf2b9_balloonfight_loop:	; Balloon Fight Game Loop
+BalloonFightGameLoop:	; Balloon Fight Game Loop
 	jsr Pause
 	lda PhaseDisplayTimer	; \
-	beq lf2c5				; | Display Phase Number
+	beq @SkipPhaseText		; | Display Phase Number
 	dec PhaseDisplayTimer	; | if the time is not 0
-	jsr lf3cc_phasedisplay	; /
-lf2c5:
+	jsr DrawPhaseText		; /
+	@SkipPhaseText:
 	jsr UpdateRNG
 	jsr ObjectManage
 	jsr FishManage
@@ -5315,7 +5307,7 @@ lf2c5:
 	jsr SplashManage
 	jsr PropellerManage
 	inc StarUpdateFlag
-	ldx TwoPlayerFlag		; X = 2 Player Flag
+	ldx TwoPlayerFlag	; X = 2 Player Flag
 	@PlayerRespawnLoop:
 		lda ObjectBalloons,x	; \ If Player X has balloons
 		bpl @SkipRespawn		; / then skip respawn code
@@ -5349,19 +5341,19 @@ lf2c5:
 	jsr PollController0
 	lda Joy1Press				; \
 	and #SelectBtn | StartBtn	; | If START or SELECT is pressed
-	beq lf2b9_balloonfight_loop	; / then loop
+	beq BalloonFightGameLoop	; / then loop
 	:rts
 	@PhaseClearCheck:
 		ldx #5	; Enemy Check
 		@EnemyCheckLoop:
 			lda ObjectBalloons+2,x		; \ If Enemy Balloons
 			beq @NextEnemy				; | == 0 then ?
-			bpl lf2b9_balloonfight_loop	; /  > 0 then loop
+			bpl BalloonFightGameLoop	; /  > 0 then loop
 			@NextEnemy:
 			dex					; \ Check next enemy
 			bpl @EnemyCheckLoop	; /
 		lda SplashAnim	; Loop if water plonk effect
-		bpl lf2b9_balloonfight_loop	; is not finished yet.
+		bpl BalloonFightGameLoop	; is not finished yet.
 		ldx TwoPlayerFlag	; Only check existing players
 		@PlayerCheckLoop:
 			ldy ObjectBalloons,x	; \ If Player X has balloons
@@ -5373,7 +5365,7 @@ lf2c5:
 			sta ObjectBalloons,x	; / to none
 			lda #1					; \ Set Player X Respawn Delay
 			sta PlayerSpawnDelay,x	; / to 1 frame
-			jmp lf2b9_balloonfight_loop	; loop
+			jmp BalloonFightGameLoop	; loop
 			@NextPlayer:
 			dex						; \ Loop player checks until
 			bpl @PlayerCheckLoop	; / we can assume phase is cleared.
@@ -5447,27 +5439,27 @@ EnemyStartDelayData:
 EnemyInflateSpeedData:
 	.BYTE $04,$04,$03,$03,$02,$02,$02,$02,$02
 
-lf3cc_phasedisplay:
+DrawPhaseText:
 	lda PhaseDisplayTimer	; \ Toggle between "PHASE-??"
 	and #$20				; | and empty
-	beq lf3ee				; / every #$20 frames?
-	ldx #$0a	; \
-lf3d4:
-	lda PhaseText,x	; | Copy "PHASE-  " PPU Block
-	sta $57,x	; |
-	dex			; |
-	bpl lf3d4	; /
-	ldy #10			; \
-	lda $3c			; | Add 1st digit of
-	sta $43			; | Phase Number
-	jsr DivideByY	; | (Divide by 10)
-	sta $60			; /
-	lda $43		; \ Add 2nd digit of
-	sta $61		; / Phase Number
+	beq @ClearText			; / every #$20 frames?
+	ldx #10					; \
+	@LoadLoop:
+		lda PhaseText,x		; | Copy "PHASE-  " PPU Block
+		sta PPUTempBlock,x	; |
+		dex					; |
+		bpl @LoadLoop		; /
+	ldy #10					; \
+	lda CurrentPhaseNum		; | Add 1st digit of
+	sta DivisionRemainder	; | Phase Number
+	jsr DivideByY			; | (Divide by 10)
+	sta PPUTempBlock+9		; /
+	lda DivisionRemainder	; \ Add 2nd digit of
+	sta PPUTempBlock+10		; / Phase Number
 	jmp CopyPPUTempBlock
-lf3ee:
-	lday PhaseTextEmpty	; \ Copy Empty PPU Block
-	jmp CopyPPUBlock	; /
+	@ClearText:
+		lday PhaseTextEmpty	; \ Copy Empty PPU Block
+		jmp CopyPPUBlock	; /
 
 PhaseText:	
 	.BYTE $20,$6c,$08	; $206C - 8 tiles
@@ -5478,13 +5470,13 @@ PhaseTextEmpty:
 
 DrawGameOverText:
 	jsr FinishFrame
-	ldx #1					; \
+	ldx #1							; \
 	@Loop:
-		lda lf43b,x			; | Prepare Game Over
-		ldy lf43b+2,x		; | PPU blocks
-		jsr CopyPPUBlock	; | to upload
-		dex					; |
-		bpl @Loop			; /
+		lda GOPPUBlockPointersLo,x	; | Prepare Game Over
+		ldy GOPPUBlockPointersHi,x	; | PPU blocks
+		jsr CopyPPUBlock			; | to upload
+		dex							; |
+		bpl @Loop					; /
 	ldx #15				; \
 	@EmptyLoop:
 		lda #$24		; | Prepare 16 empty tiles
@@ -5497,26 +5489,27 @@ DrawGameOverText:
 	sta PPUTempBlock	; /
 	ldx #2						; \
 	@AddrLoop:
-		lda lf43f,x				; | Prepare uploading
-		sta $58					; | empty tiles to nametable
+		lda GOClearLoAddr,x		; | Prepare uploading
+		sta PPUTempBlock+1		; | empty tiles to nametable
 		jsr CopyPPUTempBlock	; | ($2188, $21A8, $21E8)
 		dex						; | to PPU Buffer
 		bpl @AddrLoop			; /
 	rts
 
-.define PPUBlockPointers lf442, lf455
-lf43b:	; Pointers to PPU Blocks
-	.LOBYTES PPUBlockPointers
-lf43d:
-	.HIBYTES PPUBlockPointers
+.define GOPPUBlockPointers GameOverMainText, GameOverMainAttr
+GOPPUBlockPointersLo:	; Pointers to PPU Blocks
+	.LOBYTES GOPPUBlockPointers
+GOPPUBlockPointersHi:
+	.HIBYTES GOPPUBlockPointers
 
-lf43f:	; Empty tiles lower PPUADDR
+GOClearLoAddr:	; Empty tiles lower PPUADDR
 	.BYTE $88,$a8,$e8
-lf442:	; "   GAME  OVER   "
-	.BYTE $21,$c8,$10	;16 bytes to $21C8
-	.BYTE $24,$24,$24,$10,$0a,$16,$0e,$24,$24,$18,$1f,$0e,$1b,$24,$24,$24
-lf455:	; Tile Attributes?
-	.BYTE $23,$da,$04,$aa,$aa,$aa,$aa
+GameOverMainText:	; "   GAME  OVER   "
+	.BYTE $21,$c8,16	;16 bytes to $21C8
+	.BYTE $24,$24,$24,$10,$0a,$16,$0e,$24,$24,$18,$1f,$0e,$1b,$24,$24,$24	; "   GAME  OVER   "
+GameOverMainAttr:	; Tile Attributes
+	.BYTE $23,$da,4
+	.BYTE %10101010,%10101010,%10101010,%10101010
 
 Wait20Frames:
 	ldx #20

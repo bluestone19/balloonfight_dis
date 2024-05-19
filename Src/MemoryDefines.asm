@@ -338,7 +338,7 @@ PropellerXPos		.set $05D2	; $05D2-$05DB
 PropellerYPos		.set $05DC	; $05DC-$05E5
 PropellerAddrLo		.set $05E6	; $05E6-$05EF
 PropellerAddrHi		.set $05F0	; $05F0-$05F9
-PropellerType		.set $05FA	; $05FA-$0603
+PropellerAngle		.set $05FA	; $05FA-$0603
 PropellerState		.set $0604	; $0604-$060D
 PropellerCountdown	.set $060E	; $060E-$0617
 
