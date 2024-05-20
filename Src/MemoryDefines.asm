@@ -65,14 +65,14 @@ CollisionUnknown	.set $4B
 ; $004B = ?
 
 CloudCount			.set $A3	; Amount of Clouds (zero-based) (-1 if none)
-; $00A4 = Selected Cloud ID? (Blink?)
-; $00A5 = Selected Cloud ID?? (Lightning?)
-; $00A6-$00A8 = Cloud 16x16 Tile Attribute $23xx (Top?)
-; $00A9-$00AB = Cloud 16x16 Tile Attribute $23xx
-; $00AC-$00AE = Cloud 16x16 Tile Attribute $23xx
-; $00AF-$00B1 = Cloud 16x16 Tile Attribute $23xx
-; $00B2-$00B4 = Cloud related
-; $00B5-$00B7 = Cloud related
+SelectedCloud		.set $A4
+CurrentSparkCloud	.set $A5
+CloudAttrAddrLo0	.set $A6	; $00A6-$00A8 = Cloud 16x16 Tile Attribute $23xx (Top?)
+CloudAttrAddrLo1	.set $A9	; $00A9-$00AB = Cloud 16x16 Tile Attribute $23xx
+CloudAttrAddrLo2	.set $AC	; $00AC-$00AE = Cloud 16x16 Tile Attribute $23xx
+CloudAttrAddrLo3	.set $AF	; $00AF-$00B1 = Cloud 16x16 Tile Attribute $23xx
+CloudXPos			.set $B2	; $00B2-$00B4
+CloudYPos			.set $B5	; $00B5-$00B7
 SparkCountdown		.set $B8
 ; $00B9 = Unused?
 SparkIntensity		.set $BA	;Speed of sparks
