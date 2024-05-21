@@ -279,14 +279,14 @@ ObjectCountdown		.set $045A	;$045A-$0462 Used for Auto-Input and spark death del
 ObjectDriftXVelFrac	.set $0463	;$0463-$046B
 ObjectDriftXVelInt	.set $046C	;$046C-$0474
 ObjectHitCooldown	.set $0475	;$0475-$047D
-ObjectUnknown5		.set $047E	;$047E-$0486
+ObjectRespawnFlag	.set $047E	;$047E-$0486
 
 PlayerInvincible	.set $BD	;$00BD-$00BE
 PlayerInvTimer		.set $BF	;$00BF-$00C0
 PlayerFreeze		.set $C1	;$00C1-$00C2
 PlayerSpawnDelay	.set $C3	;$00C3-$00C4
 
-ColScoreOffset		.set $0487
+ColScoreOffset		.set $0487	;Collision score offset
 BTPlatformX			.set $0488	;Balloon Trip Starting Platform X Position
 
 ;Fish
@@ -345,11 +345,10 @@ PropellerCountdown	.set $060E	; $060E-$0617
 PopupCountdown		.set $0618	; $0618-$0619
 PopupState			.set $061A	; $061A-$061B
 
-; $0620-$0628 = ???
 ABtnCooldown		.set $0620
-GameATopScore		.set $0629	;1-Player Game Top Score
-GameBTopScore		.set $062E	;2-Player Game Top Score
-GameCTopScore		.set $0633	;Balloon Trip Top Score
+GameATopScore		.set $0629	; $0629-$062D 1-Player Game Top Score
+GameBTopScore		.set $062E	; $062E-$0632 2-Player Game Top Score
+GameCTopScore		.set $0633	; $0633-$0638 Balloon Trip Top Score
 
 ; $0700-$07F9 = Balloon Trip Rank 01 to 50 Scores (5 bytes each)
 ;				 Rank 47 = Score 000000

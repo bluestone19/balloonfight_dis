@@ -834,35 +834,35 @@ BRKLoop:
 ;----------------------
 ; Fish code
 
-	lc5b7:	; Fish Animation 0
+	FishRiseAnimData:
 		.BYTE $01,$02,$03,$03
-	lc5bb:	; Fish Animation 1
+	FishFallAnimData:
 		.BYTE $02,$01,$ff,$03,$04,$05,$06,$ff
 
-	lc5c3:
+	ManageFishAnimation:
 		lda FishFrameTime	; \
 		lsrr 3				; | X = FishFrameTime / 8
 		tax					; /
-		lda FishAnimation	; \
-		bne lc5d5			; | If Fish Animation? == 0
-		lda lc5b7,x			; / set Fish Status
-		jmp lc5d8
-		lc5d5:
-		lda lc5bb,x	; If Fish Animation? != 0
-		lc5d8:
+		lda FishAnimation		; \
+		bne @LoadAnim1			; | If Fish Animation? == 0
+		lda FishRiseAnimData,x	; / set Fish Status
+		jmp @SetStatus
+		@LoadAnim1:
+			lda FishFallAnimData,x	; If Fish Animation? != 0
+		@SetStatus:
 		sta ObjectStatus+8	; Update Fish Status
 		ldx #8
-		jsr le3a4
+		jsr DrawObjectX
 		lda FishTargetEaten	; \ If Fish Target Eaten Flag
 		beq :+				; / is set
 		ldx FishTargetID	; X = Fish Target
 		lda FishFrameTime		; \
 		cmp #32					; |
-		bne lc5f4				; | If Fish Frame Time == 32
+		bne @SkipTargetEat		; | If Fish Frame Time == 32
 		lda #<-1				; | then target is eaten
 		sta ObjectBalloons,x	; | (Balloons = -1)
-		bmi lc610				; /
-		lc5f4:
+		bmi @Finish				; /
+		@SkipTargetEat:
 		bcs :+	; If Fish Frame Time < $20
 		lda ObjectDirection+8	; \ Depending on Fish Direction
 		bne @MoveLeft			; /
@@ -877,8 +877,8 @@ BRKLoop:
 		lda ObjectYPosInt+8	; \ Fish Target's Y position =
 		ssbc #10			; | (Fish Y - 10)
 		sta ObjectYPosInt,x	; /
-		lc610:
-		jsr le3a4
+		@Finish:
+		jsr DrawObjectX
 		:rts
 
 	FishSearchTarget:
@@ -926,7 +926,7 @@ BRKLoop:
 		dec ObjectYPosInt+8	; Fish Y goes up by 1 pixel
 		lda ObjectYPosInt+8	; \
 		cmp #196			; | If Fish Y Position is about
-		bcs @FinishYMove	; | to go above $C4
+		bcs @FinishYMove	; | to go above 196
 		inc ObjectYPosInt+8	; | then
 		inc FishAnimation	; | Set Fish Animation? to 1
 		inc FishYDirection	; | and Fish Y Direction to down
@@ -1015,8 +1015,7 @@ BRKLoop:
 		ContinueFishAttack:
 			jsr FishFollowTarget	; Handle Fish Teleport to Target
 			jsr ManageFishEat	; Handle Fish Target Eating
-			jmp lc5c3	; Handle Fish Target Eating Movement & Return
-
+			jmp ManageFishAnimation	; Handle Fish Target Eating Movement & Return
 
 ;----------------------
 ; Spark Code
@@ -1527,12 +1526,12 @@ BRKLoop:
 			lda PlayerInvincible,y	; \ Skip if Player Y is invincible
 			bne @Skip				; /
 			lda SparkXPosInt,x		; \
-			ssbc ObjectXPosInt,y	; | Skip if Player Y and Spark X are horizontally too far away
+			ssbcy ObjectXPosInt		; | Skip if Player Y and Spark X are horizontally too far away
 			jsr GetAbsoluteValue	; | |Spark[X].XPos - Player[Y].XPos| >= 8
 			cmp #8					; |
 			bcs @Skip				; /
 			lda SparkYPosInt,x		; \
-			ssbc ObjectYPosInt,y	; | Skip if Player Y and Spark X are vertically too far away
+			ssbcy ObjectYPosInt		; | Skip if Player Y and Spark X are vertically too far away
 			ssbc #8					; | |Spark[X].YPos - Player[Y].YPos - 8| >= 12
 			jsr GetAbsoluteValue	; |
 			cmp #12					; |
@@ -2062,16 +2061,16 @@ BonusPhaseGameLoop:
 	jsr CopyPPUBlock
 	ldx TwoPlayerFlag
 	@BonusEndPlayerLoop:
-		lda #32
-		sta ObjectXPosInt,x
-		lda PlayerBonusYPos,x
-		sta ObjectYPosInt,x
-		lda #3
-		sta ObjectStatus,x
-		lda #1
-		sta ObjectDirection,x
+		lda #32					; \ Move Players into place for Bonus Phase end screen
+		sta ObjectXPosInt,x		; | Set X to 32px
+		lda PlayerBonusYPos,x	; |
+		sta ObjectYPosInt,x		; / Set Y to 80px or 112px
+		lda #3				; \ Set player status to 3 (Ground Idle)
+		sta ObjectStatus,x	; /
+		lda #1					; \ Set players facing right
+		sta ObjectDirection,x	; /
 		jsr InitPlayerType
-		jsr le3a4
+		jsr DrawObjectX
 		dex
 		bpl @BonusEndPlayerLoop
 	lda #68
@@ -2085,19 +2084,19 @@ BonusPhaseGameLoop:
 	sta BalloonStatus
 	sta BalloonStatus+1
 	ldx TwoPlayerFlag
-lcfb5:
-	jsr ManageBalloonXSprite
-	dex
-	bpl lcfb5
+	@EndBalloonLoop:
+		jsr ManageBalloonXSprite
+		dex
+		bpl @EndBalloonLoop
 	jsr Wait20Frames
 	lda #$2b
 	sta $57
 	lda #$24
 	sta $58
 	sta $59
-	lda #$0c
+	lda #12
 	sta $54
-	lda #$0b
+	lda #11
 	sta $55
 	lda #5
 	sta $56
@@ -2105,34 +2104,34 @@ lcfb5:
 	jsr ld1c9
 	lda TwoPlayerFlag
 	beq lcfe8
-	lda #$0f
+	lda #15
 	sta $55
 	lda P2BonusBalloons
 	jsr ld1c9
-lcfe8:
+	lcfe8:
 	jsr Wait20Frames
-	lda $0559
+	lda BalloonPts
 	sta $57
 	lda #0
 	sta $58
 	sta $59
 	lda #8
 	sta $54
-	lda #$0b
+	lda #11
 	sta $55
 	lda #3
 	sta $56
-	lda $0559
+	lda BalloonPts
 	jsr UploadPPU
 	lda TwoPlayerFlag
 	beq ld013
-	lda #$0f
+	lda #15
 	sta $55
 	jsr UploadPPU
 ld013:
 	lda #$ff
-	sta $055d
-	sta $055e
+	sta BalloonStatus
+	sta BalloonStatus+1
 	ldx TwoPlayerFlag
 ld01d:
 	jsr ManageBalloonXSprite
@@ -2292,7 +2291,7 @@ SuperBonusText:
 	.BYTE $22,$c6,23	; 23 Bytes to 0x22C6
 	.BYTE $1c,$1e,$19,$0e,$1b,$24,$0b,$18,$17,$1e,$1c,$24,$24,$24,$01,$00,$00,$00,$00,$19,$1d,$1c,$2c ; "SUPER BONUS   10000PTS."
 PlayerBonusYPos:
-	.BYTE $50,$70
+	.BYTE 80,112
 
 ld1a0:
 	ldx #28
@@ -3334,7 +3333,7 @@ MenuCursorYOptions:
 
 .include "SpriteAnimData.asm"
 
-le3a4:
+DrawObjectX:
 	lda OAMObjectOrder1,x	; \ Set Pointer from the first table
 	sta OAMPointerLo		; /
 	lda FrameCounter		; \
@@ -3649,6 +3648,7 @@ ObjectGravityData:
 	.BYTE $04,$04,$05,$06,$03,$03,$03,$06,$0a,$0a,$0a,$0a
 ObjectFlapAccelData:	;Fractional
 	.BYTE $28,$32,$46,$78,$00,$00,$00,$64,$00,$00,$00,$00
+
 ObjectXAccelData1:
 	.BYTE $0a,$1e,$32,$70,$00,$00,$00,$70,$00,$00,$00,$00
 ObjectXAccelData2:
@@ -3676,13 +3676,13 @@ ObjectMinYVelDataInt:
 
 ObjectManage:
 	jsr CheckObjectPairCollision
-	ldx #7						; \
+	ldx #7
 	@Loop:
-		lda ObjectBalloons,x	; | Check all Object's Balloons
+		lda ObjectBalloons,x	; \ Check all Object's Balloons
 		bpl @IsAlive			; | If >= 0 then proceed
 		cmp #<-1				; | else if == -1 then go to next object
-		beq @Next				; | else ? and go to next object
-		jsr ManageBubbleX				; |
+		beq @Next				; |
+		jsr ManageBubbleX		; | Otherwise it's a bubble
 		jmp @Next				; /
 		@IsAlive:
 		cpx #2			; \ Skip if Object is Player
@@ -3692,7 +3692,7 @@ ObjectManage:
 		lda ObjectStatus,x	; \ Skip if Object Status >= 2
 		cmp #2				; |
 		bcs @SkipJingle		; /
-		lda SFX2Req	; \
+		lda SFX2Req	; \ If Object X is enemy, balloon == 1, and status < 2
 		ora #$20	; | Play Enemy Parachute Jingle
 		sta SFX2Req	; /
 		@SkipJingle:
@@ -3710,13 +3710,13 @@ ObjectManage:
 		jsr ObjectUpdateAnim
 		stx TargetUpdateScore
 		jsr lebc4
-		jsr le796
+		jsr ManageObjectState
 		@EveryFrameUpd:
 		jsr ManageObjectVelocity
-		jsr led28
+		jsr ObjectXPlatformCollision
 		jsr le983
 		@Next:
-		jsr le3a4
+		jsr DrawObjectX
 		dex
 		bpl @Loop	; Loop back
 	rts
@@ -3751,39 +3751,39 @@ ObjectUpdateAction:
 		ldy ObjectType,x		; \ Depending on object type, determine delay with RNG
 		and AutoInWaitRange,y	; | Reduce RNG to a certain range,
 		adc AutoInWaitBase,y	; / then add a base value
-		sta ObjectCountdown,x
-		stx Temp12
-		lda FrameCounter
-		rolr 2
-		eor Temp12
-		and #1
-		tay
-		lda ObjectBalloons,y
-		bmi @ForceB
-		lda PlayerInvincible,y
-		bne @ForceB
-		lda #0
-		sta ObjectAction,x
-		lda ObjectYPosInt,y
-		ssbc #4
-		cmp ObjectYPosInt,x
-		bcs @ChooseDirection
+		sta ObjectCountdown,x	; Store input cooldown
+		stx Temp12	; Temp12 = X (Object Index)
+		lda FrameCounter	; \
+		rolr 2				; | Select player to target
+		eor Temp12			; | Y = 0 or 1
+		and #1				; | Target swaps every 4 frames, and reversed for every other enemy
+		tay					; /
+		lda ObjectBalloons,y	; \ If selected player doesn't exist,
+		bmi @ForceB				; |	Or if Player Y is invincible
+		lda PlayerInvincible,y	; | Then ascend
+		bne @ForceB				; /
+		lda #0				; \ Clear Object X's action
+		sta ObjectAction,x	; /
+		lda ObjectYPosInt,y		; \
+		ssbc #4					; | If Player[Y].YPos - 4 >= Object[X].YPos
+		cmp ObjectYPosInt,x		; | Don't hold B
+		bcs @ChooseDirection	; /
 		@ForceB:
 			lda #BBtn			; \ Make character hold B (ascend)
 			sta ObjectAction,x	; /
 		@ChooseDirection:
-			lda ObjectXPosInt,x
-			cmp ObjectXPosInt,y
-			bcs @GoLeft
-			lda ObjectAction,x
-			ora #RightDPad
-			sta ObjectAction,x
-			rts
+			lda ObjectXPosInt,x	; \
+			cmp ObjectXPosInt,y	; | If Object[X].XPos >= Player[Y].XPos then go left
+			bcs @GoLeft			; /
+			lda ObjectAction,x	; \
+			ora #RightDPad		; | Otherwise go right
+			sta ObjectAction,x	; | then return
+			rts					; /
 			@GoLeft:
-			lda ObjectAction,x
-			ora #LeftDPad
-			sta ObjectAction,x
-			rts
+			lda ObjectAction,x	; \
+			ora #LeftDPad		; | Go left then return
+			sta ObjectAction,x	; |
+			rts					; /
 
 AutoInWaitRange:
 	.BYTE 31,15,7
@@ -3820,7 +3820,7 @@ PollControllerX:
 	and Joy1Press,x	; /
 	rts			; Returns pressed buttons in A
 
-le796:
+ManageObjectState:
 	lda ObjectBalloons,x	; \ If object has balloons
 	bne @Continue			; / then continue
 	@ClearXVel:
@@ -3829,244 +3829,243 @@ le796:
 		sta ObjectXVelInt,x		; /
 		rts	; Return
 	@Continue:
-	cmp #2		; \ If 2 balloons
-	beq le7e8	; /
-	cpx #2		; \ If object is a player
-	bcc le7e8	; /
+	cmp #2						; \ If 2 balloons
+	beq ManageActiveObjectState	; /
+	cpx #2						; \ If object is a player
+	bcc ManageActiveObjectState	; /
 	lda ObjectStatus,x	; \ If Object Status >= 2
 	cmp #2				; | then zero X velocity
 	bcs @ClearXVel		; /
-le7b1:
-	lda ObjectXVelFrac,x
-	sta Temp12
-	lda ObjectXVelInt,x
-	sta Temp13
-	jsr DivideDriftVel
-	lda ObjectDriftXVelFrac,x
-	cadc Temp12
-	sta ObjectDriftXVelFrac,x
-	sta Temp12
-	lda ObjectDriftXVelInt,x
-	adc Temp13
-	sta ObjectDriftXVelInt,x
-	sta Temp13
-	jsr DivideDriftVel
-	lda ObjectXVelFrac,x
-	sec
-	sbc Temp12
-	sta ObjectXVelFrac,x
-	lda ObjectXVelInt,x
-	sbc Temp13
-	sta ObjectXVelInt,x
+ManageDriftVel:
+	lda ObjectXVelFrac,x	; \
+	sta TempDriftVelLo		; | TempDriftVel = Object[X].XVel
+	lda ObjectXVelInt,x		; |
+	sta TempDriftVelHi		; /
+	jsr DivideDriftVel	; Divide TempDriftVel (Object's old X Velocity)
+	lda ObjectDriftXVelFrac,x	; \
+	cadc TempDriftVelLo			; |
+	sta ObjectDriftXVelFrac,x	; | Object[X].DriftXVel += TempDriftVel
+	sta TempDriftVelLo			; | TempDriftVel = Object[X].DriftXVel
+	lda ObjectDriftXVelInt,x	; |
+	adc TempDriftVelHi			; |
+	sta ObjectDriftXVelInt,x	; |
+	sta TempDriftVelHi			; /
+	jsr DivideDriftVel	; Divide TempDriftVel (Object's new Drift velocity)
+	lda ObjectXVelFrac,x	; \
+	ssbc TempDriftVelLo		; |
+	sta ObjectXVelFrac,x	; | Object[X].XVel -= TempDriftVel
+	lda ObjectXVelInt,x		; |
+	sbc TempDriftVelHi		; |
+	sta ObjectXVelInt,x		; /
 	rts
-le7e8:
-	lda ObjectStatus,x
-	cmp #6
-	bcc le7ef
-	rts
-le7ef:
-	lda ObjectStatus,x
-	cmp #4
-	bne le811
-	lda ObjectAction,x
-	and #LeftDPad
-	beq le802
-	lda ObjectDirection,x
-	beq le811
-	bne le80d
-le802:
-	lda ObjectAction,x
-	and #RightDPad
-	beq le811
-	lda ObjectDirection,x
-	bne le811
-le80d:
-	lda #5
-	sta ObjectStatus,x
-le811:
-	lda ObjectStatus,x
-	cmp #2
-	bne le832
-	lda ObjectAction,x
-	and #LeftDPad
-	beq le821
-	lda #0
-	beq le829
-le821:
-	lda ObjectAction,x
-	and #RightDPad
-	beq le82e
-	lda #1
-le829:
-	cmp ObjectDirection,x
-	beq le832
-le82e:
-	lda #4
-	sta ObjectStatus,x
-le832:
-	lda ObjectStatus,x
-	cmp #4
-	bcc le854
-	lda ObjectAction,x
-	and #LeftDPad
-	beq le845
-	lda ObjectDirection,x
-	bne le854
-	beq le850
-le845:
-	lda ObjectAction,x
-	and #RightDPad
-	beq le854
-	lda ObjectDirection,x
-	beq le854
-le850:
-	lda #2
-	sta ObjectStatus,x
-le854:
-	lda ObjectStatus,x
-	cmp #3
-	bne le864
-	lda ObjectAction,x
-	and #LeftDPad | RightDPad
-	beq le864
-	lda #2
-	sta ObjectStatus,x
-le864:
-	lda ObjectStatus,x
-	cmp #4
-	bcs le87f
-	lda ObjectAction,x
-	and #LeftDPad
-	beq le874
-	lda #0
-	beq le87c
-le874:
-	lda ObjectAction,x
-	and #RightDPad
-	beq le87f
-	lda #1
-le87c:
-	sta ObjectDirection,x
-le87f:
-	lda ObjectStatus,x
-	cmp #4
-	bcc le8b8
-	lda ObjectAnimFrame,x
-	cmp #1
-	bne le8b8
-	ldy ObjectType,x
-	lda ObjectDirection,x
-	beq le8a6
-	lda ObjectXVelFrac,x
-	sec
-	sbc ObjectXAccelData2,y
-	sta ObjectXVelFrac,x
-	lda ObjectXVelInt,x
-	sbc #0
-	jmp le901
-le8a6:
-	lda ObjectXVelFrac,x
-	cadcy ObjectXAccelData2
-	sta ObjectXVelFrac,x
-	lda ObjectXVelInt,x
-	adc #0
-	jmp le901
-le8b8:
-	lda ObjectStatus,x
-	beq le8c7
-	cmp #2
-	beq le907
-	cmp #3
-	beq le8c7
-	jmp le951
-le8c7:
-	lda ObjectAnimFrame,x
-	cmp #1
-	beq le8d1
-	jmp le951
-le8d1:
-	ldy ObjectType,x
-	lda ObjectAction,x
-	and #LeftDPad
-	beq le8ec
-	lda ObjectXVelFrac,x
-	ssbcy ObjectXAccelData1
-	sta ObjectXVelFrac,x
-	lda ObjectXVelInt,x
-	sbc #0
-	jmp le901
-le8ec:
-	lda ObjectAction,x
-	and #RightDPad
-	beq le951
-	lda ObjectXVelFrac,x
-	cadcy ObjectXAccelData1
-	sta ObjectXVelFrac,x
-	lda ObjectXVelInt,x
-	adc #0
-le901:
-	sta ObjectXVelInt,x
-	jmp le951
-le907:
-	lda ObjectAnimFrame,x
-	cmp #1
-	bne le951
-	ldy ObjectType,x
-	lda ObjectAction,x
-	and #LeftDPad
-	beq le929
-	lda ObjectXVelFrac,x
-	sec
-	sbc ObjectXAccelData2,y
-	sta ObjectXVelFrac,x
-	lda ObjectXVelInt,x
-	sbc #0
-	jmp le93e
-le929:
-	lda ObjectAction,x
-	and #RightDPad
-	beq le951
-	lda ObjectXVelFrac,x
-	cadcy ObjectXAccelData2
-	sta ObjectXVelFrac,x
-	lda ObjectXVelInt,x
-	adc #0
-le93e:
-	sta ObjectXVelInt,x
-	lda ObjectAction,x
-	and #LeftDPad | RightDPad
-	beq le951
-	cpx #2
-	bcs le951
-	lda SFX1Req
-	ora #8
-	sta SFX1Req
-le951:
-	lda ObjectStatus,x
-	cmp #4
-	bcc :+
-	lda ObjectDirection,x
-	bne le963
-	lda ObjectXVelInt,x
-	bmi :+
-	bpl le968
-le963:
-	lda ObjectXVelInt,x
-	bpl :+
-le968:
-	lda ObjectStatus,x
-	cmp #5
-	bne le976
-	lda ObjectDirection,x
-	eor #1
-	sta ObjectDirection,x
-le976:
-	lda #3
-	sta ObjectStatus,x
-	lda #0
-	sta ObjectXVelFrac,x
-	sta ObjectXVelInt,x
-	:rts
+
+ManageActiveObjectState:
+	lda ObjectStatus,x	; \
+	cmp #6				; | Return if Object X's Status >= 6
+	bcc @CheckFToTSkid	; |
+	rts					; /
+	@CheckFToTSkid:
+		lda ObjectStatus,x		; \
+		cmp #4					; | If State == 4 (Forward skid), check if a switch to turning skid state is needed
+		bne @CheckWalkToFSkid	; / Else skip to next check
+		lda ObjectAction,x		; \
+		and #LeftDPad			; | Check Left Button input
+		beq @CheckRightFtoTSkid	; / If no left input, check right
+		lda ObjectDirection,x	; \  
+		beq @CheckWalkToFSkid	; | If pressing left and facing left, skip
+		bne @SetTurnSkid		; / If pressing left and facing right, start skidding
+		@CheckRightFtoTSkid:
+			lda ObjectAction,x		; \
+			and #RightDPad			; | Check Right Button input
+			beq @CheckWalkToFSkid	; / If no left input, skip to next check
+			lda ObjectDirection,x	; \ If pressing right and facing left, start skidding
+			bne @CheckWalkToFSkid	; / If pressing right facing right, skip to next check
+		@SetTurnSkid:
+			lda #5				; \ Set state to 5 (Turning skid)
+			sta ObjectStatus,x	; /
+	@CheckWalkToFSkid:
+		lda ObjectStatus,x		; \
+		cmp #2					; | If State == 2, (Walking)
+		bne @CheckSkidToWalk	; / Else skip to next check
+		lda ObjectAction,x	; \ Check left input
+		and #LeftDPad		; /
+		beq @CheckRightWalktoFSkid	; If no left input, try checking right
+		lda #0					; \ If left input, compare against direction
+		beq @CheckWalkDirMatch	; / 0 = left
+		@CheckRightWalktoFSkid:
+			lda ObjectAction,x	; \ Check right input
+			and #RightDPad		; /
+			beq @SetFSkid	; If neither direction was pressed, start skidding
+			lda #1	; 1 = right, compare against direction
+		@CheckWalkDirMatch:
+			cmp ObjectDirection,x	; \ If pressed direction == object direction,
+			beq @CheckSkidToWalk	; / Don't start skidding
+		@SetFSkid:
+			lda #4				; \ Set state to skidding
+			sta ObjectStatus,x	; /
+	@CheckSkidToWalk:
+		lda ObjectStatus,x		; \
+		cmp #4					; | If State >= 4 (Skidding)
+		bcc @CheckStandToWalk	; / Else Skip to next check
+		lda ObjectAction,x	; \ Check left input
+		and #LeftDPad		; /
+		beq @CheckRightSkidToWalk	; If no left input, check right
+		lda ObjectDirection,x	; \
+		bne @CheckStandToWalk	; | If left button pressed and direction is right, skip to next check
+		beq @SetWalking			; / If left button pressed and direction is left, set state to walking
+		@CheckRightSkidToWalk:
+			lda ObjectAction,x	; \ Check right input
+			and #RightDPad		; /
+			beq @CheckStandToWalk	; If no right input, skip to next check
+			lda ObjectDirection,x	; \ If pressing right and facing left, skip to next check
+			beq @CheckStandToWalk	; / If pressing right and facing right, set state to walking
+		@SetWalking:
+			lda #2				; \ Set state to 2 (Walking)
+			sta ObjectStatus,x	; /
+	@CheckStandToWalk:
+		lda ObjectStatus,x		; \
+		cmp #3					; | If object state == 3 (Standing)
+		bne @ObjectSetDirection	; / Else Skip to next check
+		lda ObjectAction,x			; \ Check for horizontal input
+		and #LeftDPad | RightDPad	; /
+		beq @ObjectSetDirection	; If nothing, stay standing
+		lda #2				; \ Else set state to 2 (walking)
+		sta ObjectStatus,x	; /
+	@ObjectSetDirection:
+		lda ObjectStatus,x	; \
+		cmp #4				; | If object state < 4 (Not skidding)
+		bcs @le87f			; / Else skip to next check
+		lda ObjectAction,x	; \ Check left button
+		and #LeftDPad		; /
+		beq @CheckRightSetDirection
+		lda #0				; \ Set direction to left
+		beq @SetDirection	; /
+		@CheckRightSetDirection:
+			lda ObjectAction,x	; \ Check right button
+			and #RightDPad		; /
+			beq @le87f
+			lda #1	; Set direction to right
+		@SetDirection:
+			sta ObjectDirection,x	; Set direction to match input
+	@le87f:
+		lda ObjectStatus,x	; \
+		cmp #4				; | If object state >= 4 (Skidding)
+		bcc @le8b8			; / Else skip to next check
+		lda ObjectAnimFrame,x
+		cmp #1
+		bne @le8b8
+		ldy ObjectType,x
+		lda ObjectDirection,x
+		beq @le8a6
+		lda ObjectXVelFrac,x
+		ssbcy ObjectXAccelData2
+		sta ObjectXVelFrac,x
+		lda ObjectXVelInt,x
+		sbc #0
+		jmp @le901
+		@le8a6:
+		lda ObjectXVelFrac,x
+		cadcy ObjectXAccelData2
+		sta ObjectXVelFrac,x
+		lda ObjectXVelInt,x
+		adc #0
+		jmp @le901
+	@le8b8:
+		lda ObjectStatus,x
+		beq @le8c7
+		cmp #2
+		beq @le907
+		cmp #3
+		beq @le8c7
+		jmp @SkidEndCheck
+	@le8c7:
+		lda ObjectAnimFrame,x
+		cmp #1
+		beq @le8d1
+		jmp @SkidEndCheck
+		@le8d1:
+		ldy ObjectType,x
+		lda ObjectAction,x
+		and #LeftDPad
+		beq @le8ec
+		lda ObjectXVelFrac,x
+		ssbcy ObjectXAccelData1
+		sta ObjectXVelFrac,x
+		lda ObjectXVelInt,x
+		sbc #0
+		jmp @le901
+		@le8ec:
+		lda ObjectAction,x
+		and #RightDPad
+		beq @SkidEndCheck
+		lda ObjectXVelFrac,x
+		cadcy ObjectXAccelData1
+		sta ObjectXVelFrac,x
+		lda ObjectXVelInt,x
+		adc #0
+		@le901:
+		sta ObjectXVelInt,x
+		jmp @SkidEndCheck
+	@le907:
+		lda ObjectAnimFrame,x
+		cmp #1
+		bne @SkidEndCheck
+		ldy ObjectType,x
+		lda ObjectAction,x
+		and #LeftDPad
+		beq @le929
+		lda ObjectXVelFrac,x
+		sec
+		sbc ObjectXAccelData2,y
+		sta ObjectXVelFrac,x
+		lda ObjectXVelInt,x
+		sbc #0
+		jmp @SetXVel
+		@le929:
+		lda ObjectAction,x
+		and #RightDPad
+		beq @SkidEndCheck
+		lda ObjectXVelFrac,x
+		cadcy ObjectXAccelData2
+		sta ObjectXVelFrac,x
+		lda ObjectXVelInt,x
+		adc #0
+		@SetXVel:
+			sta ObjectXVelInt,x
+		lda ObjectAction,x			; \
+		and #LeftDPad | RightDPad	; | If no directional input, don't play footstep SFX
+		beq @SkidEndCheck			; /
+		cpx #2				; \ Don't play footstep SFX for enemies
+		bcs @SkidEndCheck	; /
+		lda SFX1Req	; \
+		ora #$08	; | Play footstep SFX
+		sta SFX1Req	; /
+	@SkidEndCheck:
+		lda ObjectStatus,x	; \ If player X is skidding (Status >= 4)
+		cmp #4				; /
+		bcc :+	; Return if not
+		lda ObjectDirection,x	; \ Go to separate check if direction is 1 (Right)
+		bne @RightSkid			; /
+		lda ObjectXVelInt,x	; \ If facing left and X Vel >= 0, then finish skidding
+		bmi :+				; | Otherwise if not stopped, return
+		bpl @EndSkid		; /
+		@RightSkid:
+			lda ObjectXVelInt,x	; \ If facing right and X Vel < 0, then finish skidding
+			bpl :+				; / Otherwise if not stopped, return
+		@EndSkid:
+			lda ObjectStatus,x		; \
+			cmp #5					; | Flip direction if Status == 5 (Turning skid)
+			bne @SkipDirectionFlip	; /
+			lda ObjectDirection,x	; \
+			eor #1					; | Reverse direction
+			sta ObjectDirection,x	; /
+			@SkipDirectionFlip:
+			lda #3				; \ Set status to 3 (Ground idle)
+			sta ObjectStatus,x	; /
+			lda #0					; \
+			sta ObjectXVelFrac,x	; | Set X Velocity to 0
+			sta ObjectXVelInt,x		; /
+			:rts
 
 le983:
 	lda $cb
@@ -4075,8 +4074,7 @@ le983:
 	beq le99a
 	lda BTPlatformX
 	beq le99a
-	sec
-	sbc ObjectXPosInt,x
+	ssbcx ObjectXPosInt
 	jsr GetAbsoluteValue
 	cmp #5
 	bcc le9b6
@@ -4097,11 +4095,11 @@ le983:
 	sta ObjectCountdown,x
 	rts
 	le9b6:
-	lda #0
-	sta ObjectYVelFrac,x
-	sta ObjectYVelInt,x
-	sta ObjectYPosFrac,x
-	sta $cb
+	lda #0					; \
+	sta ObjectYVelFrac,x	; | Object[X].YVel = 0
+	sta ObjectYVelInt,x		; | Object[X].YPosFrac = 0 (Align to top of pixel)
+	sta ObjectYPosFrac,x	; /
+	sta $cb	; Clear $cb
 	cpx #2
 	bcc le9fd
 	lda ObjectBalloons,x
@@ -4390,7 +4388,7 @@ lebc4:
 	@Enemies:	; Enemy
 		lda ObjectBalloons,x	; \ If Enemy Balloons == 2
 		cmp #2					; | Then check input
-		beq @CheckInput				; /
+		beq @CheckInput			; /
 		lda ObjectAnimFrame,x	; \ If enemy animation frames != 0
 		bne :+					; / Then
 		lda ObjectBalloons,x	; \ If Enemy Status != 0
@@ -4419,10 +4417,10 @@ lebc4:
 			lda #0
 			sta ObjectStatus,x
 			ldy ObjectType,x
-			lda lecae,y
-			ldy ObjectUnknown5,x
+			lda EnemyUpgradeNextType,y
+			ldy ObjectRespawnFlag,x
 			bne @EnemyCont2
-			dec ObjectUnknown5,x
+			dec ObjectRespawnFlag,x
 			lda ObjectType,x
 			and #3
 			@EnemyCont2:
@@ -4453,45 +4451,45 @@ lebc4:
 			lda ABtnCooldown,x	; \ Return if the A Button was already being pressed
 			bne :+				; /
 		@BPressed:
-		lda ObjectStatus,x
-		cmp #2
-		bcc lec75
-		dec ObjectYPosInt,x
-		dec ObjectYPosInt,x
-		lda #0
-		sta ObjectYVelFrac,x
-		sta ObjectYVelInt,x
-		beq lec7e
-		lec75:
-			cmp #1
-			beq lec7e
-			lda ObjectAnimFrame,x
-			bne :+	; Return
-			lec7e:
-			lda #0
-			sta ObjectStatus,x
-			lda #1
-			sta ObjectAnimFrame,x
-			lda #1
-			sta ABtnCooldown,x
-			ldy #0
-			cpx #2
-			bcc lec93
-			iny
-			lec93:
-			lda SFX1Req,y
-			ora #$10
-			sta SFX1Req,y
-			lda ObjectYVelFrac,x
-			sec
-			ldy ObjectType,x
-			sbc ObjectFlapAccelData,y
-			sta ObjectYVelFrac,x
-			bcs :+
-			dec ObjectYVelInt,x
-			:rts
+			lda ObjectStatus,x	; \ 
+			cmp #2				; | If object was airborne (Flying or Air Idle)
+			bcc @CheckFlap		; / Check if the object can flap currently
+			dec ObjectYPosInt,x	; \ If object was grounded
+			dec ObjectYPosInt,x	; / Object[X].YPos -= 2
+			lda #0					; \
+			sta ObjectYVelFrac,x	; | Object[X].YVel = 0
+			sta ObjectYVelInt,x		; /
+			beq @CanFlap	; Can always flap from ground
+			@CheckFlap:
+				cmp #1			; \ If was previously idling in air,
+				beq @CanFlap	; / Object can flap immediately
+				lda ObjectAnimFrame,x	; \ If in flying state and frame is 0, it can flap
+				bne :+					; / Else return
+			@CanFlap:
+				lda #0
+				sta ObjectStatus,x
+				lda #1
+				sta ObjectAnimFrame,x
+				lda #1
+				sta ABtnCooldown,x
+				ldy #0
+				cpx #2
+				bcc lec93
+				iny
+				lec93:
+				lda SFX1Req,y
+				ora #$10
+				sta SFX1Req,y
+				lda ObjectYVelFrac,x
+				sec
+				ldy ObjectType,x
+				sbc ObjectFlapAccelData,y
+				sta ObjectYVelFrac,x
+				bcs :+
+				dec ObjectYVelInt,x
+				:rts
 
-lecae:
+EnemyUpgradeNextType:
 	.BYTE $01,$02,$02,$03
 	.BYTE $01,$02,$02,$03
 	.BYTE $01,$02,$02,$03
@@ -4499,7 +4497,7 @@ lecae:
 ManageBubbleX:
 	lda ObjectStatus,x	; \ If Object(x).Status != 0
 	bne :+				; / then don't do anything
-	jsr le7b1
+	jsr ManageDriftVel
 	jsr ObjectApplyXVelocity
 	lda ObjectYPosFrac,x	; \
 	ssbc #96				; |
@@ -4550,96 +4548,93 @@ ManageBubbleX:
 	plx	; Restore X
 	:rts
 
-led28:
+ObjectXPlatformCollision:
 	ldy ObjectBalloons,x
 	dey
-	bpl led2e
+	bpl @ObjectValid
 	:rts
-led2e:
+	@ObjectValid:
 	lda ObjectYPosInt,x
-	cmp #$f9
-	bcc led40
+	cmp #<-7
+	bcc @Continue
 	lda ObjectYVelInt,x
 	bpl :-
-	lda #0
-	sta CollisionFlags
+	lda #0				; \ Clear Collision Flags
+	sta CollisionFlags	; /
 	jmp lede1
-led40:
+	@Continue:
 	ldy PlatformCount
 	bmi :--
-led44:
-	lda #0
-	sta CollisionFlags
-	lda (TopPointer),y
-	sec
-	sbc #$18
-	cmp ObjectYPosInt,x
-	bcs ledb6
-	adc #3
-	cmp ObjectYPosInt,x
-	bcc led5b
-	lda #1
-	bne led69
-led5b:
-	lda (BottomPointer),y
-	cmp ObjectYPosInt,x
-	bcc ledb6
-	sbc #3
-	cmp ObjectYPosInt,x
-	bcs led89
-	lda #2
-led69:
-	sta CollisionFlags
-	lda (LeftPointer),y
-	cmp #$10
-	beq led78
-	sec
-	sbc #$0c
-	cmp ObjectXPosInt,x
-	bcs led85
-led78:
-	lda (RightPointer),y
-	cmp #$ff
-	beq led89
-	sec
-	sbc #4
-	cmp ObjectXPosInt,x
-	bcs led89
-led85:
-	lda #0
-	sta CollisionFlags
-led89:
-	lda (LeftPointer),y
-	sec
-	sbc #$10
-	beq leda0
-	cmp ObjectXPosInt,x
-	bcs ledb6
-	adc #4
-	cmp ObjectXPosInt,x
-	bcc leda0
-	lda CollisionFlags
-	ora #4
-	bne ledb4
-leda0:
-	lda (RightPointer),y
-	cmp #$ff
-	beq ledb6
-	cmp ObjectXPosInt,x
-	bcc ledb6
-	sbc #4
-	cmp ObjectXPosInt,x
-	bcs ledb6
-	lda CollisionFlags
-	ora #8
-ledb4:
-	sta CollisionFlags
-ledb6:
-	lda CollisionFlags
-	bne ledc1
-	dey
-	bmi :+
-	jmp led44
+	@PlatformLoop:
+		lda #0				; \ Clear Collision Flags
+		sta CollisionFlags	; /
+		; Check Top
+			lda (TopPointer),y	; \
+			ssbc #24			; | If Platform[Y].TopY - 24 >= Object[X].YPos then skip
+			cmp ObjectYPosInt,x	; |
+			bcs @Next			; /
+			adc #3
+			cmp ObjectYPosInt,x
+			bcc @CheckBottom
+			lda #1
+			bne @CheckLeft
+		@CheckBottom:
+			lda (BottomPointer),y
+			cmp ObjectYPosInt,x
+			bcc @Next
+			sbc #3
+			cmp ObjectYPosInt,x
+			bcs @CheckLeft2
+			lda #2
+		@CheckLeft:
+			sta CollisionFlags
+			lda (LeftPointer),y
+			cmp #16
+			beq @CheckRight
+			ssbc #12
+			cmp ObjectXPosInt,x
+			bcs @ClearFlags
+		@CheckRight:
+			lda (RightPointer),y
+			cmp #<-1
+			beq @CheckLeft2
+			ssbc #4
+			cmp ObjectXPosInt,x
+			bcs @CheckLeft2
+		@ClearFlags:
+			lda #0				; \ Clear Collision Flags
+			sta CollisionFlags	; /
+		@CheckLeft2:
+			lda (LeftPointer),y
+			ssbc #16
+			beq @CheckRight2
+			cmp ObjectXPosInt,x
+			bcs @Next
+			adc #4
+			cmp ObjectXPosInt,x
+			bcc @CheckRight2
+			lda CollisionFlags
+			ora #4
+			bne @SetFlagLeft
+		@CheckRight2:
+			lda (RightPointer),y
+			cmp #<-1
+			beq @Next
+			cmp ObjectXPosInt,x
+			bcc @Next
+			sbc #4
+			cmp ObjectXPosInt,x
+			bcs @Next
+			lda CollisionFlags
+			ora #8
+		@SetFlagLeft:
+			sta CollisionFlags
+		@Next:
+			lda CollisionFlags
+			bne ledc1
+			dey
+			bmi :+
+			jmp @PlatformLoop
 	:rts
 
 ledc1:
@@ -4835,7 +4830,7 @@ lef37:
 	bcc @IncludesPlayer	; /
 	jmp @Skip	; Skip if both enemies
 	@IncludesPlayer:
-	lda #0				; \ Reset ColScoreOffset
+	lda #0				; \ Reset Collision Score Offset
 	sta ColScoreOffset	; /
 	lda ObjectHitCooldown,x	; \
 	beq @ColReady			; | If the object has a hit cooldown active, skip
@@ -4926,7 +4921,7 @@ lef37:
 	lda lf05e,y
 	sta ObjectType,x
 	lda #1
-	sta ObjectUnknown5,x
+	sta ObjectRespawnFlag,x
 	ldy Temp12
 	cpy #2
 	bcs @Skip	; Skip
@@ -5196,9 +5191,9 @@ StartDemoGame:
 	@GiveP2Lives:
 	sta P2Lives		; Set Player 2 Lives to -1 or 2
 	ldx #0
-	stx BTPlatformX
-	stx CurrentPhaseHeader		; Current Level Header = 0
-	stx CurrentPhaseNum		; Current Phase = 0
+	stx BTPlatformX	; Put Balloon Trip Platform at 0px	
+	stx CurrentPhaseHeader	; Current Level Header = 0
+	stx CurrentPhaseNum	; Current Phase = 0
 	stx BonusPhaseIntensity	; Bonus Phase Level = 0
 	dex
 	stx ObjectBalloons+1	; Set Player 2 Balloons to -1
@@ -5233,7 +5228,7 @@ LoadPhase:
 		lda #0						; | Initialize variables for each object (except Fish?)
 		sta ObjectDirection,x		; | - Direction (0 = Left, 1 = Right)
 		sta ObjectHitCooldown,x		; |
-		sta ObjectUnknown5,x		; |
+		sta ObjectRespawnFlag,x		; |
 		sta ObjectXVelFrac,x		; | - X Velocity (Frac)
 		sta ObjectXVelInt,x			; | - X Velocity (Int)
 		sta ObjectYVelFrac,x		; | - Y Velocity (Frac)
@@ -5251,7 +5246,7 @@ LoadPhase:
 		bpl @ClearLoop				; /
 	ldx #5						; \
 	@EnemyClearLoop:
-		lda #$ff				; | Initialize Enemies
+		lda #<-1				; | Initialize Enemies
 		sta ObjectBalloons+2,x	; |
 		dex						; |
 		bpl @EnemyClearLoop		; /
@@ -5317,9 +5312,9 @@ BalloonFightGameLoop:	; Balloon Fight Game Loop
 		bmi @SkipRespawn	; / then skip respawn code
 		dec PlayerSpawnDelay,x	; \ Decrease Player X Respawn Delay
 		bne @PhaseClearCheck	; / If not 0 then ?
-		phx
+		phx	; Preserve X
 		jsr InitializeSparkDifficulty
-		plx
+		plx	; Restore X
 		ldy #2
 		dec P1Lives,x	; Decrement Player X Lives
 		sty StatusUpdateFlag	; Update Status Bar
