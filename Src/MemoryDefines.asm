@@ -238,10 +238,9 @@ PPUTempBlock		.set $57
 
 ; Star Animation:
 StarUpdateFlag		.set $4C
-; $004D-$004E = Unused
-; $004F = Star Animation - Star ID
-; $0050 = PPU Address Low
-; $0051 = PPU Address High
+StarAnimID			.set $4F	; ID of star to update
+StarAddressLo		.set $50
+StarAddressHi		.set $51
 
 
 ; - Object RAM:
@@ -279,7 +278,7 @@ ObjectCountdown		.set $045A	;$045A-$0462 Used for Auto-Input and spark death del
 ObjectDriftXVelFrac	.set $0463	;$0463-$046B
 ObjectDriftXVelInt	.set $046C	;$046C-$0474
 ObjectHitCooldown	.set $0475	;$0475-$047D
-ObjectRespawnFlag	.set $047E	;$047E-$0486
+ObjectUpgradeFlag	.set $047E	;$047E-$0486
 
 PlayerInvincible	.set $BD	;$00BD-$00BE
 PlayerInvTimer		.set $BF	;$00BF-$00C0
@@ -351,14 +350,9 @@ GameBTopScore		.set $062E	; $062E-$0632 2-Player Game Top Score
 GameCTopScore		.set $0633	; $0633-$0638 Balloon Trip Top Score
 
 ; $0700-$07F9 = Balloon Trip Rank 01 to 50 Scores (5 bytes each)
-;				 Rank 47 = Score 000000
-
-; $07E8 = Balloon Trip Music Flag
-; $07F0 = Audio related?
-; $07F5 = $F0 SFX Flags for Balloon Trip?
+; Due to overlap with sound variables in US/EU ver. the last few get corrupted
 
 HALStringMem		.set $07FA
-
 
 .IF REGION >= 1
 	SoundPage	.set $0700

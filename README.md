@@ -10,7 +10,7 @@ The reason for the change from LuigiBlood's original choice of bass as an assemb
 
 ## Build ROM
 
-This project is not intended for being built into a ROM to play or distribute. For this reason, it doesn't include the game's graphics. However, the codebase is written in a format compatible with CC65. Specifically, it uses CA65 & LD65.
+This project is not intended for being built into a ROM to play or distribute. For this reason, it doesn't include the game's graphics. However, the codebase is compatible with CC65. Specifically, it uses CA65 & LD65.
 
 https://cc65.github.io/
 
