@@ -62,7 +62,6 @@ DivisionRemainder	.set $43	;Division Dividend & Modulo Result
 BTRankLo			.set $49
 BTRankHi			.set $4A
 CollisionUnknown	.set $4B
-; $004B = ?
 
 CloudCount			.set $A3	; Amount of Clouds (zero-based) (-1 if none)
 SelectedCloud		.set $A4
@@ -74,7 +73,7 @@ CloudAttrAddrLo3	.set $AF	; $00AF-$00B1 = Cloud 16x16 Tile Attribute $23xx
 CloudXPos			.set $B2	; $00B2-$00B4
 CloudYPos			.set $B5	; $00B5-$00B7
 SparkCountdown		.set $B8
-; $00B9 = Unused?
+
 SparkIntensity		.set $BA	;Speed of sparks
 SplashAnim			.set $BB	;Water Splash Animation Frame
 SplashXOffset		.set $BC	;The X position of the splash sprite
@@ -85,11 +84,9 @@ EnemyInflateSpeed	.set $C7	;Higher=slower, determines how long it takes for enem
 PhaseType			.set $C8	;0 = Regular, 1 = Bonus
 TileScrollCount		.set $C9	;For Balloon Trip
 ScreenScrollCount	.set $CA	;For Balloon Trip
-; $00CB = ???
+LandingFlag			.set $CB
 CollisionFlags		.set $CC
 PlatformCount		.set $CD
-; $00CE = Unused
-; $00CF = Unused
 
 TempDriftVel		.set $12
 TempDriftVelLo		.set TempDriftVel
@@ -229,12 +226,11 @@ PPUBufferSize		.set $53
 PPUBlockAddrLo		.set $54
 PPUBlockAddrHi		.set $55
 
+UploadTileX			.set $54
+UploadTileY			.set $55
+
 UploadBlockSize		.set $56
 PPUTempBlock		.set $57
-
-; $005A-$0079 = Palette
-; $007A-$007E = Unused?
-
 
 ; Star Animation:
 StarUpdateFlag		.set $4C
