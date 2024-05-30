@@ -334,26 +334,27 @@ BonusPhaseGameLoop:
 		jsr ManageBonusBalloonSpawn	; /
 		@OutOfBalloons:
 		jsr ManageBonusBalloons
-		lda BonusBalloonStock
-		bne BonusPhaseGameLoop
+		lda BonusBalloonStock	; \ Repeat game loop here if there are balloons left
+		bne BonusPhaseGameLoop	; /
 		ldx #9
 		@BalloonCheckLoop:
-			lda BalloonStatus,x
-			bpl BonusPhaseGameLoop
-			dex
+			lda BalloonStatus,x		; \
+			bpl BonusPhaseGameLoop	; | Repeat game loop if there are active balloons
+			dex						; /
 			bpl @BalloonCheckLoop
-		lda FrameCounter
-		bne BonusPhaseGameLoop
-	jsr ClearPPU
-	ldx #2
-	stx StatusUpdateFlag
-	jsr WaitXFrames
-	lday BonusEndScreenPalette
-	jsr CopyPPUBlock
-	lday SuperBonusTextAttribute
-	jsr CopyPPUBlock
-	lday BonusStatusAttribute
-	jsr CopyPPUBlock
+		lda FrameCounter		; \ If all balloons are gone,
+		bne BonusPhaseGameLoop	; / Wait until FrameCounter == 0 to go to end screen
+	jsr ClearPPU	; Clear screen
+	ldx #2					; \ Update Status bar
+	stx StatusUpdateFlag	; /
+	jsr WaitXFrames	; Wait 2 frames
+
+	lday BonusEndScreenPalette	; \ Upload Bonus End Screen Palette
+	jsr CopyPPUBlock			; /
+	lday SuperBonusTextAttribute	; \ Upload attributes for Super Bonus text
+	jsr CopyPPUBlock				; /
+	lday BonusStatusAttribute	; \ Upload attributes for status bar
+	jsr CopyPPUBlock			; /
 	ldx TwoPlayerFlag
 	@BonusEndPlayerLoop:
 		lda #32					; \ Move Players into place for Bonus Phase end screen
@@ -379,148 +380,156 @@ BonusPhaseGameLoop:
 	sta BalloonStatus	; | Set bonus end screen Balloon statuses to 1
 	sta BalloonStatus+1	; /
 	ldx TwoPlayerFlag				; \
-	@EndBalloonLoop:
+	@EndBalloonLoop:				; |
 		jsr ManageBalloonXSprite	; | Draw only the balloons necessary for the number of players
 		dex							; /
 		bpl @EndBalloonLoop
 	jsr Wait20Frames
+
 	lda #$2b			; \
 	sta PPUTempBlock	; |
 	lda #$24			; | "x  "
 	sta PPUTempBlock+1	; |
 	sta PPUTempBlock+2	; /
-	lda #12
-	sta $54
-	lda #11
-	sta $55
-	lda #5
-	sta UploadBlockSize
-	lda P1BonusBalloons
-	jsr ld1c9
-	lda TwoPlayerFlag
-	beq @SkipP2
-	lda #15
-	sta $55
-	lda P2BonusBalloons
-	jsr ld1c9
+	lda #12			; \
+	sta UploadTileX	; | Put multiplication text at tile 12,11
+	lda #11			; |
+	sta UploadTileY	; /
+	lda #5				; \ Upload 5 tiles
+	sta UploadBlockSize	; /
+	lda P1BonusBalloons		; \ Upload Player 1's Balloon count
+	jsr UploadBalloonCount	; /
+	lda TwoPlayerFlag	; \ Skip uploading Player 2's Balloon count if only 1 player
+	beq @SkipP2			; /
+	lda #15			; \ Upload player 2's balloon count text at 12,15
+	sta UploadTileY	; /
+	lda P2BonusBalloons		; \ Upload Player 2's Balloon count
+	jsr UploadBalloonCount	; /
 	@SkipP2:
 	jsr Wait20Frames
-	lda BalloonPts
-	sta $57
-	lda #0
-	sta $58
-	sta $59
-	lda #8
-	sta $54
-	lda #11
-	sta $55
-	lda #3
-	sta $56
+
+	lda BalloonPts		; \
+	sta PPUTempBlock	; | Put balloon point value into PPUTempBlock
+	lda #0				; | 
+	sta PPUTempBlock+1	; | BalloonPts .. "00"
+	sta PPUTempBlock+2	; /
+	lda #8			; \
+	sta UploadTileX	; | Put Balloon Points at tile 8,11
+	lda #11			; |
+	sta UploadTileY	; /
+	lda #3				; \ Balloon Points is 3 tiles
+	sta UploadBlockSize	; /
 	lda BalloonPts
 	jsr UploadPPU
-	lda TwoPlayerFlag
-	beq @SkipP22
-	lda #15
-	sta $55
-	jsr UploadPPU
+	lda TwoPlayerFlag	; \
+	beq @SkipP22		; |
+	lda #15				; |
+	sta UploadTileY		; | If two player, also display points at tile 8,15
+	jsr UploadPPU		; /
 	@SkipP22:
 	lda #<-1			; \
 	sta BalloonStatus	; | Make both balloons pop
 	sta BalloonStatus+1	; /
-	ldx TwoPlayerFlag
-	@EndBalloonLoop2:
-		jsr ManageBalloonXSprite
-		dex
+	ldx TwoPlayerFlag				; \
+	@EndBalloonLoop2:				; | Update balloon sprites again to be popping
+		jsr ManageBalloonXSprite	; |
+		dex							; /
 		bpl @EndBalloonLoop2
 	lda #$02	; \ Play Pop SFX
 	sta SFX1Req	; /
-	ldx #2
-	jsr WaitXFrames
-	ldx TwoPlayerFlag
-	@EndBalloonLoop3:
-		jsr ManageBalloonXSprite
-		dex
+	ldx #2			; \ Wait 2 frames
+	jsr WaitXFrames	; /
+
+	ldx TwoPlayerFlag				; \
+	@EndBalloonLoop3:				; | Update balloon sprites again to disappear
+		jsr ManageBalloonXSprite	; |
+		dex							; /
 		bpl @EndBalloonLoop3
-	jsr ld1a0
+	jsr DrawBalloonPointTotals
 	jsr Wait20Frames
+
 	lda #$01	; \ End SFX
 	sta SFX1Req	; /
-	jsr CheckTotalBonusBalloons
-	bne @SkipSuperBonus
-	lday PerfectText
-	jsr CopyPPUBlock
+	jsr CheckTotalBonusBalloons	; \ Check if players collected all the balloons
+	bne @SkipSuperBonus			; / If they failed, skip the super bonus
+	lday PerfectText	; \ Upload the "P E R F E C T !!!" text
+	jsr CopyPPUBlock	; /
 	jsr FinishFrame
+
 	ldx #26
 	@SBLoadLoop:
 		lda SuperBonusText,x	; \
 		sta PPUTempBlock,x		; | Load Super Bonus Text to PPUTempBlock
 		dex						; /
 		bpl @SBLoadLoop
-	lda SuperBonusPtsUpper
-	sta PPUTempBlock+17
-	lda SuperBonusPtsLower
-	sta PPUTempBlock+18
+	lda SuperBonusPtsUpper	; \
+	sta PPUTempBlock+17		; | Update value in Super Bonus Text
+	lda SuperBonusPtsLower	; |
+	sta PPUTempBlock+18		; /
 	jsr CopyPPUTempBlock
 	lda #$10		; \ Play super bonus jingle
 	sta MusicReq	; /
 	@SkipSuperBonus:
-	ldx #120
-	jsr WaitXFrames
-	jsr ld1a0
-	ld070:
+	ldx #120		; \ Wait 120 frames
+	jsr WaitXFrames	; /
+
+	jsr DrawBalloonPointTotals	; Redraw point totals so the PPU temp blocks are in memory again
+	@PointAwardLoop:
 		lda #0
 		sta TargetUpdateScore
 		ldx #4
 		jsr ld213
 		jsr CopyPPUTempBlock
 		lda TwoPlayerFlag
-		beq ld08e
+		beq @SkipP23
 		inc TargetUpdateScore
 		ldx #$12
 		jsr ld213
-		lda #$65
+		lda #PPUTempBlock+14
 		ldy #0
 		jsr CopyPPUBlock
-		ld08e:
-		lda #$01
-		sta SFX2Req
-		ldx #2
-		jsr WaitXFrames
-		lda $5d
-		cmp #$24
-		bne ld070
+		@SkipP23:
+		lda #$01	; \ Play point count SFX
+		sta SFX2Req	; /
+		ldx #2			; \ Wait 2 frames between counting up points
+		jsr WaitXFrames	; /
+		lda PPUTempBlock+6	; \
+		cmp #$24			; | Continue until 
+		bne @PointAwardLoop	; /
 		lda TwoPlayerFlag
 		beq @FinishMainBonusPts
 		lda a:PPUTempBlock+20	;Absolute addressing on ZP location?
 		cmp #$24
-		bne ld070
+		bne @PointAwardLoop
 	@FinishMainBonusPts:
 	ldx #10			; \ Wait 10 frames
 	jsr WaitXFrames	; /
+
 	jsr CheckTotalBonusBalloons
-	bne @SkipSuperBonus
+	bne @SkipSuperBonus2
 	lda SuperBonusPtsUpper	; \
 	sta ScoreDigit4			; | Put Super Bonus points into upper ScoreDigits for awarding
 	lda SuperBonusPtsLower	; |
 	sta ScoreDigit5			; /
-	lda TwoPlayerFlag
-	sta TargetUpdateScore
-	@SBPlayerLoop:
-		jsr UpdateScore
-		dec TargetUpdateScore
+	lda TwoPlayerFlag			; \
+	sta TargetUpdateScore		; |
+	@SBPlayerLoop:				; |
+		jsr UpdateScore			; | Update score for each player
+		dec TargetUpdateScore	; /
 		bpl @SBPlayerLoop
 	lda #$01	; \ Play point count SFX
 	sta SFX2Req	; /
 	jsr Wait20Frames
-	@SkipSuperBonus:
+
+	@SkipSuperBonus2:
 	lda #0			; \
 	sta ScoreDigit4	; | Clear upper two ScoreDigits
 	sta ScoreDigit5	; /
 	ldx #1
 	@LifeCheckLoop:
-		lda P1Lives,x
-		bpl @PlayerXAlive
-		sta ObjectBalloons,x
+		lda P1Lives,x		; \ Continue if player x has lives
+		bpl @PlayerXAlive	; /
+		sta ObjectBalloons,x	; Set Player[X].Balloons to 0 if they have no lives
 		@PlayerXAlive:
 		dex
 		bpl @LifeCheckLoop
@@ -569,10 +578,10 @@ BonusEndScreenPalette:
 BonusTotalText:
 	;P1 Bonus Total Text
 	.BYTE $21,$73,11	; 11 Bytes to 0x2173
-	.BYTE $29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26	; "=00000 PTS."
-	;P2 Bonus Total Text
+	.BYTE $29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26	; "=00000 PTS." Score value at offsets 4-8
+	;P2 Bonus Total Text (Second block loaded simultaneously, starts 14 bytes in)
 	.BYTE $21,$f3,11	; 11 Bytes to 0x21F3
-	.BYTE $29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26	; "=00000 PTS."
+	.BYTE $29,$00,$00,$00,$00,$00,$24,$19,$1d,$1c,$26	; "=00000 PTS." Score value at offsets 18-22
 SuperBonusTextAttribute:
 	.BYTE $23,$e8,8		; 8 Bytes to 0x23E8
 	.BYTE $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff	; Set attributes for the SUPER BONUS text
@@ -588,62 +597,64 @@ SuperBonusText:
 PlayerBonusYPos:
 	.BYTE 80,112
 
-ld1a0:
+DrawBalloonPointTotals:
 	ldx #28
 	@Loop:
-		lda BonusTotalText,x
-		sta PPUTempBlock,x
+		lda BonusTotalText,x	; \ Load base Bonus Total text
+		sta PPUTempBlock,x		; /
 		dex
 		bpl @Loop
-	ldx #4
-	ldy P1BonusBalloons
-	jsr ld1dc
-	ldx #18
-	ldy P2BonusBalloons
-	jsr ld1dc
-	jsr CopyPPUTempBlock
-	lda TwoPlayerFlag
-	bne ld1c2
-	rts
+	ldx #4	; P1's Balloon score total starts 4 tiles in
+	ldy P1BonusBalloons			; \ Multiply P1BonusBalloons * BalloonPts
+	jsr BonusBalloonPtsMultiply	; /
 
-ld1c2:
-	lda #101
+	ldx #18	; P2's Balloon score total starts 18 tiles in
+	ldy P2BonusBalloons			; \ Multiply P2BonusBalloons * BalloonPts
+	jsr BonusBalloonPtsMultiply	; /
+
+	jsr CopyPPUTempBlock	; Upload P1's balloon score total
+	lda TwoPlayerFlag
+	bne @UploadP2	; \ If single player, then return here
+	rts				; /
+	@UploadP2:
+	lda #PPUTempBlock+14	; \ Upload P2's balloon score total
 	ldy #0
-	jmp CopyPPUBlock
-ld1c9:
-	ldy #0
-	ld1cb:
-	cmp #10
-	bcc ld1d5
-	iny
-	sbc #10
-	jmp ld1cb
-	ld1d5:
-	sty $5a
-	sta $5b
+	jmp CopyPPUBlock		; / Then return
+
+UploadBalloonCount:
+	ldy #0	; Y = 10's place
+	@Loop:
+		cmp #10		; \ If remainder < 10, then it's done
+		bcc @Finish	; /
+		iny	; If remainder >= 10, increase 10's place by one
+		sbc #10	; Then reduce remainder by 10
+		jmp @Loop
+	@Finish:
+	sty PPUTempBlock+3	; Put 10's place into PPUTempBlock
+	sta PPUTempBlock+4	; Put 1's place into PPUTempBlock
 	jmp UploadPPU
 
-ld1dc:
-	dey				; \ If Y == 0, erase zeroes
-	bmi EraseZeroes	; /
-	lda BalloonPts
-	cadcx PPUTempBlock+2
-	cmp #10
-	bcc ld1ed
-	sbc #10
-	inc PPUTempBlock+1,x
-	ld1ed:
-	sta PPUTempBlock+2,x
-	lda PPUTempBlock+1,x
-	cmp #10
-	bcc @SkipMod10
-	sbc #10
-	inc PPUTempBlock,x
-	sta PPUTempBlock+1,x
+BonusBalloonPtsMultiply:	; Y = Player's Bonus Balloons, X = Total Text Offset
+	dey					; \ If Y == 0, erase lead zeroes then return
+	bmi EraseLeadZeroes	; /
+	lda BalloonPts			; \ Add BalloonPts 100's place to total 100's place
+	cadcx PPUTempBlock+2	; /
+	cmp #10					; \ If 100's place overflowed,
+	bcc @SkipMod10			; |
+	sbc #10					; | Reduce 100's place by 10
+	inc PPUTempBlock+1,x	; / And increase 1000's place by 1
 	@SkipMod10:
-	jmp ld1dc
+	sta PPUTempBlock+2,x	; Store 100's place
+	lda PPUTempBlock+1,x	; \
+	cmp #10					; | If 1000's place overflowed,
+	bcc @SkipMod100			; |
+	sbc #10					; | Reduce 1000's place by 10
+	inc PPUTempBlock,x		; | Increase 10000's place by 1
+	sta PPUTempBlock+1,x	; / And update 1000's place
+	@SkipMod100:
+	jmp BonusBalloonPtsMultiply ; Repeat Y times
 
-EraseZeroes:
+EraseLeadZeroes:
 	ldy #0
 	@Loop:
 		lda PPUTempBlock,x	; Get tile X in PPUTempBlock
@@ -651,7 +662,7 @@ EraseZeroes:
 		cmp #$24	; \ Return if not empty tile
 		bne :+		; /
 		@Continue:
-		lda #$24			; \ Set tile to blank
+		lda #$24			; \ Set 0 tile to blank
 		sta PPUTempBlock,x	; /
 		inx	; Go to next tile
 		iny		; \ Only loop up to 4 times
@@ -660,34 +671,34 @@ EraseZeroes:
 	:rts
 
 ld213:
-	lda $59,x
+	lda PPUTempBlock+2,x
 	cmp #$24
-	beq ld243
+	beq @Finish
 	tay
-	bne ld238
-	lda $58,x
+	bne @ld238
+	lda PPUTempBlock+1,x
 	cmp #$24
-	beq ld243
-	lda $58,x
-	bne ld232
+	beq @Finish
+	lda PPUTempBlock+1,x
+	bne @ld232
 	lda PPUTempBlock,x
 	cmp #$24
-	beq ld243
+	beq @Finish
 	lda #10
-	sta $58,x
+	sta PPUTempBlock+1,x
 	dec PPUTempBlock,x
-	ld232:
+	@ld232:
 	lda #10
-	sta $59,x
-	dec $58,x
-	ld238:
-	dec $59,x
+	sta PPUTempBlock+2,x
+	dec PPUTempBlock+1,x
+	@ld238:
+	dec PPUTempBlock+2,x
 	phx
 	lda #10
 	jsr AddScore
 	plx
-	ld243:
-	jmp EraseZeroes
+	@Finish:
+	jmp EraseLeadZeroes
 
 ClearPPU:	;Clear PPU?
 	jsr ClearPPUMask
@@ -745,35 +756,35 @@ InitGameModeAB:
 		jsr GetByteFromLoadPointer	; |
 		cmp #$ff					; | Load Clouds (XX YY)
 		beq @FinishClouds			; | until one has $FF as
-		sta PPUBlockAddrLo			; | X coordinate
+		sta UploadTileX				; | X coordinate
 		jsr GetByteFromLoadPointer	; |
-		sta PPUBlockAddrHi			; /
-		ldy #3							; \
+		sta UploadTileY				; /
+		ldy #3					; \
 		@Loop1:
-			jsr ld4fb_setppuaddr_render	; |
-			lda #4						; |
-			sta Temp12					; | Render Cloud
-			lda CloudTiles,y			; | to the screen
+			jsr GetTileAddress	; |
+			lda #4				; |
+			sta Temp12			; | Render Cloud
+			lda CloudTiles,y	; | to the screen
 			@Loop2:
-				sta PPUDATA				; |
-				cadc #4					; |
-				dec Temp12				; |
-				bne @Loop2				; |
-			inc PPUBlockAddrHi			; |
-			dey							; |
-			bpl @Loop1					; /
-		lda PPUBlockAddrHi
+				sta PPUDATA		; |
+				cadc #4			; |
+				dec Temp12		; |
+				bne @Loop2		; |
+			inc UploadTileY		; |
+			dey					; |
+			bpl @Loop1			; /
+		lda UploadTileY
 		ssbc #4
-		sta PPUBlockAddrHi
+		sta UploadTileY
 		jsr GetAttributeAddr
 		sta CloudAttrAddrLo0,x
-		incr 2, PPUBlockAddrLo
+		incr 2, UploadTileX
 		jsr GetAttributeAddr
 		sta CloudAttrAddrLo1,x
-		incr 2, PPUBlockAddrHi
+		incr 2, UploadTileY
 		jsr GetAttributeAddr
 		sta CloudAttrAddrLo3,x
-		decr 2, PPUBlockAddrLo
+		decr 2, UploadTileX
 		jsr GetAttributeAddr
 		sta CloudAttrAddrLo2,x
 		stx SelectedCloud
@@ -781,11 +792,11 @@ InitGameModeAB:
 		jsr UpdateCloudAttribute
 		jsr UploadPPUAndMaskBuffer
 		ldx SelectedCloud
-		lda PPUBlockAddrLo
+		lda UploadTileX
 		aslr 3
 		cadc #16
 		sta CloudXPos,x
-		lda PPUBlockAddrHi
+		lda UploadTileY
 		aslr 3
 		sta CloudYPos,x
 		inx
@@ -798,32 +809,32 @@ InitGameModeAB:
 		jsr GetByteFromLoadPointer	; |
 		cmp #$ff					; | Load Propellers (XX YY TT)
 		beq @FinishPropellers		; | until one has $FF as
-		sta PPUBlockAddrLo			; | X coordinate
+		sta UploadTileX				; | X coordinate
 		jsr GetByteFromLoadPointer	; |
-		sta PPUBlockAddrHi			; |
+		sta UploadTileY				; |
 		jsr GetByteFromLoadPointer	; |
 		sta PropellerAngle,x		; /
-		lda PPUBlockAddrLo	; \
+		lda UploadTileX		; \
 		aslr 3				; | X Pos = (Tile X Pos * 8) + 12
 		adc #12				; |
 		sta PropellerXPos,x	; /
-		lda PPUBlockAddrHi	; \
+		lda UploadTileY		; \
 		aslr 3				; | Y Pos = (Tile Y Pos * 8) + 12
 		adc #12				; |
 		sta PropellerYPos,x	; /
 		lda #0					; \ Set propeller state to 0 (not spinning)
 		sta PropellerState,x	; /
-		jsr ld4fb_setppuaddr_render
-		sta PropellerAddrLo,x
-		lda Temp13
-		sta PropellerAddrHi,x
+		jsr GetTileAddress	; Get PPU Address of first tile of Propeller
+		sta PropellerAddrLo,x	; \
+		lda Temp13				; | Store Propeller's PPU Address
+		sta PropellerAddrHi,x	; /
 		jsr DrawUploadPropellerX
 		jsr SetPropellerAttribute	; \ Set all four propeller attributes
-		incr 2, PPUBlockAddrLo		; |
+		incr 2, UploadTileX			; |
 		jsr SetPropellerAttribute	; |
-		incr 2, PPUBlockAddrHi		; |
+		incr 2, UploadTileY			; |
 		jsr SetPropellerAttribute	; |
-		decr 2, PPUBlockAddrLo		; |
+		decr 2, UploadTileX			; |
 		jsr SetPropellerAttribute	; /
 		inx
 		jmp @PropellerLoop	; Load another propeller data
@@ -972,44 +983,44 @@ NextPlatformPointer:
 CloudTiles:
 	.BYTE $7f,$7e,$7d,$7c
 
-UploadBackground:	;Argument: $001D = Pointer to pointers to screen data
-	jsr GetByteFromLoadPointer
-	sta DataPointerLo
-	jsr GetByteFromLoadPointer
-	sta DataPointerHi
-	tax
-	beq :+
-ld4a4:
-	jsr GetByteFromDataPointer
-	tax
-	beq UploadBackground
-	and #%01111111
-	sta PPUADDR
-	jsr GetByteFromDataPointer
-	sta PPUADDR
-	jsr GetByteFromDataPointer
-	sta Temp12
-	txa
-	and #%10000000
-	lsrr 5
-	ora PPUCTRLShadow
-	sta PPUCTRL
-	txa
-	and #%01000000
-	bne ld4d8
-ld4cc:
-	jsr GetByteFromDataPointer
-	sta PPUDATA
-	dec Temp12
-	bne ld4cc
-	beq ld4a4
-ld4d8:
-	jsr GetByteFromDataPointer
-ld4db:
-	sta PPUDATA
-	dec Temp12
-	bne ld4db
-	beq ld4a4
+UploadBackground:	;LoadPointer = Pointer to pointers to screen data
+	jsr GetByteFromLoadPointer	; \
+	sta DataPointerLo			; | Get next graphics pointer
+	jsr GetByteFromLoadPointer	; | Put in DataPointer
+	sta DataPointerHi			; /
+	tax		; \
+	beq :+	; / Return if next pointer was 0
+	@GetNextBlock:
+		jsr GetByteFromDataPointer	; \
+		tax							; / X = Upper Address byte
+		beq UploadBackground	; If this byte was 0, it was the end
+		and #%01111111	; \ Omit uppermost bit from Upper Address
+		sta PPUADDR		; / (Used for vertical/horizontal)
+		jsr GetByteFromDataPointer	; \
+		sta PPUADDR					; / Load Lower Address byte
+		jsr GetByteFromDataPointer	; \
+		sta Temp12					; / Temp12 = Tile count
+		txa					; \
+		and #%10000000		; | If bit 7 is set,
+		lsrr 5				; | Draw these tiles vertically
+		ora PPUCTRLShadow	; |
+		sta PPUCTRL			; /
+		txa				; \
+		and #%01000000	; | If Bit 6 of upper address is set,
+		bne @RepeatTile	; / this block is just one tile repeated
+		@DataWriteLoop:
+			jsr GetByteFromDataPointer	; \
+			sta PPUDATA					; / Get & Upload next tile
+			dec Temp12	; Continue for Tile Count in Temp12
+			bne @DataWriteLoop
+		beq @GetNextBlock
+		@RepeatTile:
+			jsr GetByteFromDataPointer	; \
+			@DataWriteLoopRep:
+				sta PPUDATA				; / Write the same tile repeatedly
+				dec Temp12	; Continue for Tile Count in Temp12
+				bne @DataWriteLoopRep
+			beq @GetNextBlock
 	:rts
 
 GetByteFromLoadPointer:
@@ -1028,20 +1039,21 @@ GetByteFromDataPointer:
 	inc DataPointerHi	; /
 	:rts
 
-ld4fb_setppuaddr_render:
-	lda $55
-	sta Temp12
-	lda #0
-	aslr 4, Temp12
-	rol
-	asl Temp12
-	rol
-	ora #%00100000
-	sta PPUADDR
-	sta Temp13
-	lda Temp12
-	ora $54
-	sta PPUADDR
+GetTileAddress:
+	lda UploadTileY	; \ Temp12 = TileY
+	sta Temp12		; /
+	lda #0	; Clear A
+	aslr 3, Temp12	; Temp12 *= 8
+	asl Temp12	; \ Shift 2 bits from Temp12 into A
+	rol			; | Now A = TileY / 8
+	asl Temp12	; | Temp12 = TileY * 32
+	rol			; /
+	ora #$20	; \ Upper PPU Address = $20 + (TileY / 8)
+	sta PPUADDR	; /
+	sta Temp13	; Temp13 = Upper PPU Address
+	lda Temp12		; \
+	ora UploadTileX	; | Lower PPU Address = TileX + (TileY * 32)
+	sta PPUADDR		; /
 	rts
 
 GetAttributeAddr:
@@ -2857,7 +2869,7 @@ ObjectXPlatformCollision:
 	bpl :-				; / If Object is hitting ceiling while moving upward, bounce
 	lda #0				; \ Clear Collision Flags
 	sta CollisionFlags	; | Then bounce off ceiling
-	jmp lede1			; /
+	jmp @CeilingBounce	; /
 	@Continue:
 	ldy PlatformCount
 	bmi :--
@@ -2946,44 +2958,44 @@ ObjectXPlatformCollision:
 		sta LandingFlag	; /
 		@NoLanding:
 		lsr CollisionFlags
-		bcc ledf4
+		bcc @NoCeilingBounce
 		lda ObjectYVelInt,x
-		bpl ledf4
+		bpl @NoCeilingBounce
 		lda (BottomPointer),y
-	lede1:
-		sta ObjectYPosInt,x
-		jsr ObjectBounceY
-		jsr ReduceYVelocity
+		@CeilingBounce:
+			sta ObjectYPosInt,x
+			jsr ObjectBounceY
+			jsr ReduceYVelocity
 		cpx #2
-		bcs ledf0
+		bcs @NoBumpSFX
 		jsr PlayBumpSFX
-		ledf0:
+		@NoBumpSFX:
 		lda LandingFlag
 		bne :+
-		ledf4:
+		@NoCeilingBounce:
 		lsr CollisionFlags
-		bcc ledff
+		bcc @ContinueHorizCheck
 		lda ObjectXVelInt,x
-		bmi ledff
-		bpl lee08
-		ledff:
+		bmi @ContinueHorizCheck
+		bpl @HorizontalBounce
+		@ContinueHorizCheck:
 		lsr CollisionFlags
 		bcc :+
 		lda ObjectXVelInt,x
 		bpl :+
-		lee08:
-		jsr ObjectBounceX
-		jsr ReduceXVelocity
-		lda ObjectXVelInt,x
-		ora ObjectXVelFrac,x
-		beq :+
-		lda ObjectDirection,x
-		eor #1
-		sta ObjectDirection,x
-		lda SFX2Req	; \
-		ora #$02	; | Play Bump SFX
-		sta SFX2Req	; /
-		:rts
+		@HorizontalBounce:
+			jsr ObjectBounceX
+			jsr ReduceXVelocity
+			lda ObjectXVelInt,x
+			ora ObjectXVelFrac,x
+			beq :+
+			lda ObjectDirection,x	; \
+			eor #1					; | Reverse Object X's Direction
+			sta ObjectDirection,x	; /
+			lda SFX2Req	; \
+			ora #$02	; | Play Bump SFX
+			sta SFX2Req	; /
+			:rts
 
 CheckObjectPairCollision:
 	ldx #7

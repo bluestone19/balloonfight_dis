@@ -59,7 +59,7 @@ SetRemainingLoops:
 	and #$3f
 	sta $d8,x
 	dec $d8,x
-	lda $e8,x
+	lda Sq1TrackOffset,x
 	sta $ec,x
 GetNextTrackData:
 	jmp LoadTrackDataLoop
@@ -77,9 +77,9 @@ ContinueNoteDataCheck:
 	cmp #2
 	beq lf5c4
 lf575:
-	ldy $e8,x
-	inc $e8,x
-	lda ($fe),y
+	ldy Sq1TrackOffset,x
+	inc Sq1TrackOffset,x
+	lda (CurTrackPointer),y
 NoteDataHas80Set:
 	tay
 	txa
@@ -99,8 +99,7 @@ ChannelIsFree:
 	sta SQ1_HI,x
 lf599:
 	tay
-	pla
-	tax
+	plx
 	tya
 	bne SetChannelVolumeToDC
 	ldy #0
@@ -535,12 +534,12 @@ lf8dd:
 lf8e8:
 	ldxy lf6f9
 	jsr WriteSq1XY
-	lda $1b
+	lda RNGOutput
 	and #$0f
 	sta SQ1_LO
 	ldxy lf6f9
 	jsr WriteSq2
-	lda $1b
+	lda RNGOutput
 	lsrr 2
 	and #$0f
 	sta SQ2_LO
@@ -635,7 +634,7 @@ lf993:
 	beq lf9ca
 	cmp #6
 	bcc lf9b1
-	lda $1b
+	lda RNGOutput
 	ora #$10
 	and #$7f
 	sta FishChompPitchSq1
@@ -749,7 +748,7 @@ lfa64:
 	bne :-
 	ldxy TweetSFXBase
 	jsr WriteSq2
-	lda $1b
+	lda RNGOutput
 	and #$3f
 	ora #$10
 	sta SQ2_LO

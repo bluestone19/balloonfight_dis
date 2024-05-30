@@ -223,9 +223,6 @@ PPUAddressLo		.set $51
 PPUBufferPosition	.set $52
 PPUBufferSize		.set $53
 
-PPUBlockAddrLo		.set $54
-PPUBlockAddrHi		.set $55
-
 UploadTileX			.set $54
 UploadTileY			.set $55
 
