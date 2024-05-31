@@ -143,68 +143,6 @@ PreciseVelSub		.set PreciseVel
 PreciseVelFrac		.set $2F
 PreciseVelInt		.set $30
 
-; Sound:
-; $00D0 = ?
-; $00D1 = ?
-; $00D2 = ?
-; $00D3 = ?
-
-; $00DC = ?
-; $00DD = ?
-
-TrackTempo			.set $DF
-
-; Channel Track Pointers
-Sq1TrackPointer		.set $E0
-Sq1TrackPointerLo	.set $E0
-Sq1TrackPointerHi	.set $E1
-
-Sq2TrackPointer		.set $E2
-Sq2TrackPointerLo	.set $E2
-Sq2TrackPointerHi	.set $E3
-
-TriTrackPointer		.set $E4
-TriTrackPointerLo	.set $E4
-TriTrackPointerHi	.set $E5
-
-NoiseTrackPointer	.set $E6
-NoiseTrackPointerLo	.set $E6
-NoiseTrackPointerHi	.set $E7
-
-; Track Offsets
-Sq1TrackOffset		.set $E8
-Sq2TrackOffset		.set $E9
-TriTrackOffset		.set $EA
-NoiseTrackOffset	.set $EB
-
-; Sound Requests
-SFX1Req				.set $F0
-SFX2Req				.set $F1
-MusicReq			.set $F2
-SFX3Req				.set $F3
-
-; Current Sounds
-SFX1Cur				.set $F4
-SFX2Cur				.set $F5
-MusicCur			.set $F6
-SFX3Cur				.set $F7
-
-; $00F8 = Unused?
-; $00F9-$00FC = Written but not read?
-
-SndDataTargetPtr	.set $F9
-SndDataTargetPtrLo	.set $F9
-SndDataTargetPtrHi	.set $FA
-
-SndDataSourcePtr	.set $FB
-SndDataSourcePtrLo	.set $FB
-SndDataSourcePtrHi	.set $FC
-
-SoundAttrOffset		.set $FD
-CurTrackPointer		.set $FE
-CurTrackPointerLo	.set $FE
-CurTrackPointerHi	.set $FF
-
 ; $0100-$01FF = Stack
 
 OAM					.set $0200
@@ -347,6 +285,90 @@ GameCTopScore		.set $0633	; $0633-$0638 Balloon Trip Top Score
 
 HALStringMem		.set $07FA
 
+;----------------------
+; Sound:
+;----------------------
+
+; Note Countdowns
+Sq1Countdown		.set $D0
+Sq2Countdown		.set $D1
+TriCountdown		.set $D2
+NoiseCountdown		.set $D3
+
+; Note Length
+Sq1NoteLength		.set $D4
+Sq2NoteLength		.set $D5
+TriNoteLength		.set $D6
+NoiseNoteLength		.set $D7
+
+; Unknown
+Sq1Unknown3			.set $D8
+Sq2Unknown3			.set $D9
+TriUnknown3			.set $DA
+NoiseUnknown3		.set $DB
+
+SoundX				.set $DC
+SoundY				.set $DD
+; $00DE = ?
+TrackTempo			.set $DF
+
+; Channel Track Pointers
+Sq1TrackPointer		.set $E0
+Sq1TrackPointerLo	.set $E0
+Sq1TrackPointerHi	.set $E1
+
+Sq2TrackPointer		.set $E2
+Sq2TrackPointerLo	.set $E2
+Sq2TrackPointerHi	.set $E3
+
+TriTrackPointer		.set $E4
+TriTrackPointerLo	.set $E4
+TriTrackPointerHi	.set $E5
+
+NoiseTrackPointer	.set $E6
+NoiseTrackPointerLo	.set $E6
+NoiseTrackPointerHi	.set $E7
+
+; Track Offsets
+Sq1TrackOffset		.set $E8
+Sq2TrackOffset		.set $E9
+TriTrackOffset		.set $EA
+NoiseTrackOffset	.set $EB
+
+; Unknown
+Sq1Unknown4			.set $EC
+Sq2Unknown4			.set $ED
+TriUnknown4			.set $EE
+NoiseUnknown4		.set $EF
+
+; Sound Requests
+SFX1Req				.set $F0
+SFX2Req				.set $F1
+MusicReq			.set $F2
+SFX3Req				.set $F3
+
+; Current Sounds
+SFX1Cur				.set $F4
+SFX2Cur				.set $F5
+MusicCur			.set $F6
+SFX3Cur				.set $F7
+
+; $00F8 = Unused?
+
+SndDataTargetPtr	.set $F9
+SndDataTargetPtrLo	.set $F9
+SndDataTargetPtrHi	.set $FA
+
+SndDataSourcePtr	.set $FB
+SndDataSourcePtrLo	.set $FB
+SndDataSourcePtrHi	.set $FC
+
+SoundRegOffset		.set $FD	; Offset of current channel's registers from Square 1
+
+CurTrackPointer		.set $FE
+CurTrackPointerLo	.set $FE
+CurTrackPointerHi	.set $FF
+
 .IF REGION >= 1
 	SoundPage	.set $0700
 .ELSE
@@ -398,10 +420,12 @@ SQ2_LO		.set $4006
 SQ2_HI		.set $4007
 
 TRI_LINEAR	.set $4008
+; $4009
 TRI_LO		.set $400A
 TRI_HI		.set $400B
 
 NOISE_VOL	.set $400C
+; $400D
 NOISE_LO	.set $400E
 NOISE_HI	.set $400F
 

@@ -5,73 +5,73 @@
 .SEGMENT "SOUND"
 EndMusic:
 	jsr CheckMusic
-:	rts
-;-----------------------
+	:rts
 
 ContinuePlayingMusic:
 	lda #0				;\
-	tax					;| Clear A, X, and SoundAttrOffset
-	sta SoundAttrOffset	;/
+	tax					;| Clear A, X, and SoundRegOffset
+	sta SoundRegOffset	;/
 	beq NextContinueMusic	;Always taken
+
 NextChannelWLSRX:
-	lsrx
+	lsrx	; Halve X, since it was temporarily doubled during pointer check
 NextChannel:
-	inx
-	txa
-	cmp #4
-	beq :-	;RTS
-	lda SoundAttrOffset
-	clc
-	adc #4
-	sta SoundAttrOffset
+	inx	; Increment X to choose next channel
+	txa		; \
+	cmp #4	; | Return if X == 4 (Finished all channels)
+	beq :-	; /
+	lda SoundRegOffset	; \
+	cadc #4				; | SoundRegOffset += 4
+	sta SoundRegOffset	; /
 NextContinueMusic:
-	aslx
+	aslx	; X *= 2, since pointers are 2 bytes long
 	lda Sq1TrackPointerLo,x	; \
 	sta CurTrackPointerLo	; | Copy Channel X's track pointer to CurTrackPointer
 	lda Sq1TrackPointerHi,x	; |
 	sta CurTrackPointerHi	; /
-	lda Sq1TrackPointerHi,x
-	beq NextChannelWLSRX
-	lsrx
-	dec $d0,x
-	bne NextChannel
+	lda Sq1TrackPointerHi,x	; \ If pointer was $0000, this track is unused.
+	beq NextChannelWLSRX	; / For unused tracks, go to next channel after undoing X being doubled
+	lsrx	; X /= 2, since no longer working with pointers
+	dec Sq1Countdown,x	; \ Decrement countdown, and unless it hits 0 don't update channel
+	bne NextChannel		; /
 LoadTrackDataLoop:
-	ldy Sq1TrackOffset,x
-	inc Sq1TrackOffset,x
-	lda (CurTrackPointer),y
-	beq EndMusic
-	tay
-	cmp #$ff
-	beq SubTrackEnd
-	and #$c0
-	cmp #$c0
-	beq SetRemainingLoops
-	jmp ContinueNoteDataCheck
+	ldy Sq1TrackOffset,x	; Y = Channel X's Track Offset
+	inc Sq1TrackOffset,x	; Increment offset for next pass
+	lda (CurTrackPointer),y	; \ If next byte in track data is 0, end music
+	beq EndMusic			; /
+	tay	; Y = New byte from track data
+	cmp #$ff		; \ If byte was $FF, end sub track
+	beq SubTrackEnd	; /
+	and #%11000000			; \
+	cmp #%11000000			; | If uppermost two bits are set,
+	beq SetRemainingLoops	; / Then use byte to set remaining loops
+	jmp ContinueNoteDataCheck	; Otherwise continue checking byte
+
 SubTrackEnd:
-	lda $d8,x
+	lda Sq1Unknown3,x
 	beq GetNextTrackData
-	dec $d8,x
-	lda $ec,x
-	sta $e8,x
+	dec Sq1Unknown3,x
+	lda Sq1Unknown4,x
+	sta Sq1TrackOffset,x
 	bne GetNextTrackData
 SetRemainingLoops:
 	tya
-	and #$3f
-	sta $d8,x
-	dec $d8,x
+	and #$3f			; \ Lower 6 bits of data byte becomes ???
+	sta Sq1Unknown3,x	; /
+	dec Sq1Unknown3,x
 	lda Sq1TrackOffset,x
-	sta $ec,x
+	sta Sq1Unknown4,x
 GetNextTrackData:
 	jmp LoadTrackDataLoop
+
 ContinueNoteDataCheck:
 	tya
 	bpl NoteDataHas80Set
 	and #$0f
-	clc
-	adc TrackTempo
+	cadc TrackTempo
 	tay
 	lda NoteLengthOptions,y
-	sta $d4,x
+	sta Sq1NoteLength,x
 	tay
 	txa
 	cmp #2
@@ -90,14 +90,14 @@ NoteDataHas80Set:
 	cmp #1
 	beq Sq2BusyCheck
 ChannelIsFree:
-	ldx SoundAttrOffset
-	lda lf601,y
+	ldx SoundRegOffset
+	lda lf600+1,y
 	beq lf599
 	sta SQ1_LO,x
 	lda lf600,y
 	ora #8
 	sta SQ1_HI,x
-lf599:
+	lf599:
 	tay
 	plx
 	tya
@@ -106,17 +106,17 @@ lf599:
 	txa
 	cmp #2
 	beq SetChannelVolumeContinue
-	ldy #$10
+	ldy #16
 	bne SetChannelVolumeContinue
 SetChannelVolumeToDC:
 	ldy $dc,x
 SetChannelVolumeContinue:
 	tya
-	ldy SoundAttrOffset
+	ldy SoundRegOffset
 	sta SQ1_VOL,y
 SetCountdownThenContinue:
-	lda $d4,x
-	sta $d0,x
+	lda Sq1NoteLength,x
+	sta Sq1Countdown,x
 	jmp NextChannel
 Sq2BusyCheck:
 	lda SFX2Cur
@@ -153,95 +153,102 @@ lf5e1:
 	sta NOISE_HI
 lf5f9:
 	jmp SetCountdownThenContinue
+
 BubbleRiseSFXSq1:
-.BYTE $16,$ff,$10,$c5
+	.BYTE $16,$ff,$10,$c5
+
 lf600:
-.BYTE $07
-lf601:
-    ;95 bytes
-.BYTE $f0,$00,$00,$00,$d4,$00,$c8,$00,$bd,$00,$b2,$00,$a8,$00,$9f
-.BYTE $00,$96,$00,$8d,$00,$85,$00,$7e,$00,$76,$00,$70,$01,$ab,$01
-.BYTE $93,$01,$7c,$01,$67,$01,$52,$01,$3f,$01,$2d,$01,$1c,$01,$0c
-.BYTE $00,$fd,$00,$ee,$00,$e1,$03,$57,$03,$27,$02,$f9,$02,$cf,$02
-.BYTE $a6,$02,$80,$02,$5c,$02,$3a,$02,$1a,$01,$fc,$01,$df,$01,$c4
-.BYTE $03,$f8,$00,$69,$00,$63,$00,$5e,$00,$58,$00,$53,$00,$4f,$00
-.BYTE $4a,$00,$46,$00,$42
+	.BYTE $07,$f0,$00,$00,$00,$d4,$00,$c8
+	.BYTE $00,$bd,$00,$b2,$00,$a8,$00,$9f
+	.BYTE $00,$96,$00,$8d,$00,$85,$00,$7e
+	.BYTE $00,$76,$00,$70,$01,$ab,$01,$93
+	.BYTE $01,$7c,$01,$67,$01,$52,$01,$3f
+	.BYTE $01,$2d,$01,$1c,$01,$0c,$00,$fd
+	.BYTE $00,$ee,$00,$e1,$03,$57,$03,$27
+	.BYTE $02,$f9,$02,$cf,$02,$a6,$02,$80
+	.BYTE $02,$5c,$02,$3a,$02,$1a,$01,$fc
+	.BYTE $01,$df,$01,$c4,$03,$f8,$00,$69
+	.BYTE $00,$63,$00,$5e,$00,$58,$00,$53
+	.BYTE $00,$4f,$00,$4a,$00,$46,$00,$42
+
 NoteLengthOptions:
-    ;35 bytes
-.BYTE $03,$06,$0c,$18,$30,$12,$24,$09,$08,$04,$07,$01,$04,$08,$10
-.BYTE $20,$40,$18,$30,$0c,$01,$06,$0c,$18,$30,$60,$24,$48,$12,$10
-.BYTE $08,$0e,$02,$03,$04
+	; Tempo 0
+		.BYTE 3,6,12,24,48
+		.BYTE 18,36,9,8,4,7,1
+	; Tempo 12
+		.BYTE 4,8,16,32,64
+		.BYTE 24,48,12,1
+	; Tempo 21
+		.BYTE 6,12,24,48,96
+		.BYTE 36,72,18,16,8,14,2,3,4
 
 WriteSq1XY:					; \
-	lda #0					; |
+	lda #<SQ1_VOL			; |
 	beq WriteChannelDataA	; |
 WriteTriXY:					; | Different entry points for each channel
-	lda #8					; | Determines lower byte of SndDataTargetPtr
+	lda #<TRI_LINEAR		; | 
 	bne WriteChannelDataA	; |
-WriteNoiseXY:				; |
-	lda #$0c				; |
+WriteNoiseXY:				; | Determines lower byte of SndDataTargetPtr
+	lda #<NOISE_VOL			; |
 	bne WriteChannelDataA	; |
 WriteSq2:					; |
-	lda #4					; /
+	lda #<SQ2_VOL			; /
 WriteChannelDataA:
-	sta SndDataTargetPtrLo
-	lda #$40
-	sta SndDataTargetPtrHi
-	stx SndDataSourcePtrLo
-	sty SndDataSourcePtrHi
+	sta SndDataTargetPtrLo	; Write lower byte of pointer
+	lda #>SQ1_VOL			; \ Write upper byte of pointer
+	sta SndDataTargetPtrHi	; / All $40
+	stx SndDataSourcePtrLo	; \ Get data from address in YX
+	sty SndDataSourcePtrHi	; /
 	ldy #0
-ChannelWriteLoop:
-	lda (SndDataSourcePtr),y
-	sta (SndDataTargetPtr),y
-	iny
-	tya
-	cmp #4
-	bne ChannelWriteLoop
+	@WriteLoop:
+		lda (SndDataSourcePtr),y	; \
+		sta (SndDataTargetPtr),y	; |
+		iny							; | Load 4 bytes from Source Pointer to Target Pointer
+		tya							; |
+		cmp #4						; /
+		bne @WriteLoop
 	rts
-;-----------------------
 
 LoadSoundSequence:
 	tax						; \
 	jsr InitNeededChannels	; | Initialize Sound Channels
 	stx MusicCur			; / and Sound Variables
-	lda PopParachuteReq		; \
-	beq LoadMusicTrackData	; | Check [PopParachuteReq] == $00 or $02
-	cmp #$02				; |
-	bne LoadMusicTrackData	; /
-	sta SFX1Req		; [$00F0] = [PopParachuteReq] (!= 00 or 02)
+	lda PopParachuteReq	; \
+	beq @LoadData		; | Check PopParachuteReq == $00 or $02
+	cmp #$02			; |
+	bne @LoadData		; /
+	sta SFX1Req		; SFX1Req = [PopParachuteReq] (!= 00 or 02)
 	lda #0				; \
 	sta PopParachuteReq	; / Clear [PopParachuteReq]
-LoadMusicTrackData:
+	@LoadData:
 	lda MusicTrackInitData,y	; \ Load Sound Sequence Pointer to Y
 	tay							; /
-	ldx #0						; \
-LoadMusicTempoTrackLoop:
-	lda MusicTrackInitData,y	; |
-	sta TrackTempo,x			; | Load Sound Sequence Header
-	iny							; | (9 bytes)
-	inx							; |
-	txa							; |
-	cmp #9						; |
-	bne LoadMusicTempoTrackLoop	; /
+	ldx #0							; \
+	@MusicInitLoop:
+		lda MusicTrackInitData,y	; |
+		sta TrackTempo,x			; | Load Sound Sequence Header
+		iny							; | (9 bytes)
+		inx							; | Track Tempo, then pointers for Sq1-Noise Tracks
+		txa							; |
+		cmp #9						; |
+		bne @MusicInitLoop			; /
 
 	lda #1					; \
-	sta $d0					; |
-	sta $d1					; |
-	sta $d2					; | Initialize Sequence stuff
-	sta $d3					; |
+	sta Sq1Countdown		; |
+	sta Sq2Countdown		; |
+	sta TriCountdown		; | Initialize Sequence stuff
+	sta NoiseCountdown		; |
 	lda #0					; |
 	sta Sq1TrackOffset		; |
 	sta Sq2TrackOffset		; |
 	sta TriTrackOffset		; |
 	sta NoiseTrackOffset	; /
 	rts
-;-----------------------
 
-    ;27 bytes
 FlapSFX:
-.BYTE $94,$ab,$fd,$58
+	.BYTE $94,$ab,$fd,$58
 FootstepNoise:
-.BYTE $00,$7f,$04,$18
+	.BYTE $00,$7f,$04,$18
 lf6ed:
 .BYTE $3f,$7f,$00,$00
 lf6f1:
@@ -253,13 +260,12 @@ lf6f9:
 lf6fc:
 .BYTE $ff,$ff,$ff
 lf700:
-    ;18 bytes
-.BYTE $10,$00,$18
-.BYTE $10,$01,$18
-.BYTE $00,$01,$88
-.BYTE $02,$02,$40
-.BYTE $03,$05,$40
-.BYTE $04,$07,$40
+	.BYTE $10,$00,$18
+	.BYTE $10,$01,$18
+	.BYTE $00,$01,$88
+	.BYTE $02,$02,$40
+	.BYTE $03,$05,$40
+	.BYTE $04,$07,$40
 
 ClearSquareSweeps:
 	lda #$7f		; \ Set Pulse Channels:
@@ -269,7 +275,6 @@ StoreSoundXY:
 	stx $dc
 	sty $dd
 	rts
-;-----------------------
 
 PlayFlapSFX:
 	ldxy FlapSFX
@@ -285,7 +290,6 @@ lf725:
 	and #$10
 	bne PlayFlapSFX
 	rts
-;-----------------------
 
 lf736:
 	lda SFX3Cur
@@ -297,7 +301,6 @@ lf736:
 lf745:
 	jsr WriteSq1XY
 	rts
-;-----------------------
 
 lf749:
 	inc BubbleRiseSFXTimer
@@ -307,12 +310,11 @@ lf749:
 	lda #0
 	sta SFX3Cur
 	rts
-;-----------------------
 
 AudioMain:
 	lda #$c0		; \ Set Frame Counter
 	sta APU_FRAME	; / to 4-step sequence, clear frame interrupt flag
-	jsr lfb25_music
+	jsr ManageMusic
 	jsr lf90a
 	jsr lfa38
 	jsr CheckSFX2Change
@@ -324,8 +326,7 @@ AudioMain:
 	sta SFX2Req		; | Clear Music/SFX Flags
 	sta MusicReq	; |
 	sta SFX3Req		; /
-:	rts
-;-----------------------
+	:rts
 
 TryFootstepNoise:
 	lda SFX1Cur
@@ -342,8 +343,8 @@ CheckMusic:
 	bne CheckSFX
 	inc TripMusicFlag
 InitNeededChannels:
-	and #$0f	; \ Initialize Sound Channels
-	cmp #$0f	; | differently depending on
+	and #$0f				; \ Initialize Sound Channels
+	cmp #$0f				; | differently depending on
 	bne InitAllSoundMemory	; / Music/Jingle needs
 	txa
 CheckSFX:
@@ -366,11 +367,10 @@ ResetCurrentSounds:
 	sta DMC_RAW	; Clear DMC Channel Load Counter
 	sta UnknownSoundFlag
 	rts
-;-----------------------
 
 InitSquare2Noise:
-	lda #$10	; \ Constant volume on:
-	sta SQ2_VOL	; | - Pulse 2 Channel
+	lda #$10		; \ Constant volume on:
+	sta SQ2_VOL		; | - Pulse 2 Channel
 	sta NOISE_VOL	; / - Noise Channel
 	lda #0
 	beq ResetCurrentSounds
@@ -378,7 +378,6 @@ ResetSplashSFXPhase:
 	lda #0
 	sta SplashSFXPhase
 	rts
-;-----------------------
 
 PlaySplashNoise2:
 	ldxy lf6f5
@@ -391,7 +390,6 @@ CheckSplashCountdown:
 	cmp #$20
 	beq ResetSplashSFXPhase
 	rts
-;-----------------------
 
 PlaySplashNoise:
 	lda #0
@@ -448,8 +446,7 @@ ContinueSFX1ChangeCheck:
 	bcs CheckPopCountdown
 	lsr
 	bcs CheckLightningSFXCountdown
-:	rts
-;-----------------------
+	:rts
 
 GotoTryFootstepNoise:
 	jmp TryFootstepNoise
@@ -468,7 +465,6 @@ TryLightningStrikeSFX:
 WriteNoiseRTS:
 	jsr WriteNoiseXY
 	rts
-;-----------------------
 
 CheckLightningSFXCountdown:
 	inc LightningSFXTimer
@@ -487,13 +483,11 @@ ClearSFX1Lower:
 	lda SFX1Cur
 	and #$f0
 	sta SFX1Cur
-:	rts
-;-----------------------
+	:rts
 
 WriteNoisePitch:
 	sta NOISE_LO
 	rts
-;-----------------------
 
 PlaySparkBounceSFX:
 	lda #0
@@ -523,9 +517,8 @@ lf8ca:
 	and #$0f
 	sta SFX1Cur
 	rts
-;-----------------------
 
-lf8dd:
+PlayShocked:
 	jsr InitAllSoundMemory
 	lda #$80
 	sta SFX1Cur
@@ -544,7 +537,6 @@ lf8e8:
 	and #$0f
 	sta SQ2_LO
 	rts
-;-----------------------
 
 lf907:
 	jmp PlaySparkBounceSFX
@@ -561,11 +553,11 @@ lf90a:
 lf91b:
 	lda SFX1Req
 	asl
-	bcs lf8dd
+	bcs PlayShocked
 	asl
-	bcs lf952
+	bcs PlaySplash
 	asl
-	bcs lf965
+	bcs PlayFalling
 	lda SFX1Cur
 	asl
 	bcs lf8e8
@@ -589,12 +581,11 @@ lf91b:
 	bcs lf993
 lf94b:
 	jsr lf725
-:	rts
-;-----------------------
+	:rts
 
 lf94f:
 	jmp lf8bf
-lf952:
+PlaySplash:
 	lda #$0f
 	sta SplashSFXPhase
 	lda SFX1Cur
@@ -603,14 +594,15 @@ lf952:
 	sta SFX1Cur
 	ldxy lf9d1
 	bne lf98f
-lf965:
-	lda #2
-	sta SFX1Req
-	lda SFX1Cur
-	and #$0f
-	ora #$20
-	sta SFX1Cur
-	ldxy lf9cd
+
+PlayFalling:
+	lda #2		; \ Also request pop sfx
+	sta SFX1Req	; /
+	lda SFX1Cur	; \
+	and #$0f	; | Preserve End SFX, Pop, Lightning Strike, and Player Footstep
+	ora #$20	; | Add in Falling to current SFX1
+	sta SFX1Cur	; /
+	ldxy FallingSq1
 	bne lf98f
 lf977:
 	lda #0
@@ -625,7 +617,6 @@ lf977:
 lf98f:
 	jsr WriteSq1XY
 	rts
-;-----------------------
 
 lf993:
 	inc ChompSFXTimer
@@ -652,26 +643,24 @@ lf9bd:
 	lda FishChompPitchSq1
 	sta SQ1_LO
 	rts
-;-----------------------
 
 lf9ca:
 	jmp lf8ca
-    ;28 bytes
 
-lf9cd:
-.BYTE $b8,$d5,$20,$00
+FallingSq1:
+	.BYTE $b8,$d5,$20,$00
 lf9d1:
-.BYTE $9f,$93,$80,$22
+	.BYTE $9f,$93,$80,$22
 lf9d5:
-.BYTE $3f,$ba,$e0,$06
+	.BYTE $3f,$ba,$e0,$06
 lf9d9:
-.BYTE $3f,$bb,$ce,$06
+	.BYTE $3f,$bb,$ce,$06
 lf9dd:
-.BYTE $b8,$93,$50,$02
+	.BYTE $b8,$93,$50,$02
 lf9e1:
-.BYTE $80,$7f,$60,$68
+	.BYTE $80,$7f,$60,$68
 lf9e5:
-.BYTE $80,$7f,$62,$68
+	.BYTE $80,$7f,$62,$68
 
 lf9e9:
 	lda SFX2Cur
@@ -703,8 +692,7 @@ lfa0c:
 	lda SFX2Cur
 	and #$e0
 	sta SFX2Cur
-:	rts
-;-----------------------
+	:rts
 
 lfa27:
 	jsr InitAllSoundMemory
@@ -731,14 +719,13 @@ lfa42:
 	lsr
 	bcs lf9e9
 	lsr
-	bcs lfa83
+	bcs PlayBubbleCollect
 	lsrr 2
 	bcs lfa64
 	lda SFX2Cur
 	lsrr 2
 	bcs lfa0c
-:	rts
-;-----------------------
+	:rts
 
 lfa64:
 	lda MusicCur
@@ -746,31 +733,29 @@ lfa64:
 	lda SFX2Cur
 	and #2
 	bne :-
-	ldxy TweetSFXBase
+	ldxy TweetSq2Base
 	jsr WriteSq2
 	lda RNGOutput
 	and #$3f
 	ora #$10
 	sta SQ2_LO
 	rts
-;-----------------------
 
 lfa7f:
 	jsr WriteSq2
 	rts
-;-----------------------
 
-lfa83:
-	ldy #$0a
+PlayBubbleCollect:
+	ldy #10
 	lda #$ef
 	jmp lfba5
 
-TweetSFXBase:
-.BYTE $d9,$86,$a8,$48
+TweetSq2Base:
+	.BYTE $d9,$86,$a8,$48
 EnemyLandTri1:
-.BYTE $08,$7f,$40,$28
+	.BYTE $08,$7f,$40,$28
 EnemyLandTri2:
-.BYTE $08,$7f,$45,$28
+	.BYTE $08,$7f,$45,$28
 
 lfa96:
 	inc EnemyLandSFXTimer
@@ -796,7 +781,7 @@ ContinueSFX2Check:
 	bne :+
 	lda SFX2Req
 	asl
-	bcs lfb17
+	bcs PlayEnemyDown
 	asl
 	bcs EnemyLandingSFX
 	lda SFX2Cur
@@ -806,9 +791,8 @@ ContinueSFX2Check:
 	and #$20
 	beq lfad9
 	lda MusicCur
-	beq lfb04
-:	rts
-;-----------------------
+	beq PlayParachuting
+	:rts
 
 lfad9:
 	lda MusicCur
@@ -831,90 +815,88 @@ EnemyLandingSFX:
 WriteTriRTS:
 	jsr WriteTriXY
 	rts
-;-----------------------
 
-lfb04:
+PlayParachuting:	; Sequenced SFX: Parachuting
 	lda LastSFX2Req
 	and #$20
-	bne lfb10
+	bne @SkipPopReq
 	lda #2
 	sta PopParachuteReq
-lfb10:
+	@SkipPopReq:
 	ldy #$08
 	lda #$df
 	jmp lfba5
 
-lfb17:
-	ldy #$04
+PlayEnemyDown:	; Sequenced SFX: Enemy Down
+	ldy #4
 	lda #$7f
 	jmp lfba5
 
-lfb1e:		; Music/Jingle: Stage Clear
-	ldy #$00
+PlayPhaseClear:		; Music/Jingle: Stage Clear
+	ldy #0
 	lda #$02
 	jmp lfbc1
 
-lfb25_music:
+ManageMusic:
 	lda TripMusicFlag	; \ Play Balloon Trip Music
-	bne lfb5e			; /
+	bne PlayBonusTrip	; /
 	lda MusicReq		; \ Play Music/Jingle:
 	lsr					; |
-	bcs lfb82			; | #$01 = Game Over
+	bcs PlayGameOver	; | #$01 = Game Over
 	lsr					; |
-	bcs lfb1e			; | #$02 = Stage Clear
+	bcs PlayPhaseClear	; | #$02 = Stage Clear
 	lsr					; |
-	bcs lfb4c			; | #$04 = Pause
+	bcs PlayPause		; | #$04 = Pause
 	lsr					; |
-	bcs lfb7c			; | #$08 = Stage Start
+	bcs PlayNewStart	; | #$08 = Stage Start
 	lsr					; |
-	bcs lfb69			; | #$10 = Bonus Phase Perfect
+	bcs PlaySuperBonus	; | #$10 = Bonus Phase Perfect
 	lsr					; |
-	bcs lfb5e			; | #$20 = Balloon Trip / Bonus Phase Music
+	bcs PlayBonusTrip	; | #$20 = Balloon Trip / Bonus Phase Music
 	lsr					; |
-	bcs lfb58			; | #$40 = Fish
+	bcs PlayEatenByFish	; | #$40 = Fish
 	lsr					; |
-	bcs lfb52			; / #$80 = Respawn
-	lda MusicCur	; \
-	bne lfb49		; / Current Music/Jingle
-	rts
-;-----------------------
-
-lfb49:
+	bcs PlayRespawn		; / #$80 = Respawn
+	lda MusicCur			; \ If no new requests, and music is playing,
+	bne ContinueMusicUpdate	; / Continue current Music/Jingle
+	rts	; Return if no music was requested & none is playing
+ContinueMusicUpdate:
 	jmp ContinuePlayingMusic
 
-lfb4c:		; Music/Jingle: Pause
-	ldy #$02
+PlayPause:
+	ldy #2
 	lda #$04
 	bne lfba5
-lfb52:		; Music/Jingle: Respawn
-	ldy #$09
+PlayRespawn:
+	ldy #9
 	lda #$80
 	bne lfb6d
-lfb58:		; Music/Jingle: Fish
-	ldy #$07
+PlayEatenByFish:
+	ldy #7
 	lda #$40
 	bne lfb6d
-lfb5e:		; Music/Jingle: Balloon Trip / Bonus Game
-	lda #$00
+PlayBonusTrip:	; Balloon Trip / Bonus Phase
+	lda #0
 	sta TripMusicFlag
-	ldy #$06
+	ldy #6
 	lda #$20
 	bne lfbc1
-lfb69:		; Music/Jingle: Bonus Game Perfect
-	ldy #$05
+PlaySuperBonus:		; Music/Jingle: Bonus Game Perfect
+	ldy #5
 	lda #$10
 lfb6d:
 	jsr LoadSoundSequence
 	ldxy lfcfc
 	jsr ClearSquareSweeps
 	inc UnknownSoundFlag
-	bne lfb49
-lfb7c:		; Music/Jingle: Stage Start
-	ldy #$03
+	bne ContinueMusicUpdate
+PlayNewStart:
+	ldy #3
 	lda #$08
 	bne lfb86
-lfb82:		; Music/Jingle: Game Over
-	ldy #$01
+	
+PlayGameOver:
+	ldy #1
 	lda #$01
 lfb86:
 	jsr LoadSoundSequence
@@ -942,10 +924,10 @@ lfbaf:
 	sta UnknownSoundFlag
 	lda SFX1Cur
 	and #$20
-	beq lfb49
+	beq ContinueMusicUpdate
 	lda #$d5
 	sta SQ1_SWEEP
-	bne lfb49
+	bne ContinueMusicUpdate
 lfbc1:
 	jsr LoadSoundSequence
 	ldx #$80
@@ -957,328 +939,343 @@ lfbc1:
 ;----------------------
 
 MusicTrackInitData: ;Music Track Init Data
-.BYTE $0b,$14,$1d,$26,$2f,$38,$41,$4a,$53,$5c,$65
-lfbd5: ;Phase Clear Music Init Data
-.BYTE $0c
-.WORD lff02,lff0b,lff1e,lff31
-lfbde: ;Game Over Music Init Data
-.BYTE $15
-.WORD lfe18,lfe2a,lfe65,lfe86
-lfbe7: ;Pause Music Init Data
-.BYTE $0c
-.WORD lfe0d,$0000,lfe13,$0000
-lfbf0: ;New Start Music Init Data
-.BYTE $15
-.WORD lff38,lff5a,lff79,lff94
-lfbf9: ;Enemy Down Music Init Data
-.BYTE $00
-.WORD $0000,lfed7,lfeed,$0000
-lfc02: ;Super Bonus Music Init Data
-.BYTE $00
-.WORD lffb3,lffc9,lffda,lffef
-lfc0b: ;Bonus Trip Music Init Data
-.BYTE $15
-.WORD lfca5,lfd0a,lfd98,lfde0
-lfc14: ;Eaten By Fish Music Init Data
-.BYTE $15
-.WORD lfeb2,$0000,lfec5,$0000
-lfc1d: ;Parachute Music Init Data
-.BYTE $15
-.WORD $0000,lfe92,lfea1,$0000
-lfc26: ;Respawn Music Init Data
-.BYTE $0c
-.WORD lfc59,lfc72,lfc8c,$0000
-lfc2f: ;Bubble Collect Music Init Data
-.BYTE $00
-.WORD $0000,lfc38,lfc49,$0000
+	; Offsets to each track's init data
+		.BYTE PhaseClearInitData - MusicTrackInitData
+		.BYTE GameOverInitData - MusicTrackInitData
+		.BYTE PauseInitData - MusicTrackInitData
+		.BYTE NewStartInitData - MusicTrackInitData
+		.BYTE EnemyDownInitData - MusicTrackInitData
+		.BYTE SuperBonusInitData - MusicTrackInitData
+		.BYTE BonusTripInitData - MusicTrackInitData
+		.BYTE EatenByFishInitData - MusicTrackInitData
+		.BYTE ParachuteInitData - MusicTrackInitData
+		.BYTE RespawnInitData - MusicTrackInitData
+		.BYTE BubbleCollectInitData - MusicTrackInitData
 
-lfc38:
-.BYTE $82,$02,$8b,$02
-.BYTE $80,$08,$02,$10
-.BYTE $02,$16,$02,$52
-.BYTE $02,$02,$02,$1a
-.BYTE $00
-lfc49:
-.BYTE $82,$02,$80,$10
-.BYTE $02,$16,$02,$52
-.BYTE $02,$5a,$02,$02
-.BYTE $02,$56,$81,$02
-lfc59:
-.BYTE $80,$12,$02,$0c
-.BYTE $02,$04,$02,$0c
-.BYTE $02,$04,$02,$2a
-.BYTE $02,$81,$04,$02
-.BYTE $80,$04,$02,$81
-.BYTE $04,$88,$02,$02
-.BYTE $00
-lfc72:
-.BYTE $88,$02,$02,$80
-.BYTE $04,$02,$2a,$02
-.BYTE $24,$02,$2a,$02
-.BYTE $24,$02,$1c,$02
-.BYTE $81,$22,$02,$80
-.BYTE $22,$02,$81,$24
-.BYTE $88,$02
-lfc8c:
-.BYTE $88,$02,$80,$56
-.BYTE $02,$4e,$02,$12
-.BYTE $02,$4e,$02,$12
-.BYTE $02,$0c,$02,$81
+	PhaseClearInitData: ;Phase Clear Music Init Data
+		.BYTE 12
+		.WORD PhaseClearSq1,PhaseClearSq2,PhaseClearTri,PhaseClearNoise
+	GameOverInitData: ;Game Over Music Init Data
+		.BYTE 21
+		.WORD GameOverSq1,GameOverSq2,GameOverTri,GameOverNoise
+	PauseInitData: ;Pause Music Init Data
+		.BYTE 12
+		.WORD PauseSq1,$0000,PauseTri,$0000
+	NewStartInitData: ;New Start Music Init Data
+		.BYTE 21
+		.WORD NewStartSq1,NewStartSq2,NewStartTri,NewStartNoise
+	EnemyDownInitData: ;Enemy Down Music Init Data
+		.BYTE 0
+		.WORD $0000,EnemyDownSq2,EnemyDownTri,$0000
+	SuperBonusInitData: ;Super Bonus Music Init Data
+		.BYTE 0
+		.WORD SuperBonusSq1,SuperBonusSq2,SuperBonusTri,SuperBonusNoise
+	BonusTripInitData: ;Bonus Trip Music Init Data
+		.BYTE 21
+		.WORD BonusTripSq1,BonusTripSq2,BonusTripTri,BonusTripNoise
+	EatenByFishInitData: ;Eaten By Fish Music Init Data
+		.BYTE 21
+		.WORD EatenByFishSq1,$0000,EatenByFishTri,$0000
+	ParachuteInitData: ;Parachute Music Init Data
+		.BYTE 21
+		.WORD $0000,ParachuteSq2,ParachuteTri,$0000
+	RespawnInitData: ;Respawn Music Init Data
+		.BYTE 12
+		.WORD RespawnSq1,RespawnSq2,RespawnTri,$0000
+	BubbleCollectInitData: ;Bubble Collect Music Init Data
+		.BYTE 0
+		.WORD $0000,BubbleCollectSq2,BubbleCollectTri,$0000
 
-.BYTE $10,$02,$80,$10
-.BYTE $02,$81,$12,$88
-.BYTE $02
-lfca5:
-.BYTE $c3,$81,$02,$02
-.BYTE $1c,$02,$02,$02
-.BYTE $1c,$1c,$ff,$c6
-.BYTE $88,$1c,$ff,$c7
-.BYTE $82,$4c,$4c,$2a
-.BYTE $4c,$ff,$c6,$88
-.BYTE $1c,$ff,$c4,$81
-.BYTE $46,$02,$46,$02
-.BYTE $32,$02,$46,$80
-.BYTE $2e,$2e,$ff,$c3
-.BYTE $82,$46,$46,$81
-.BYTE $32,$32,$46,$2e
-.BYTE $ff,$80,$0c,$0c
-.BYTE $81,$46,$46,$46
-.BYTE $80,$04,$04,$81
-.BYTE $46,$46,$02,$c8
-.BYTE $82,$4c,$4c,$2a
-.BYTE $4c,$ff,$c2,$81
-.BYTE $46,$80,$32,$32
-.BYTE $82,$46,$04,$81
-.BYTE $46,$2a,$ff,$c2
-.BYTE $81,$0c,$0c
+BubbleCollectSq2:
+	.BYTE $82,$02,$8b,$02
+	.BYTE $80,$08,$02,$10
+	.BYTE $02,$16,$02,$52
+	.BYTE $02,$02,$02,$1a
+	.BYTE $00
+BubbleCollectTri:
+	.BYTE $82,$02,$80,$10
+	.BYTE $02,$16,$02,$52
+	.BYTE $02,$5a,$02,$02
+	.BYTE $02,$56,$81,$02
+RespawnSq1:
+	.BYTE $80,$12,$02,$0c
+	.BYTE $02,$04,$02,$0c
+	.BYTE $02,$04,$02,$2a
+	.BYTE $02,$81,$04,$02
+	.BYTE $80,$04,$02,$81
+	.BYTE $04,$88,$02,$02
+	.BYTE $00
+RespawnSq2:
+	.BYTE $88,$02,$02,$80
+	.BYTE $04,$02,$2a,$02
+	.BYTE $24,$02,$2a,$02
+	.BYTE $24,$02,$1c,$02
+	.BYTE $81,$22,$02,$80
+	.BYTE $22,$02,$81,$24
+	.BYTE $88,$02
+RespawnTri:
+	.BYTE $88,$02,$80,$56
+	.BYTE $02,$4e,$02,$12
+	.BYTE $02,$4e,$02,$12
+	.BYTE $02,$0c,$02,$81
+	.BYTE $10,$02,$80,$10
+	.BYTE $02,$81,$12,$88
+	.BYTE $02
+BonusTripSq1:
+	.BYTE $c3,$81,$02,$02
+	.BYTE $1c,$02,$02,$02
+	.BYTE $1c,$1c,$ff,$c6
+	.BYTE $88,$1c,$ff,$c7
+	.BYTE $82,$4c,$4c,$2a
+	.BYTE $4c,$ff,$c6,$88
+	.BYTE $1c,$ff,$c4,$81
+	.BYTE $46,$02,$46,$02
+	.BYTE $32,$02,$46,$80
+	.BYTE $2e,$2e,$ff,$c3
+	.BYTE $82,$46,$46,$81
+	.BYTE $32,$32,$46,$2e
+	.BYTE $ff,$80,$0c,$0c
+	.BYTE $81,$46,$46,$46
+	.BYTE $80,$04,$04,$81
+	.BYTE $46,$46,$02,$c8
+	.BYTE $82,$4c,$4c,$2a
+	.BYTE $4c,$ff,$c2,$81
+	.BYTE $46,$80,$32,$32
+	.BYTE $82,$46,$04,$81
+	.BYTE $46,$2a,$ff,$c2
+	.BYTE $81,$0c,$0c
 lfcfc:
-.BYTE $80,$04,$04,$81
-.BYTE $04,$80,$2e,$2e
-.BYTE $81,$2e,$82,$24
-.BYTE $ff,$00
-lfd0a:
-.BYTE $81,$32,$02,$02
-.BYTE $06,$0c,$32,$02
-.BYTE $02,$8a,$2e,$8b
-.BYTE $02,$8a,$2e,$8b
-.BYTE $02,$8a,$2e,$8b
-.BYTE $02,$88,$2e,$32
-.BYTE $2e,$d0,$8c,$2c
-.BYTE $24,$ff,$d0,$2e
-.BYTE $20,$ff,$c3,$80
-.BYTE $28,$02,$82,$02
-.BYTE $80,$2c,$02,$32
-.BYTE $02,$24,$02,$82
-.BYTE $02,$81,$02,$80
-.BYTE $28,$02,$06,$02
-.BYTE $28,$02,$81,$02
-.BYTE $80,$24,$02,$32
-.BYTE $02,$24,$02,$ff
-.BYTE $80,$28,$02,$82
-.BYTE $02,$80,$2c,$02
-.BYTE $32,$02,$24,$02
-.BYTE $82,$02,$89,$0c
-.BYTE $0a,$08,$06,$32
-.BYTE $30,$2e,$2c,$2a
-.BYTE $28,$26,$24,$02
-.BYTE $02,$02,$86,$02
-.BYTE $c7,$84,$02,$ff
-.BYTE $c4,$80,$28,$02
-.BYTE $82,$02,$80,$2c
-.BYTE $02,$32,$02,$24
-.BYTE $02,$82,$02,$81
-.BYTE $02,$80,$28,$02
-.BYTE $06,$02,$28,$02
-.BYTE $81,$02,$80,$24
-.BYTE $02,$32,$02,$24
-.BYTE $02,$ff,$c8,$84
-.BYTE $02,$ff
-lfd98:
-.BYTE $81,$14,$02,$02
-.BYTE $14,$1a,$14,$02
-.BYTE $02,$88,$10,$10
-.BYTE $10,$10,$14,$10
-.BYTE $85,$3c,$81,$44
-.BYTE $85,$4a,$81,$44
-.BYTE $88,$28,$24,$20
-.BYTE $46,$42,$40,$c6
-.BYTE $81,$3c,$02,$02
-.BYTE $44,$02,$02,$02
-.BYTE $4a,$02,$46,$36
-.BYTE $36,$38,$38,$02
-.BYTE $3a,$02,$80,$3c
-.BYTE $3c,$81,$02,$24
-.BYTE $02,$02,$2c,$24
-.BYTE $88,$24,$1e,$46
-.BYTE $36,$38,$3a,$ff
-.BYTE $c4,$84,$02,$ff
-lfde0:
-.BYTE $d8,$81,$06,$ff
-.BYTE $c6,$88,$06,$ff
-.BYTE $c7,$81,$06,$06
-.BYTE $80,$06,$06,$81
-.BYTE $06,$06,$80,$06
-.BYTE $06,$81,$06,$06
-.BYTE $ff,$c6,$88,$06
-.BYTE $ff,$e0,$81,$06
-.BYTE $06,$ff,$82,$0f
-.BYTE $81,$06,$06,$ea
-.BYTE $06,$06,$06,$06
-.BYTE $ff
-lfe0d:
-.BYTE $c5,$80,$0e,$58,$ff,$00
-lfe13:
-.BYTE $c5,$80,$0e,$58,$ff
-lfe18:
-.BYTE $82,$1c,$1c,$c3
-.BYTE $82,$1c,$1c,$81
-.BYTE $1c,$1c,$1c,$02
-.BYTE $ff,$c7,$88,$1c
-.BYTE $ff,$00
-lfe2a:
-.BYTE $83,$02,$80,$0e
-.BYTE $02,$0e,$02,$0c
-.BYTE $02,$0e,$02,$4e
-.BYTE $02,$02,$02,$0e
-.BYTE $02,$0c,$02,$02
-.BYTE $02,$0e,$02,$0c
-.BYTE $02,$0e,$02,$4e
-.BYTE $02,$02,$02,$0e
-.BYTE $02,$0c,$02,$0e
-.BYTE $02,$0e,$02,$0c
-.BYTE $02,$0e,$02,$4e
-.BYTE $02,$02,$02,$0e
-.BYTE $02,$0c,$02,$88
-.BYTE $4e,$18,$16,$12
-.BYTE $0e,$0c,$0e
-lfe65:
-.BYTE $83,$02,$81,$3e
-.BYTE $3e,$82,$46,$1c
-.BYTE $46,$81,$02,$38
-.BYTE $3e,$02,$82,$46
-.BYTE $1c,$82,$48,$48
-.BYTE $81,$3e,$3e,$82
-.BYTE $38,$88,$24,$20
-.BYTE $1c,$48,$46,$42
-.BYTE $3e
-lfe86:
-.BYTE $82,$09,$09
-.BYTE $c6,$82,$03,$0c
-.BYTE $ff,$c6,$88,$06
-.BYTE $ff
-lfe92:
-.BYTE $ed,$89,$2a,$02
-.BYTE $04,$0c,$02,$04
-.BYTE $08,$02,$30,$26
-.BYTE $02,$30,$ff
-lfea1:
-.BYTE $80,$02,$ed,$89
-.BYTE $0c,$02,$12,$4e
-.BYTE $02,$12,$18,$02
-.BYTE $0e,$08,$02,$0e
-.BYTE $ff
-lfeb2:
-.BYTE $80,$42,$02,$48
-.BYTE $02,$1e,$02,$24
-.BYTE $02,$02,$02,$2a
-.BYTE $02,$c6,$8c,$30
-.BYTE $2a,$ff,$00
-lfec5:
-.BYTE $80,$24,$02,$2a
-.BYTE $02,$30,$02,$06
-.BYTE $02,$02,$02,$0c
-.BYTE $02,$c6,$8c,$12
-.BYTE $18,$ff
-lfed7:
-.BYTE $80,$56,$54,$52
-.BYTE $50,$81,$02,$80
-.BYTE $5e,$5a,$54,$50
-.BYTE $18,$14,$10,$0a
-.BYTE $06,$30,$2c,$28
-.BYTE $02,$00
-lfeed:
-.BYTE $80,$1a,$18,$16
-.BYTE $14,$81,$02,$80
-.BYTE $02,$5e,$5a,$54
-.BYTE $50,$18,$14,$10
-.BYTE $0a,$06,$30,$2c
-.BYTE $28
-lff02:
-.BYTE $82,$1c,$02,$1c
-.BYTE $02,$02,$1c,$1c,$00
-lff0b:
-.BYTE $81,$10,$0a,$32
-.BYTE $28,$80,$32,$02
-.BYTE $32,$02,$82,$32
-.BYTE $81,$06,$02,$06
-.BYTE $02,$82,$32
-lff1e:
-.BYTE $81,$54,$1a,$10
-.BYTE $0a,$80,$10,$02
-.BYTE $10,$02,$82,$10
-.BYTE $81,$16,$02,$16
-.BYTE $02,$82,$0a
-lff31:
-.BYTE $83,$03,$0c,$82
-.BYTE $03,$0c,$0c
-lff38:
-.BYTE $c2,$88,$1c,$1c
-.BYTE $1c,$1c,$1c,$1c
-.BYTE $83,$1c,$80,$04
-.BYTE $04,$2a,$02,$82
-.BYTE $1c,$ff,$81,$4c
-.BYTE $02,$4c,$02,$2a
-.BYTE $02,$4c,$1c,$81
-.BYTE $4c,$02,$4c,$02
-.BYTE $4c,$00
-lff5a:
-.BYTE $88,$2e,$2e,$2e
-.BYTE $30,$04,$30,$c4
-.BYTE $80,$2e,$04,$ff
-.BYTE $83,$02,$88,$2e
-.BYTE $2e,$2e,$30,$04
-.BYTE $30,$c4,$80,$2e
-.BYTE $04,$ff,$83,$02
-.BYTE $84,$02,$02
-lff79:
-.BYTE $c2,$88,$3e,$3e
-.BYTE $3e,$42,$46,$42
-.BYTE $84,$3e,$ff,$85
-.BYTE $3e,$81,$3e,$88
-.BYTE $1c,$46,$1c,$81
-.BYTE $02,$3e,$3e,$3e
-.BYTE $82,$34,$02
-lff94:
-.BYTE $c2,$88,$06,$06
-.BYTE $06,$06,$06,$06
-.BYTE $82,$06,$06,$06
-.BYTE $06,$ff,$c2,$81
-.BYTE $06,$06,$80,$06
-.BYTE $06,$81,$06,$06
-.BYTE $06,$06,$80,$06
-.BYTE $06,$ff,$09
-lffb3:
-.BYTE $80,$10,$02,$10
-.BYTE $02,$10,$02,$0c
-.BYTE $0c,$0c,$02,$0c
-.BYTE $02,$14,$14,$14
-.BYTE $02,$14,$02,$85
-.BYTE $10,$00
-lffc9:
-.BYTE $80,$32,$02,$32
-.BYTE $02,$32,$02,$c2
-.BYTE $32,$32,$32,$02
-.BYTE $32,$02,$ff,$85
-.BYTE $32
-lffda:
-.BYTE $80,$54,$02,$54
-.BYTE $02,$54,$02,$50
-.BYTE $50,$50,$02,$50
-.BYTE $02,$56,$56,$56
-.BYTE $02,$56,$02,$85
-.BYTE $54
-lffef:
-.BYTE $c4,$85,$0c,$ff
-.BYTE $ff,$ff,$ff,$ff
+	.BYTE $80,$04,$04,$81
+	.BYTE $04,$80,$2e,$2e
+	.BYTE $81,$2e,$82,$24
+	.BYTE $ff,$00
+BonusTripSq2:
+	.BYTE $81,$32,$02,$02
+	.BYTE $06,$0c,$32,$02
+	.BYTE $02,$8a,$2e,$8b
+	.BYTE $02,$8a,$2e,$8b
+	.BYTE $02,$8a,$2e,$8b
+	.BYTE $02,$88,$2e,$32
+	.BYTE $2e,$d0,$8c,$2c,$24,$ff
+	.BYTE $d0,$2e,$20,$ff
+	.BYTE $c3
+	.BYTE $80,$28,$02,$82
+	.BYTE $02,$80,$2c,$02
+	.BYTE $32,$02,$24,$02
+	.BYTE $82,$02,$81,$02
+	.BYTE $80,$28,$02,$06
+	.BYTE $02,$28,$02,$81
+	.BYTE $02,$80,$24,$02
+	.BYTE $32,$02,$24,$02,$ff
+	.BYTE $80,$28,$02,$82
+	.BYTE $02,$80,$2c,$02
+	.BYTE $32,$02,$24,$02
+	.BYTE $82,$02,$89,$0c
+	.BYTE $0a,$08,$06,$32
+	.BYTE $30,$2e,$2c,$2a
+	.BYTE $28,$26,$24,$02
+	.BYTE $02,$02,$86,$02
+	.BYTE $c7
+	.BYTE $84,$02,$ff
+	.BYTE $c4
+	.BYTE $80,$28,$02,$82
+	.BYTE $02,$80,$2c,$02
+	.BYTE $32,$02,$24,$02
+	.BYTE $82,$02,$81,$02
+	.BYTE $80,$28,$02,$06
+	.BYTE $02,$28,$02,$81
+	.BYTE $02,$80,$24,$02
+	.BYTE $32,$02,$24,$02,$ff
+	.BYTE $c8
+	.BYTE $84,$02,$ff
+BonusTripTri:
+	.BYTE $81,$14,$02,$02
+	.BYTE $14,$1a,$14,$02
+	.BYTE $02,$88,$10,$10
+	.BYTE $10,$10,$14,$10
+	.BYTE $85,$3c,$81,$44
+	.BYTE $85,$4a,$81,$44
+	.BYTE $88,$28,$24,$20
+	.BYTE $46,$42,$40,$c6
+	.BYTE $81,$3c,$02,$02
+	.BYTE $44,$02,$02,$02
+	.BYTE $4a,$02,$46,$36
+	.BYTE $36,$38,$38,$02
+	.BYTE $3a,$02,$80,$3c
+	.BYTE $3c,$81,$02,$24
+	.BYTE $02,$02,$2c,$24
+	.BYTE $88,$24,$1e,$46
+	.BYTE $36,$38,$3a,$ff
+	.BYTE $c4
+	.BYTE $84,$02,$ff
+BonusTripNoise:
+	.BYTE $d8,$81,$06,$ff
+	.BYTE $c6,$88,$06,$ff
+	.BYTE $c7,$81,$06,$06
+	.BYTE $80,$06,$06,$81
+	.BYTE $06,$06,$80,$06
+	.BYTE $06,$81,$06,$06
+	.BYTE $ff,$c6,$88,$06
+	.BYTE $ff,$e0,$81,$06
+	.BYTE $06,$ff,$82,$0f
+	.BYTE $81,$06,$06,$ea
+	.BYTE $06,$06,$06,$06
+	.BYTE $ff
+PauseSq1:
+	.BYTE $c5,$80,$0e,$58,$ff,$00
+PauseTri:
+	.BYTE $c5,$80,$0e,$58,$ff
+GameOverSq1:
+	.BYTE $82,$1c,$1c,$c3
+	.BYTE $82,$1c,$1c,$81
+	.BYTE $1c,$1c,$1c,$02
+	.BYTE $ff,$c7,$88,$1c
+	.BYTE $ff,$00
+GameOverSq2:
+	.BYTE $83,$02,$80,$0e
+	.BYTE $02,$0e,$02,$0c
+	.BYTE $02,$0e,$02,$4e
+	.BYTE $02,$02,$02,$0e
+	.BYTE $02,$0c,$02,$02
+	.BYTE $02,$0e,$02,$0c
+	.BYTE $02,$0e,$02,$4e
+	.BYTE $02,$02,$02,$0e
+	.BYTE $02,$0c,$02,$0e
+	.BYTE $02,$0e,$02,$0c
+	.BYTE $02,$0e,$02,$4e
+	.BYTE $02,$02,$02,$0e
+	.BYTE $02,$0c,$02,$88
+	.BYTE $4e,$18,$16,$12
+	.BYTE $0e,$0c,$0e
+GameOverTri:
+	.BYTE $83,$02,$81,$3e
+	.BYTE $3e,$82,$46,$1c
+	.BYTE $46,$81,$02,$38
+	.BYTE $3e,$02,$82,$46
+	.BYTE $1c,$82,$48,$48
+	.BYTE $81,$3e,$3e,$82
+	.BYTE $38,$88,$24,$20
+	.BYTE $1c,$48,$46,$42
+	.BYTE $3e
+GameOverNoise:
+	.BYTE $82,$09,$09
+	.BYTE $c6,$82,$03,$0c
+	.BYTE $ff,$c6,$88,$06
+	.BYTE $ff
+ParachuteSq2:
+	.BYTE $ed,$89,$2a,$02
+	.BYTE $04,$0c,$02,$04
+	.BYTE $08,$02,$30,$26
+	.BYTE $02,$30,$ff
+ParachuteTri:
+	.BYTE $80,$02,$ed,$89
+	.BYTE $0c,$02,$12,$4e
+	.BYTE $02,$12,$18,$02
+	.BYTE $0e,$08,$02,$0e
+	.BYTE $ff
+EatenByFishSq1:
+	.BYTE $80,$42,$02,$48
+	.BYTE $02,$1e,$02,$24
+	.BYTE $02,$02,$02,$2a
+	.BYTE $02,$c6,$8c,$30
+	.BYTE $2a,$ff,$00
+EatenByFishTri:
+	.BYTE $80,$24,$02,$2a
+	.BYTE $02,$30,$02,$06
+	.BYTE $02,$02,$02,$0c
+	.BYTE $02,$c6,$8c,$12
+	.BYTE $18,$ff
+EnemyDownSq2:
+	.BYTE $80,$56,$54,$52
+	.BYTE $50,$81,$02,$80
+	.BYTE $5e,$5a,$54,$50
+	.BYTE $18,$14,$10,$0a
+	.BYTE $06,$30,$2c,$28
+	.BYTE $02,$00
+EnemyDownTri:
+	.BYTE $80,$1a,$18,$16
+	.BYTE $14,$81,$02,$80
+	.BYTE $02,$5e,$5a,$54
+	.BYTE $50,$18,$14,$10
+	.BYTE $0a,$06,$30,$2c
+	.BYTE $28
+PhaseClearSq1:
+	.BYTE $82,$1c,$02,$1c
+	.BYTE $02,$02,$1c,$1c,$00
+PhaseClearSq2:
+	.BYTE $81,$10,$0a,$32
+	.BYTE $28,$80,$32,$02
+	.BYTE $32,$02,$82,$32
+	.BYTE $81,$06,$02,$06
+	.BYTE $02,$82,$32
+PhaseClearTri:
+	.BYTE $81,$54,$1a,$10
+	.BYTE $0a,$80,$10,$02
+	.BYTE $10,$02,$82,$10
+	.BYTE $81,$16,$02,$16
+	.BYTE $02,$82,$0a
+PhaseClearNoise:
+	.BYTE $83,$03,$0c,$82
+	.BYTE $03,$0c,$0c
+NewStartSq1:
+	.BYTE $c2,$88,$1c,$1c
+	.BYTE $1c,$1c,$1c,$1c
+	.BYTE $83,$1c,$80,$04
+	.BYTE $04,$2a,$02,$82
+	.BYTE $1c,$ff,$81,$4c
+	.BYTE $02,$4c,$02,$2a
+	.BYTE $02,$4c,$1c,$81
+	.BYTE $4c,$02,$4c,$02
+	.BYTE $4c,$00
+NewStartSq2:
+	.BYTE $88,$2e,$2e,$2e
+	.BYTE $30,$04,$30,$c4
+	.BYTE $80,$2e,$04,$ff
+	.BYTE $83,$02,$88,$2e
+	.BYTE $2e,$2e,$30,$04
+	.BYTE $30,$c4,$80,$2e
+	.BYTE $04,$ff,$83,$02
+	.BYTE $84,$02,$02
+NewStartTri:
+	.BYTE $c2,$88,$3e,$3e
+	.BYTE $3e,$42,$46,$42
+	.BYTE $84,$3e,$ff,$85
+	.BYTE $3e,$81,$3e,$88
+	.BYTE $1c,$46,$1c,$81
+	.BYTE $02,$3e,$3e,$3e
+	.BYTE $82,$34,$02
+NewStartNoise:
+	.BYTE $c2,$88,$06,$06
+	.BYTE $06,$06,$06,$06
+	.BYTE $82,$06,$06,$06
+	.BYTE $06,$ff,$c2,$81
+	.BYTE $06,$06,$80,$06
+	.BYTE $06,$81,$06,$06
+	.BYTE $06,$06,$80,$06
+	.BYTE $06,$ff,$09
+SuperBonusSq1:
+	.BYTE $80,$10,$02,$10
+	.BYTE $02,$10,$02,$0c
+	.BYTE $0c,$0c,$02,$0c
+	.BYTE $02,$14,$14,$14
+	.BYTE $02,$14,$02,$85
+	.BYTE $10,$00
+SuperBonusSq2:
+	.BYTE $80,$32,$02,$32
+	.BYTE $02,$32,$02,$c2
+	.BYTE $32,$32,$32,$02
+	.BYTE $32,$02,$ff,$85
+	.BYTE $32
+SuperBonusTri:
+	.BYTE $80,$54,$02,$54
+	.BYTE $02,$54,$02,$50
+	.BYTE $50,$50,$02,$50
+	.BYTE $02,$56,$56,$56
+	.BYTE $02,$56,$02,$85
+	.BYTE $54
+SuperBonusNoise:
+	.BYTE $c4,$85,$0c,$ff
+	.BYTE $ff,$ff,$ff,$ff
+
 GotoAudioMain:
 	jmp AudioMain
