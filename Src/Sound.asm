@@ -42,53 +42,53 @@ LoadTrackDataLoop:
 	tay	; Y = New byte from track data
 	cmp #$ff		; \ If byte was $FF, end sub track
 	beq SubTrackEnd	; /
-	and #%11000000			; \
-	cmp #%11000000			; | If uppermost two bits are set,
-	beq SetRemainingLoops	; / Then use byte to set remaining loops
+	and #%11000000		; \
+	cmp #%11000000		; | If uppermost two bits are set,
+	beq StartSubTrack	; / Then start a new sub track
 	jmp ContinueNoteDataCheck	; Otherwise continue checking byte
 
 SubTrackEnd:
-	lda Sq1Unknown3,x
-	beq GetNextTrackData
-	dec Sq1Unknown3,x
-	lda Sq1Unknown4,x
-	sta Sq1TrackOffset,x
-	bne GetNextTrackData
-SetRemainingLoops:
-	tya
-	and #$3f			; \ Lower 6 bits of data byte becomes ???
-	sta Sq1Unknown3,x	; /
-	dec Sq1Unknown3,x
-	lda Sq1TrackOffset,x
-	sta Sq1Unknown4,x
+	lda Sq1SubTrackLoops,x	; \ If no loops remaining, then load next byte insteaad of looping
+	beq GetNextTrackData	; /
+	dec Sq1SubTrackLoops,x	; Decrement remaining loops
+	lda Sq1SubTrackStart,x	; \ Go back to start of sub track
+	sta Sq1TrackOffset,x	; /
+	bne GetNextTrackData	; Load next byte from start of sub track
+StartSubTrack:
+	tya						; \
+	and #$3f				; | (Lower 6 bits of data - 1) byte becomes repeat count
+	sta Sq1SubTrackLoops,x	; |
+	dec Sq1SubTrackLoops,x	; /
+	lda Sq1TrackOffset,x	; \ Set start point of sub track
+	sta Sq1SubTrackStart,x	; /
 GetNextTrackData:
-	jmp LoadTrackDataLoop
+	jmp LoadTrackDataLoop	; Load next byte from data and parse it
 
 ContinueNoteDataCheck:
-	tya
-	bpl NoteDataHas80Set
-	and #$0f
-	cadc TrackTempo
-	tay
-	lda NoteLengthOptions,y
-	sta Sq1NoteLength,x
+	tya	; Load data byte again
+	bpl ByteIsNoteData	; If uppermost bit isn't set, it's a note
+	and #$0f		; \
+	cadc TrackTempo	; | Y = Tempo + Lower 4 bits of data byte
+	tay				; /
+	lda NoteLengthOptions,y	; \ Change next note length
+	sta Sq1NoteLength,x		; /
+	tay	; Y = New note length
+	txa							; \
+	cmp #2						; | If current channel is Triangle ???
+	beq TriangleLengthChange	; /
+LoadByteAfterLengthUpd:
+	ldy Sq1TrackOffset,x	; \
+	inc Sq1TrackOffset,x	; | Increment offset and load next byte
+	lda (CurTrackPointer),y	; / Then immediately parse that note too
+ByteIsNoteData:
 	tay
 	txa
-	cmp #2
-	beq lf5c4
-lf575:
-	ldy Sq1TrackOffset,x
-	inc Sq1TrackOffset,x
-	lda (CurTrackPointer),y
-NoteDataHas80Set:
-	tay
-	txa
-	cmp #3
-	beq lf5e1
+	cmp #3				; \ If current channel is Noise
+	beq PlayNoiseNote	; /
 	pha
 	tax
-	cmp #1
-	beq Sq2BusyCheck
+	cmp #1				; \ If current channel is Square 2, check if it's free
+	beq Sq2BusyCheck	; /
 ChannelIsFree:
 	ldx SoundRegOffset
 	lda lf600+1,y
@@ -115,44 +115,46 @@ SetChannelVolumeContinue:
 	ldy SoundRegOffset
 	sta SQ1_VOL,y
 SetCountdownThenContinue:
-	lda Sq1NoteLength,x
-	sta Sq1Countdown,x
+	lda Sq1NoteLength,x	; \ Set new note's countdown to defined length
+	sta Sq1Countdown,x	; /
 	jmp NextChannel
+
 Sq2BusyCheck:
 	lda SFX2Cur
 	and #2
 	beq ChannelIsFree
 	plx
 	jmp SetCountdownThenContinue
-lf5c4:
+
+TriangleLengthChange:
 	tya
 	ldy UnknownSoundFlag
-	beq lf5ce
+	beq @lf5ce
 	lda #$ff
-	bne lf5d9
-lf5ce:
-	clc
-	adc #$fe
+	bne @SetLinear
+	@lf5ce:
+	cadc #<-2
 	aslr 2
-	cmp #$3c
-	bcc lf5d9
-	lda #$3c
-lf5d9:
+	cmp #$3C		; \
+	bcc @SetLinear	; | Cap at $3C
+	lda #$3C		; /
+	@SetLinear:
 	sta TRI_LINEAR
 	sta $de
-	jmp lf575
-lf5e1:
-	lda SFX1Cur
-	cmp #2
-	beq lf5f9
-	lda lf700,y
-	sta NOISE_VOL
-	lda lf700+1,y
-	sta NOISE_LO
-	lda lf700+2,y
-	sta NOISE_HI
-lf5f9:
-	jmp SetCountdownThenContinue
+	jmp LoadByteAfterLengthUpd
+
+PlayNoiseNote:
+	lda SFX1Cur	; \
+	cmp #2		; | Don't modify if Pop SFX is playing
+	beq @Skip	; /
+	lda NoiseNoteSettings,y		; \
+	sta NOISE_VOL				; |
+	lda NoiseNoteSettings+1,y	; |
+	sta NOISE_LO				; |
+	lda NoiseNoteSettings+2,y	; |
+	sta NOISE_HI				; /
+	@Skip:
+		jmp SetCountdownThenContinue
 
 BubbleRiseSFXSq1:
 	.BYTE $16,$ff,$10,$c5
@@ -173,14 +175,14 @@ lf600:
 
 NoteLengthOptions:
 	; Tempo 0
-		.BYTE 3,6,12,24,48
-		.BYTE 18,36,9,8,4,7,1
+		.BYTE 3,6,12,24,48		; 0 - 4 
+		.BYTE 18,36,9,8,4,7,1	; 5 - 11
 	; Tempo 12
-		.BYTE 4,8,16,32,64
-		.BYTE 24,48,12,1
+		.BYTE 4,8,16,32,64	; 0 - 4
+		.BYTE 24,48,12,1	; 5 - 8
 	; Tempo 21
-		.BYTE 6,12,24,48,96
-		.BYTE 36,72,18,16,8,14,2,3,4
+		.BYTE 6,12,24,48,96				; 0 - 4
+		.BYTE 36,72,18,16,8,14,2,3,4	; 5 - 13
 
 WriteSq1XY:					; \
 	lda #<SQ1_VOL			; |
@@ -245,21 +247,21 @@ LoadSoundSequence:
 	sta NoiseTrackOffset	; /
 	rts
 
-FlapSFX:
+FlapSq1:
 	.BYTE $94,$ab,$fd,$58
 FootstepNoise:
 	.BYTE $00,$7f,$04,$18
-lf6ed:
-.BYTE $3f,$7f,$00,$00
-lf6f1:
-.BYTE $06,$7f,$0a,$c0
-lf6f5:
-.BYTE $08,$7f,$05,$c0
-lf6f9:
-.BYTE $c1,$89,$02,$0f
+LightningStrikeNoise:
+	.BYTE $3f,$7f,$00,$00
+SplashPopNoise:
+	.BYTE $06,$7f,$0a,$c0
+SplashNoise2:
+	.BYTE $08,$7f,$05,$c0
+ShockedSqBase:
+	.BYTE $c1,$89,$02,$0f
 lf6fc:
-.BYTE $ff,$ff,$ff
-lf700:
+	.BYTE $ff,$ff,$ff
+NoiseNoteSettings:	; Vol, Lo, Hi
 	.BYTE $10,$00,$18
 	.BYTE $10,$01,$18
 	.BYTE $00,$01,$88
@@ -277,7 +279,7 @@ StoreSoundXY:
 	rts
 
 PlayFlapSFX:
-	ldxy FlapSFX
+	ldxy FlapSq1
 	bne lf745
 lf725:
 	lda SFX3Req
@@ -380,7 +382,7 @@ ResetSplashSFXPhase:
 	rts
 
 PlaySplashNoise2:
-	ldxy lf6f5
+	ldxy SplashNoise2
 	jmp WriteNoiseRTS
 CheckSplashCountdown:
 	inc SplashSFXTimer
@@ -396,7 +398,7 @@ PlaySplashNoise:
 	sta SplashSFXTimer
 	lda #$f0
 	sta SplashSFXPhase
-	ldxy lf6f1
+	ldxy SplashPopNoise
 	jmp WriteNoiseRTS
 PlayPopNoise:
 	lda SFX1Cur
@@ -405,7 +407,7 @@ PlayPopNoise:
 	sta SFX1Cur
 	lda #0
 	sta PopSFXCountdown
-	ldxy lf6f1
+	ldxy SplashPopNoise
 	jmp WriteNoiseRTS
 CheckPopCountdown:
 	inc PopSFXCountdown
@@ -461,7 +463,7 @@ TryLightningStrikeSFX:
 	lda #0
 	sta LightningSFXTimer
 	sta LightningSFXPitch
-	ldxy lf6ed
+	ldxy LightningStrikeNoise
 WriteNoiseRTS:
 	jsr WriteNoiseXY
 	rts
@@ -525,12 +527,12 @@ PlayShocked:
 	lda #2
 	sta SFX1Req
 lf8e8:
-	ldxy lf6f9
+	ldxy ShockedSqBase
 	jsr WriteSq1XY
 	lda RNGOutput
 	and #$0f
 	sta SQ1_LO
-	ldxy lf6f9
+	ldxy ShockedSqBase
 	jsr WriteSq2
 	lda RNGOutput
 	lsrr 2
@@ -1014,13 +1016,12 @@ RespawnSq2:
 	.BYTE $22,$02,$81,$24
 	.BYTE $88,$02
 RespawnTri:
-	.BYTE $88,$02,$80,$56
-	.BYTE $02,$4e,$02,$12
-	.BYTE $02,$4e,$02,$12
-	.BYTE $02,$0c,$02,$81
-	.BYTE $10,$02,$80,$10
-	.BYTE $02,$81,$12,$88
-	.BYTE $02
+	.BYTE $88,$02
+	.BYTE $80,$56,$02,$4e,$02,$12,$02,$4e,$02,$12,$02,$0c,$02
+	.BYTE $81,$10,$02
+	.BYTE $80,$10,$02
+	.BYTE $81,$12
+	.BYTE $88,$02
 BonusTripSq1:
 	.BYTE $c3,$81,$02,$02
 	.BYTE $1c,$02,$02,$02
@@ -1109,18 +1110,29 @@ BonusTripTri:
 	.BYTE $c4
 	.BYTE $84,$02,$ff
 BonusTripNoise:
-	.BYTE $d8,$81,$06,$ff
-	.BYTE $c6,$88,$06,$ff
-	.BYTE $c7,$81,$06,$06
-	.BYTE $80,$06,$06,$81
-	.BYTE $06,$06,$80,$06
-	.BYTE $06,$81,$06,$06
-	.BYTE $ff,$c6,$88,$06
-	.BYTE $ff,$e0,$81,$06
-	.BYTE $06,$ff,$82,$0f
-	.BYTE $81,$06,$06,$ea
-	.BYTE $06,$06,$06,$06
-	.BYTE $ff
+	.BYTE $d8
+		.BYTE $81,$06
+		.BYTE $ff
+	.BYTE $c6
+		.BYTE $88,$06
+		.BYTE $ff
+	.BYTE $c7
+		.BYTE $81,$06,$06
+		.BYTE $80,$06,$06
+		.BYTE $81,$06,$06
+		.BYTE $80,$06,$06
+		.BYTE $81,$06,$06
+		.BYTE $ff
+	.BYTE $c6
+		.BYTE $88,$06
+		.BYTE $ff
+	.BYTE $e0
+		.BYTE $81,$06,$06
+		.BYTE $ff
+	.BYTE $82,$0f,$81,$06,$06
+	.BYTE $ea
+		.BYTE $06,$06,$06,$06
+		.BYTE $ff
 PauseSq1:
 	.BYTE $c5,$80,$0e,$58,$ff,$00
 PauseTri:

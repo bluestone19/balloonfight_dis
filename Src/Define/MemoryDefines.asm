@@ -301,11 +301,11 @@ Sq2NoteLength		.set $D5
 TriNoteLength		.set $D6
 NoiseNoteLength		.set $D7
 
-; Unknown
-Sq1Unknown3			.set $D8
-Sq2Unknown3			.set $D9
-TriUnknown3			.set $DA
-NoiseUnknown3		.set $DB
+; Remaining Sub Track Loops
+Sq1SubTrackLoops	.set $D8
+Sq2SubTrackLoops	.set $D9
+TriSubTrackLoops	.set $DA
+NoiseSubTrackLoops	.set $DB
 
 SoundX				.set $DC
 SoundY				.set $DD
@@ -335,11 +335,11 @@ Sq2TrackOffset		.set $E9
 TriTrackOffset		.set $EA
 NoiseTrackOffset	.set $EB
 
-; Unknown
-Sq1Unknown4			.set $EC
-Sq2Unknown4			.set $ED
-TriUnknown4			.set $EE
-NoiseUnknown4		.set $EF
+; Sub Track Start Offset
+Sq1SubTrackStart	.set $EC
+Sq2SubTrackStart	.set $ED
+TriSubTrackStart	.set $EE
+NoiseSubTrackStart	.set $EF
 
 ; Sound Requests
 SFX1Req				.set $F0
