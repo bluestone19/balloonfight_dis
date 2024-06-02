@@ -81,26 +81,26 @@ LoadByteAfterLengthUpd:
 	inc Sq1TrackOffset,x	; | Increment offset and load next byte
 	lda (CurTrackPointer),y	; / Then immediately parse that note too
 ByteIsNoteData:
-	tay
-	txa
-	cmp #3				; \ If current channel is Noise
+	tay	; Y = Note data
+	txa					; \
+	cmp #3				; | If current channel is Noise
 	beq PlayNoiseNote	; /
-	pha
-	tax
-	cmp #1				; \ If current channel is Square 2, check if it's free
+	pha	; Push current channel to stack
+	tax					; \
+	cmp #1				; | If current channel is Square 2, check if it's free
 	beq Sq2BusyCheck	; /
 ChannelIsFree:
 	ldx SoundRegOffset
-	lda lf600+1,y
-	beq lf599
-	sta SQ1_LO,x
-	lda lf600,y
-	ora #8
-	sta SQ1_HI,x
-	lf599:
-	tay
-	plx
-	tya
+	lda NotePitchData+1,y	; Load lower byte of pitch
+	beq @SkipPitchSet	; If 00, 
+	sta SQ1_LO,x	; Write lower byte of pitch
+	lda NotePitchData,y	; \
+	ora #8				; | Write upper byte of pitch with L = 1 (Infinite length)
+	sta SQ1_HI,x		; /
+	@SkipPitchSet:
+	tay	; \ Preserve upper pitch
+	plx	; |	X = current channel
+	tya	; /
 	bne SetChannelVolumeToDC
 	ldy #0
 	txa
@@ -159,19 +159,60 @@ PlayNoiseNote:
 BubbleRiseSFXSq1:
 	.BYTE $16,$ff,$10,$c5
 
-lf600:
-	.BYTE $07,$f0,$00,$00,$00,$d4,$00,$c8
-	.BYTE $00,$bd,$00,$b2,$00,$a8,$00,$9f
-	.BYTE $00,$96,$00,$8d,$00,$85,$00,$7e
-	.BYTE $00,$76,$00,$70,$01,$ab,$01,$93
-	.BYTE $01,$7c,$01,$67,$01,$52,$01,$3f
-	.BYTE $01,$2d,$01,$1c,$01,$0c,$00,$fd
-	.BYTE $00,$ee,$00,$e1,$03,$57,$03,$27
-	.BYTE $02,$f9,$02,$cf,$02,$a6,$02,$80
-	.BYTE $02,$5c,$02,$3a,$02,$1a,$01,$fc
-	.BYTE $01,$df,$01,$c4,$03,$f8,$00,$69
-	.BYTE $00,$63,$00,$5e,$00,$58,$00,$53
-	.BYTE $00,$4f,$00,$4a,$00,$46,$00,$42
+NotePitchData:	; HI, LO
+	.BYTE $07,$f0	; 00: A  1
+	.BYTE $00,$00	; 02: Silent
+
+	.BYTE $00,$d4	; 04: C  5
+	.BYTE $00,$c8	; 06: C# 5
+	.BYTE $00,$bd	; 08: D  5
+	.BYTE $00,$b2	; 0A: D# 5
+	.BYTE $00,$a8	; 0C: E  5
+	.BYTE $00,$9f	; 0E: F  5
+	.BYTE $00,$96	; 10: F# 5
+	.BYTE $00,$8d	; 12: G  5
+	.BYTE $00,$85	; 14: G# 5
+	.BYTE $00,$7e	; 16: A  5
+	.BYTE $00,$76	; 18: A# 5
+	.BYTE $00,$70	; 1A: B  5
+
+	.BYTE $01,$ab	; 1C: C  4
+	.BYTE $01,$93	; 1E: C# 4
+	.BYTE $01,$7c	; 20: D  4
+	.BYTE $01,$67	; 22: D# 4
+	.BYTE $01,$52	; 24: E  4
+	.BYTE $01,$3f	; 26: F  4
+	.BYTE $01,$2d	; 28: F# 4
+	.BYTE $01,$1c	; 2A: G  4
+	.BYTE $01,$0c	; 2C: G# 4
+	.BYTE $00,$fd	; 2E: A  4
+	.BYTE $00,$ee	; 30: A# 4
+	.BYTE $00,$e1	; 32: B  4
+
+	.BYTE $03,$57	; 34: C  3
+	.BYTE $03,$27	; 36: C# 3
+	.BYTE $02,$f9	; 38: D  3
+	.BYTE $02,$cf	; 3A: D# 3
+	.BYTE $02,$a6	; 3C: E  3
+	.BYTE $02,$80	; 3E: F  3
+	.BYTE $02,$5c	; 40: F# 3
+	.BYTE $02,$3a	; 42: G  3
+	.BYTE $02,$1a	; 44: G# 3
+	.BYTE $01,$fc	; 46: A  3
+	.BYTE $01,$df	; 48: A# 3
+	.BYTE $01,$c4	; 4A: B  3
+
+	.BYTE $03,$f8	; 4C: A  2
+
+	.BYTE $00,$69	; 4E: C  6
+	.BYTE $00,$63	; 50: C# 6
+	.BYTE $00,$5e	; 52: D  6
+	.BYTE $00,$58	; 54: D# 6
+	.BYTE $00,$53	; 56: E  6
+	.BYTE $00,$4f	; 58: F  6
+	.BYTE $00,$4a	; 5A: F# 6
+	.BYTE $00,$46	; 5C: G  6
+	.BYTE $00,$42	; 5E: G# 6
 
 NoteLengthOptions:
 	; Tempo 0
@@ -260,14 +301,14 @@ SplashNoise2:
 ShockedSqBase:
 	.BYTE $c1,$89,$02,$0f
 lf6fc:
-	.BYTE $ff,$ff,$ff
+	.BYTE $ff,$ff,$ff	; Unused
 NoiseNoteSettings:	; Vol, Lo, Hi
-	.BYTE $10,$00,$18
-	.BYTE $10,$01,$18
-	.BYTE $00,$01,$88
-	.BYTE $02,$02,$40
-	.BYTE $03,$05,$40
-	.BYTE $04,$07,$40
+	.BYTE $10,$00,$18	; 0
+	.BYTE $10,$01,$18	; 3
+	.BYTE $00,$01,$88	; 6: Soft snare
+	.BYTE $02,$02,$40	; 9
+	.BYTE $03,$05,$40	; C
+	.BYTE $04,$07,$40	; F: Hard hit
 
 ClearSquareSweeps:
 	lda #$7f		; \ Set Pulse Channels:
@@ -888,7 +929,8 @@ PlaySuperBonus:		; Music/Jingle: Bonus Game Perfect
 	lda #$10
 lfb6d:
 	jsr LoadSoundSequence
-	ldxy lfcfc
+	ldx #$fc
+	ldy #$fc
 	jsr ClearSquareSweeps
 	inc UnknownSoundFlag
 	bne ContinueMusicUpdate
@@ -989,31 +1031,27 @@ MusicTrackInitData: ;Music Track Init Data
 		.WORD $0000,BubbleCollectSq2,BubbleCollectTri,$0000
 
 BubbleCollectSq2:
-	.BYTE $82,$02,$8b,$02
-	.BYTE $80,$08,$02,$10
-	.BYTE $02,$16,$02,$52
-	.BYTE $02,$02,$02,$1a
+	.BYTE $82,$02
+	.BYTE $8b,$02
+	.BYTE $80,$08,$02,$10,$02,$16,$02,$52,$02,$02,$02,$1a
 	.BYTE $00
 BubbleCollectTri:
-	.BYTE $82,$02,$80,$10
-	.BYTE $02,$16,$02,$52
-	.BYTE $02,$5a,$02,$02
-	.BYTE $02,$56,$81,$02
+	.BYTE $82,$02
+	.BYTE $80,$10,$02,$16,$02,$52,$02,$5a,$02,$02,$02,$56,$81,$02
+
 RespawnSq1:
-	.BYTE $80,$12,$02,$0c
-	.BYTE $02,$04,$02,$0c
-	.BYTE $02,$04,$02,$2a
-	.BYTE $02,$81,$04,$02
-	.BYTE $80,$04,$02,$81
-	.BYTE $04,$88,$02,$02
+	.BYTE $80,$12,$02,$0c,$02,$04,$02,$0c,$02,$04,$02,$2a,$02
+	.BYTE $81,$04,$02
+	.BYTE $80,$04,$02
+	.BYTE $81,$04
+	.BYTE $88,$02,$02
 	.BYTE $00
 RespawnSq2:
-	.BYTE $88,$02,$02,$80
-	.BYTE $04,$02,$2a,$02
-	.BYTE $24,$02,$2a,$02
-	.BYTE $24,$02,$1c,$02
-	.BYTE $81,$22,$02,$80
-	.BYTE $22,$02,$81,$24
+	.BYTE $88,$02,$02
+	.BYTE $80,$04,$02,$2a,$02,$24,$02,$2a,$02,$24,$02,$1c,$02
+	.BYTE $81,$22,$02
+	.BYTE $80,$22,$02
+	.BYTE $81,$24
 	.BYTE $88,$02
 RespawnTri:
 	.BYTE $88,$02
@@ -1022,93 +1060,213 @@ RespawnTri:
 	.BYTE $80,$10,$02
 	.BYTE $81,$12
 	.BYTE $88,$02
+
 BonusTripSq1:
-	.BYTE $c3,$81,$02,$02
-	.BYTE $1c,$02,$02,$02
-	.BYTE $1c,$1c,$ff,$c6
-	.BYTE $88,$1c,$ff,$c7
-	.BYTE $82,$4c,$4c,$2a
-	.BYTE $4c,$ff,$c6,$88
-	.BYTE $1c,$ff,$c4,$81
-	.BYTE $46,$02,$46,$02
-	.BYTE $32,$02,$46,$80
-	.BYTE $2e,$2e,$ff,$c3
-	.BYTE $82,$46,$46,$81
-	.BYTE $32,$32,$46,$2e
-	.BYTE $ff,$80,$0c,$0c
-	.BYTE $81,$46,$46,$46
-	.BYTE $80,$04,$04,$81
-	.BYTE $46,$46,$02,$c8
-	.BYTE $82,$4c,$4c,$2a
-	.BYTE $4c,$ff,$c2,$81
-	.BYTE $46,$80,$32,$32
-	.BYTE $82,$46,$04,$81
-	.BYTE $46,$2a,$ff,$c2
-	.BYTE $81,$0c,$0c
-lfcfc:
-	.BYTE $80,$04,$04,$81
-	.BYTE $04,$80,$2e,$2e
-	.BYTE $81,$2e,$82,$24
-	.BYTE $ff,$00
+	.BYTE $c3	; Repeat 3 times
+		.BYTE $81,$02
+			.BYTE $02
+			.BYTE $1c	; C 4
+			.BYTE $02
+			.BYTE $02
+			.BYTE $02
+			.BYTE $1c	; C 4
+			.BYTE $1c	; C 4
+		.BYTE $ff
+	.BYTE $c6	; Repeat 6 times
+		.BYTE $88,$1c	; C 4
+		.BYTE $ff
+	.BYTE $c7	; Repeat 7 times
+		.BYTE $82,$4c	; A 2
+			.BYTE $4c	; A 2
+			.BYTE $2a	; G 4
+			.BYTE $4c	; A 2
+		.BYTE $ff
+	.BYTE $c6	; Repeat 6 times
+		.BYTE $88,$1c	; C 4
+		.BYTE $ff
+	.BYTE $c4	; Repeat 4 times
+		.BYTE $81,$46	; A 3
+			.BYTE $02
+			.BYTE $46	; A 3
+			.BYTE $02
+			.BYTE $32	; B 4
+			.BYTE $02
+			.BYTE $46	; A 3
+		.BYTE $80,$2e	; A 4
+			.BYTE $2e	; A 4
+		.BYTE $ff
+	.BYTE $c3	; Repeat 3 times
+		.BYTE $82,$46	; A 3
+			.BYTE $46	; A 3
+		.BYTE $81,$32	; B 4
+			.BYTE $32	; B 4
+			.BYTE $46	; A 3
+			.BYTE $2e	; A 4
+		.BYTE $ff
+	.BYTE $80,$0c	; E 5
+		.BYTE $0c	; E 5
+	.BYTE $81,$46	; A 3
+		.BYTE $46	; A 3
+		.BYTE $46	; A 3
+	.BYTE $80,$04	; C 5
+		.BYTE $04	; C 5
+	.BYTE $81,$46	; A 3
+		.BYTE $46	; A 3
+		.BYTE $02
+	.BYTE $c8	; Repeat 8 times
+		.BYTE $82,$4c	; A 2
+			.BYTE $4c	; A 2
+			.BYTE $2a	; G 4
+			.BYTE $4c	; A 2
+		.BYTE $ff
+	.BYTE $c2	; Repeat 2 times
+		.BYTE $81,$46	; A 3
+		.BYTE $80,$32	; B 4
+			.BYTE $32	; B 4
+		.BYTE $82,$46	; A 3
+			.BYTE $04	; C 5
+		.BYTE $81,$46	; A 3
+			.BYTE $2a	; G 4
+		.BYTE $ff
+	.BYTE $c2	; Repeat 2 times
+		.BYTE $81,$0c	; E 5
+			.BYTE $0c	; E 5
+		.BYTE $80,$04	; C 5
+			.BYTE $04	; C 5
+		.BYTE $81,$04	; C 5
+		.BYTE $80,$2e	; A 4
+			.BYTE $2e	; A 4
+		.BYTE $81,$2e	; A 4
+		.BYTE $82,$24	; E 4
+		.BYTE $ff
+	.BYTE $00
 BonusTripSq2:
-	.BYTE $81,$32,$02,$02
-	.BYTE $06,$0c,$32,$02
-	.BYTE $02,$8a,$2e,$8b
-	.BYTE $02,$8a,$2e,$8b
-	.BYTE $02,$8a,$2e,$8b
-	.BYTE $02,$88,$2e,$32
-	.BYTE $2e,$d0,$8c,$2c,$24,$ff
-	.BYTE $d0,$2e,$20,$ff
-	.BYTE $c3
-	.BYTE $80,$28,$02,$82
-	.BYTE $02,$80,$2c,$02
-	.BYTE $32,$02,$24,$02
-	.BYTE $82,$02,$81,$02
-	.BYTE $80,$28,$02,$06
-	.BYTE $02,$28,$02,$81
-	.BYTE $02,$80,$24,$02
-	.BYTE $32,$02,$24,$02,$ff
-	.BYTE $80,$28,$02,$82
-	.BYTE $02,$80,$2c,$02
-	.BYTE $32,$02,$24,$02
-	.BYTE $82,$02,$89,$0c
-	.BYTE $0a,$08,$06,$32
-	.BYTE $30,$2e,$2c,$2a
-	.BYTE $28,$26,$24,$02
-	.BYTE $02,$02,$86,$02
+	.BYTE $81,$32	; B 4
+		.BYTE $02
+		.BYTE $02
+		.BYTE $06	; C#5
+		.BYTE $0c	; E 5
+		.BYTE $32	; B 4
+		.BYTE $02
+		.BYTE $02
+	.BYTE $8a,$2e	; A 4
+	.BYTE $8b,$02
+	.BYTE $8a,$2e	; A 4
+	.BYTE $8b,$02
+	.BYTE $8a,$2e	; A 4
+	.BYTE $8b,$02
+	.BYTE $88,$2e	; A 4
+		.BYTE $32	; B 4
+		.BYTE $2e	; A 4
+	.BYTE $d0	; Repeat 16 times
+		.BYTE $8c,$2c	; G#4
+			.BYTE $24	; E 4
+		.BYTE $ff
+	.BYTE $d0	; Repeat 16 times
+		.BYTE $2e	; A 4
+		.BYTE $20	; D 4
+		.BYTE $ff
+	.BYTE $c3	; Repeat 3 times
+		.BYTE $80,$28	; F#4
+			.BYTE $02
+		.BYTE $82,$02
+		.BYTE $80,$2c	; G#4
+			.BYTE $02
+			.BYTE $32	; B 4
+			.BYTE $02
+			.BYTE $24	; E 4
+			.BYTE $02
+		.BYTE $82,$02
+		.BYTE $81,$02
+		.BYTE $80,$28	; F#4
+			.BYTE $02
+			.BYTE $06	; C#5
+			.BYTE $02
+			.BYTE $28	; F#4
+			.BYTE $02
+		.BYTE $81,$02
+		.BYTE $80,$24	; E 4
+			.BYTE $02
+			.BYTE $32	; B 4
+			.BYTE $02
+			.BYTE $24	; E 4
+			.BYTE $02
+		.BYTE $ff
+	.BYTE $80,$28	; F#4
+		.BYTE $02
+	.BYTE $82,$02
+	.BYTE $80,$2c
+		.BYTE $02
+		.BYTE $32	; B 4
+		.BYTE $02
+		.BYTE $24	; E 4
+		.BYTE $02
+	.BYTE $82,$02
+	.BYTE $89,$0c
+		.BYTE $0a
+		.BYTE $08
+		.BYTE $06
+		.BYTE $32	; B 4
+		.BYTE $30
+		.BYTE $2e
+		.BYTE $2c
+		.BYTE $2a
+		.BYTE $28	; F#4
+		.BYTE $26
+		.BYTE $24	; E 4
+		.BYTE $02
+		.BYTE $02
+		.BYTE $02
+	.BYTE $86,$02
 	.BYTE $c7
-	.BYTE $84,$02,$ff
-	.BYTE $c4
-	.BYTE $80,$28,$02,$82
-	.BYTE $02,$80,$2c,$02
-	.BYTE $32,$02,$24,$02
-	.BYTE $82,$02,$81,$02
-	.BYTE $80,$28,$02,$06
-	.BYTE $02,$28,$02,$81
-	.BYTE $02,$80,$24,$02
-	.BYTE $32,$02,$24,$02,$ff
+		.BYTE $84,$02
+		.BYTE $ff
+	.BYTE $c4	; Repeat 4 times
+		.BYTE $80,$28	; F#4
+			.BYTE $02
+		.BYTE $82,$02
+		.BYTE $80,$2c	; G#4
+			.BYTE $02
+			.BYTE $32	; B 4
+			.BYTE $02
+			.BYTE $24	; E 4
+			.BYTE $02
+		.BYTE $82,$02
+		.BYTE $81,$02
+		.BYTE $80,$28	; F#4
+			.BYTE $02
+			.BYTE $06	; C#5
+			.BYTE $02
+			.BYTE $28	; F#4
+			.BYTE $02
+		.BYTE $81,$02
+		.BYTE $80,$24	; E 4
+			.BYTE $02
+			.BYTE $32	; B 4
+			.BYTE $02
+			.BYTE $24	; E 4
+			.BYTE $02
+		.BYTE $ff
 	.BYTE $c8
-	.BYTE $84,$02,$ff
+		.BYTE $84,$02
+		.BYTE $ff
 BonusTripTri:
-	.BYTE $81,$14,$02,$02
-	.BYTE $14,$1a,$14,$02
-	.BYTE $02,$88,$10,$10
-	.BYTE $10,$10,$14,$10
-	.BYTE $85,$3c,$81,$44
-	.BYTE $85,$4a,$81,$44
-	.BYTE $88,$28,$24,$20
-	.BYTE $46,$42,$40,$c6
-	.BYTE $81,$3c,$02,$02
-	.BYTE $44,$02,$02,$02
-	.BYTE $4a,$02,$46,$36
-	.BYTE $36,$38,$38,$02
-	.BYTE $3a,$02,$80,$3c
-	.BYTE $3c,$81,$02,$24
-	.BYTE $02,$02,$2c,$24
-	.BYTE $88,$24,$1e,$46
-	.BYTE $36,$38,$3a,$ff
+	.BYTE $81,$14,$02,$02,$14,$1a,$14,$02,$02
+	.BYTE $88,$10,$10,$10,$10,$14,$10
+	.BYTE $85,$3c
+	.BYTE $81,$44
+	.BYTE $85,$4a
+	.BYTE $81,$44
+	.BYTE $88,$28,$24,$20,$46,$42,$40
+	.BYTE $c6
+		.BYTE $81,$3c,$02,$02,$44,$02,$02,$02,$4a,$02,$46,$36,$36,$38,$38,$02,$3a,$02
+		.BYTE $80,$3c,$3c
+		.BYTE $81,$02,$24,$02,$02,$2c,$24
+		.BYTE $88,$24,$1e,$46,$36,$38,$3a
+		.BYTE $ff
 	.BYTE $c4
-	.BYTE $84,$02,$ff
+		.BYTE $84,$02
+		.BYTE $ff
 BonusTripNoise:
 	.BYTE $d8
 		.BYTE $81,$06
@@ -1117,177 +1275,370 @@ BonusTripNoise:
 		.BYTE $88,$06
 		.BYTE $ff
 	.BYTE $c7
-		.BYTE $81,$06,$06
-		.BYTE $80,$06,$06
-		.BYTE $81,$06,$06
-		.BYTE $80,$06,$06
-		.BYTE $81,$06,$06
+		.BYTE $81,$06
+			.BYTE $06
+		.BYTE $80,$06
+			.BYTE $06
+		.BYTE $81,$06
+			.BYTE $06
+		.BYTE $80,$06
+			.BYTE $06
+		.BYTE $81,$06
+			.BYTE $06
 		.BYTE $ff
 	.BYTE $c6
 		.BYTE $88,$06
 		.BYTE $ff
 	.BYTE $e0
-		.BYTE $81,$06,$06
+		.BYTE $81,$06
+			.BYTE $06
 		.BYTE $ff
-	.BYTE $82,$0f,$81,$06,$06
+	.BYTE $82,$0f
+	.BYTE $81,$06
+		.BYTE $06
 	.BYTE $ea
-		.BYTE $06,$06,$06,$06
+		.BYTE $06,$06
+			.BYTE $06
+			.BYTE $06
 		.BYTE $ff
+		
 PauseSq1:
-	.BYTE $c5,$80,$0e,$58,$ff,$00
+	.BYTE $c5	; Repeat 5 times
+		.BYTE $80,$0e	; F 5
+			.BYTE $58	; F 6
+		.BYTE $ff
+	.BYTE $00
 PauseTri:
-	.BYTE $c5,$80,$0e,$58,$ff
+	.BYTE $c5	; Repeat 5 times
+		.BYTE $80,$0e	; F 4
+			.BYTE $58	; F 5
+		.BYTE $ff
+
 GameOverSq1:
-	.BYTE $82,$1c,$1c,$c3
-	.BYTE $82,$1c,$1c,$81
-	.BYTE $1c,$1c,$1c,$02
-	.BYTE $ff,$c7,$88,$1c
-	.BYTE $ff,$00
+	.BYTE $82,$1c	; C 4
+		.BYTE $1c	; C 4
+	.BYTE $c3
+		.BYTE $82,$1c	; C 4
+			.BYTE $1c	; C 4
+		.BYTE $81,$1c	; C 4
+			.BYTE $1c	; C 4
+			.BYTE $1c	; C 4
+			.BYTE $02
+		.BYTE $ff
+	.BYTE $c7
+		.BYTE $88,$1c	; C 4
+		.BYTE $ff
+	.BYTE $00
 GameOverSq2:
-	.BYTE $83,$02,$80,$0e
-	.BYTE $02,$0e,$02,$0c
-	.BYTE $02,$0e,$02,$4e
-	.BYTE $02,$02,$02,$0e
-	.BYTE $02,$0c,$02,$02
-	.BYTE $02,$0e,$02,$0c
-	.BYTE $02,$0e,$02,$4e
-	.BYTE $02,$02,$02,$0e
-	.BYTE $02,$0c,$02,$0e
-	.BYTE $02,$0e,$02,$0c
-	.BYTE $02,$0e,$02,$4e
-	.BYTE $02,$02,$02,$0e
-	.BYTE $02,$0c,$02,$88
-	.BYTE $4e,$18,$16,$12
-	.BYTE $0e,$0c,$0e
+	.BYTE $83,$02
+	.BYTE $80,$0e	; F 5
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $0c	; E 5
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $4e	; C 6
+		.BYTE $02
+		.BYTE $02
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $0c	; E 5
+		.BYTE $02
+		.BYTE $02
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $0c	; E 5
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $4e	; C 6
+		.BYTE $02
+		.BYTE $02
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $0c	; E 5
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $0c	; E 5
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $4e	; C 6
+		.BYTE $02
+		.BYTE $02
+		.BYTE $02
+		.BYTE $0e	; F 5
+		.BYTE $02
+		.BYTE $0c	; E 5
+		.BYTE $02
+	.BYTE $88,$4e	; C 6
+		.BYTE $18	; A#5
+		.BYTE $16	; A 5
+		.BYTE $12	; G 5
+		.BYTE $0e	; F 5
+		.BYTE $0c	; E 5
+		.BYTE $0e	; F 5
 GameOverTri:
-	.BYTE $83,$02,$81,$3e
-	.BYTE $3e,$82,$46,$1c
-	.BYTE $46,$81,$02,$38
-	.BYTE $3e,$02,$82,$46
-	.BYTE $1c,$82,$48,$48
-	.BYTE $81,$3e,$3e,$82
-	.BYTE $38,$88,$24,$20
-	.BYTE $1c,$48,$46,$42
-	.BYTE $3e
+	.BYTE $83,$02
+	.BYTE $81,$3e
+		.BYTE $3e
+	.BYTE $82,$46
+		.BYTE $1c
+		.BYTE $46
+	.BYTE $81,$02
+		.BYTE $38
+		.BYTE $3e
+		.BYTE $02
+	.BYTE $82,$46
+		.BYTE $1c
+	.BYTE $82,$48
+		.BYTE $48
+	.BYTE $81,$3e
+		.BYTE $3e
+	.BYTE $82,$38
+	.BYTE $88,$24
+		.BYTE $20
+		.BYTE $1c
+		.BYTE $48
+		.BYTE $46
+		.BYTE $42
+		.BYTE $3e
 GameOverNoise:
-	.BYTE $82,$09,$09
-	.BYTE $c6,$82,$03,$0c
-	.BYTE $ff,$c6,$88,$06
-	.BYTE $ff
+	.BYTE $82,$09
+		.BYTE $09
+	.BYTE $c6
+		.BYTE $82,$03
+			.BYTE $0c
+		.BYTE $ff
+	.BYTE $c6
+		.BYTE $88,$06
+		.BYTE $ff
+
 ParachuteSq2:
-	.BYTE $ed,$89,$2a,$02
-	.BYTE $04,$0c,$02,$04
-	.BYTE $08,$02,$30,$26
-	.BYTE $02,$30,$ff
+	.BYTE $ed
+		.BYTE $89,$2a
+			.BYTE $02
+			.BYTE $04
+			.BYTE $0c
+			.BYTE $02
+			.BYTE $04
+			.BYTE $08
+			.BYTE $02
+			.BYTE $30
+			.BYTE $26
+			.BYTE $02
+			.BYTE $30
+		.BYTE $ff
 ParachuteTri:
-	.BYTE $80,$02,$ed,$89
-	.BYTE $0c,$02,$12,$4e
-	.BYTE $02,$12,$18,$02
-	.BYTE $0e,$08,$02,$0e
-	.BYTE $ff
+	.BYTE $80,$02
+	.BYTE $ed
+		.BYTE $89,$0c
+			.BYTE $02
+			.BYTE $12
+			.BYTE $4e
+			.BYTE $02
+			.BYTE $12
+			.BYTE $18
+			.BYTE $02
+			.BYTE $0e
+			.BYTE $08
+			.BYTE $02
+			.BYTE $0e
+		.BYTE $ff
+
 EatenByFishSq1:
-	.BYTE $80,$42,$02,$48
-	.BYTE $02,$1e,$02,$24
-	.BYTE $02,$02,$02,$2a
-	.BYTE $02,$c6,$8c,$30
-	.BYTE $2a,$ff,$00
+	.BYTE $80,$42
+		.BYTE $02
+		.BYTE $48
+		.BYTE $02
+		.BYTE $1e
+		.BYTE $02
+		.BYTE $24
+		.BYTE $02
+		.BYTE $02
+		.BYTE $02
+		.BYTE $2a
+		.BYTE $02
+	.BYTE $c6
+		.BYTE $8c,$30
+			.BYTE $2a
+		.BYTE $ff
+	.BYTE $00
 EatenByFishTri:
-	.BYTE $80,$24,$02,$2a
-	.BYTE $02,$30,$02,$06
-	.BYTE $02,$02,$02,$0c
-	.BYTE $02,$c6,$8c,$12
-	.BYTE $18,$ff
+	.BYTE $80,$24
+		.BYTE $02
+		.BYTE $2a
+		.BYTE $02
+		.BYTE $30
+		.BYTE $02
+		.BYTE $06
+		.BYTE $02
+		.BYTE $02
+		.BYTE $02
+		.BYTE $0c
+		.BYTE $02
+	.BYTE $c6
+		.BYTE $8c,$12
+			.BYTE $18
+		.BYTE $ff
+
 EnemyDownSq2:
-	.BYTE $80,$56,$54,$52
-	.BYTE $50,$81,$02,$80
-	.BYTE $5e,$5a,$54,$50
-	.BYTE $18,$14,$10,$0a
-	.BYTE $06,$30,$2c,$28
-	.BYTE $02,$00
+	.BYTE $80,$56
+		.BYTE $54
+		.BYTE $52
+		.BYTE $50
+	.BYTE $81,$02
+	.BYTE $80,$5e
+		.BYTE $5a
+		.BYTE $54
+		.BYTE $50
+		.BYTE $18
+		.BYTE $14
+		.BYTE $10
+		.BYTE $0a
+		.BYTE $06
+		.BYTE $30
+		.BYTE $2c
+		.BYTE $28
+		.BYTE $02
+	.BYTE $00
 EnemyDownTri:
-	.BYTE $80,$1a,$18,$16
-	.BYTE $14,$81,$02,$80
-	.BYTE $02,$5e,$5a,$54
-	.BYTE $50,$18,$14,$10
-	.BYTE $0a,$06,$30,$2c
-	.BYTE $28
+	.BYTE $80,$1a
+		.BYTE $18
+		.BYTE $16
+		.BYTE $14
+	.BYTE $81,$02
+	.BYTE $80,$02
+		.BYTE $5e
+		.BYTE $5a
+		.BYTE $54
+		.BYTE $50
+		.BYTE $18
+		.BYTE $14
+		.BYTE $10
+		.BYTE $0a
+		.BYTE $06
+		.BYTE $30
+		.BYTE $2c
+		.BYTE $28
+
 PhaseClearSq1:
-	.BYTE $82,$1c,$02,$1c
-	.BYTE $02,$02,$1c,$1c,$00
+	.BYTE $82,$1c
+		.BYTE $02
+		.BYTE $1c
+		.BYTE $02
+		.BYTE $02
+		.BYTE $1c
+		.BYTE $1c
+	.BYTE $00
 PhaseClearSq2:
-	.BYTE $81,$10,$0a,$32
-	.BYTE $28,$80,$32,$02
-	.BYTE $32,$02,$82,$32
-	.BYTE $81,$06,$02,$06
-	.BYTE $02,$82,$32
+	.BYTE $81,$10
+		.BYTE $0a
+		.BYTE $32
+		.BYTE $28
+	.BYTE $80,$32
+		.BYTE $02
+		.BYTE $32
+		.BYTE $02
+	.BYTE $82,$32
+	.BYTE $81,$06
+		.BYTE $02
+		.BYTE $06
+		.BYTE $02
+	.BYTE $82,$32
 PhaseClearTri:
-	.BYTE $81,$54,$1a,$10
-	.BYTE $0a,$80,$10,$02
-	.BYTE $10,$02,$82,$10
-	.BYTE $81,$16,$02,$16
-	.BYTE $02,$82,$0a
+	.BYTE $81,$54
+		.BYTE $1a
+		.BYTE $10
+		.BYTE $0a
+	.BYTE $80,$10
+		.BYTE $02
+		.BYTE $10
+		.BYTE $02
+	.BYTE $82,$10
+	.BYTE $81,$16
+		.BYTE $02
+		.BYTE $16
+		.BYTE $02
+	.BYTE $82,$0a
 PhaseClearNoise:
-	.BYTE $83,$03,$0c,$82
-	.BYTE $03,$0c,$0c
+	.BYTE $83,$03
+		.BYTE $0c
+	.BYTE $82,$03
+		.BYTE $0c
+		.BYTE $0c
+
 NewStartSq1:
-	.BYTE $c2,$88,$1c,$1c
-	.BYTE $1c,$1c,$1c,$1c
-	.BYTE $83,$1c,$80,$04
-	.BYTE $04,$2a,$02,$82
-	.BYTE $1c,$ff,$81,$4c
-	.BYTE $02,$4c,$02,$2a
-	.BYTE $02,$4c,$1c,$81
-	.BYTE $4c,$02,$4c,$02
-	.BYTE $4c,$00
+	.BYTE $c2
+		.BYTE $88,$1c,$1c,$1c,$1c,$1c,$1c
+		.BYTE $83,$1c
+		.BYTE $80,$04,$04,$2a,$02
+		.BYTE $82,$1c
+		.BYTE $ff
+	.BYTE $81,$4c,$02,$4c,$02,$2a,$02,$4c,$1c
+	.BYTE $81,$4c,$02,$4c,$02,$4c
+	.BYTE $00
 NewStartSq2:
-	.BYTE $88,$2e,$2e,$2e
-	.BYTE $30,$04,$30,$c4
-	.BYTE $80,$2e,$04,$ff
-	.BYTE $83,$02,$88,$2e
-	.BYTE $2e,$2e,$30,$04
-	.BYTE $30,$c4,$80,$2e
-	.BYTE $04,$ff,$83,$02
+	.BYTE $88,$2e,$2e,$2e,$30,$04,$30
+	.BYTE $c4
+		.BYTE $80,$2e,$04
+		.BYTE $ff
+	.BYTE $83,$02
+	.BYTE $88,$2e,$2e,$2e,$30,$04,$30
+	.BYTE $c4
+		.BYTE $80,$2e,$04
+		.BYTE $ff
+	.BYTE $83,$02
 	.BYTE $84,$02,$02
 NewStartTri:
-	.BYTE $c2,$88,$3e,$3e
-	.BYTE $3e,$42,$46,$42
-	.BYTE $84,$3e,$ff,$85
-	.BYTE $3e,$81,$3e,$88
-	.BYTE $1c,$46,$1c,$81
-	.BYTE $02,$3e,$3e,$3e
+	.BYTE $c2
+		.BYTE $88,$3e,$3e,$3e,$42,$46,$42
+		.BYTE $84,$3e
+		.BYTE $ff
+	.BYTE $85,$3e
+	.BYTE $81,$3e
+	.BYTE $88,$1c,$46,$1c
+	.BYTE $81,$02,$3e,$3e,$3e
 	.BYTE $82,$34,$02
 NewStartNoise:
-	.BYTE $c2,$88,$06,$06
-	.BYTE $06,$06,$06,$06
-	.BYTE $82,$06,$06,$06
-	.BYTE $06,$ff,$c2,$81
-	.BYTE $06,$06,$80,$06
-	.BYTE $06,$81,$06,$06
-	.BYTE $06,$06,$80,$06
-	.BYTE $06,$ff,$09
+	.BYTE $c2
+		.BYTE $88,$06,$06,$06,$06,$06,$06
+		.BYTE $82,$06,$06,$06,$06
+		.BYTE $ff
+	.BYTE $c2
+		.BYTE $81,$06,$06
+		.BYTE $80,$06,$06
+		.BYTE $81,$06,$06,$06,$06
+		.BYTE $80,$06,$06
+		.BYTE $ff
+	.BYTE $09
+
 SuperBonusSq1:
-	.BYTE $80,$10,$02,$10
-	.BYTE $02,$10,$02,$0c
-	.BYTE $0c,$0c,$02,$0c
-	.BYTE $02,$14,$14,$14
-	.BYTE $02,$14,$02,$85
-	.BYTE $10,$00
+	.BYTE $80,$10,$02,$10,$02,$10,$02,$0c,$0c,$0c,$02,$0c,$02,$14,$14,$14,$02,$14,$02
+	.BYTE $85,$10,$00
 SuperBonusSq2:
-	.BYTE $80,$32,$02,$32
-	.BYTE $02,$32,$02,$c2
-	.BYTE $32,$32,$32,$02
-	.BYTE $32,$02,$ff,$85
-	.BYTE $32
+	.BYTE $80,$32,$02,$32,$02,$32,$02
+	.BYTE $c2
+		.BYTE $32,$32,$32,$02,$32,$02
+		.BYTE $ff
+	.BYTE $85,$32
 SuperBonusTri:
-	.BYTE $80,$54,$02,$54
-	.BYTE $02,$54,$02,$50
-	.BYTE $50,$50,$02,$50
-	.BYTE $02,$56,$56,$56
-	.BYTE $02,$56,$02,$85
-	.BYTE $54
+	.BYTE $80,$54,$02,$54,$02,$54,$02,$50,$50,$50,$02,$50,$02,$56,$56,$56,$02,$56,$02
+	.BYTE $85,$54
 SuperBonusNoise:
-	.BYTE $c4,$85,$0c,$ff
-	.BYTE $ff,$ff,$ff,$ff
+	.BYTE $c4
+		.BYTE $85,$0c
+		.BYTE $ff
+
+.BYTE $ff,$ff,$ff,$ff	; Unused
 
 GotoAudioMain:
 	jmp AudioMain
