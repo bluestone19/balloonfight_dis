@@ -300,8 +300,8 @@ SplashNoise2:
 	.BYTE $08,$7f,$05,$c0
 ShockedSqBase:
 	.BYTE $c1,$89,$02,$0f
-lf6fc:
-	.BYTE $ff,$ff,$ff	; Unused
+
+.BYTE $ff,$ff,$ff	; Unused
 NoiseNoteSettings:	; Vol, Lo, Hi
 	.BYTE $10,$00,$18	; 0
 	.BYTE $10,$01,$18	; 3
@@ -320,39 +320,40 @@ StoreSoundXY:
 	rts
 
 PlayFlapSFX:
-	ldxy FlapSq1
-	bne lf745
+	ldxy FlapSq1	; Load & play Pulse 1 data
+	bne FlapAndBubbleWrite	; Always taken
+
 lf725:
-	lda SFX3Req
-	lsr
-	bcs lf736
-	lda SFX3Cur
-	lsr
-	bcs lf749
-	lda SFX1Req
-	and #$10
-	bne PlayFlapSFX
+	lda SFX3Req				; \
+	lsr						; | If Bubble Rise SFX is requested, start it
+	bcs PlayBubbleRiseSFX	; /
+	lda SFX3Cur				; \
+	lsr						; | If Bubble Rise SFX is currently playing, manage it
+	bcs ManageBubbleRiseSFX	; /
+	lda SFX1Req		; \
+	and #$10		; | Check if Player Flap SFX was requested
+	bne PlayFlapSFX	; / If so play it
 	rts
 
-lf736:
-	lda SFX3Cur
-	ora #1
-	sta SFX3Cur
-	lda #0
-	sta BubbleRiseSFXTimer
+PlayBubbleRiseSFX:
+	lda SFX3Cur	; \
+	ora #1		; | Set Bubble Rise SFX to currently playing
+	sta SFX3Cur	; /
+	lda #0					; \ Initialize Bubble Rise SFX Timer
+	sta BubbleRiseSFXTimer	; /
 	ldxy BubbleRiseSFXSq1
-lf745:
-	jsr WriteSq1XY
-	rts
+FlapAndBubbleWrite:
+	jsr WriteSq1XY	; \ Can be simplified to a jmp instruction
+	rts				; /
 
-lf749:
-	inc BubbleRiseSFXTimer
-	lda BubbleRiseSFXTimer
-	cmp #$58
-	bne :+	;RTS
-	lda #0
-	sta SFX3Cur
-	rts
+ManageBubbleRiseSFX:
+	inc BubbleRiseSFXTimer	; Increment timer
+	lda BubbleRiseSFXTimer	; \
+	cmp #88					; | Return unless timer == 88 frames
+	bne :+	;RTS			; /
+	lda #0		; \
+	sta SFX3Cur	; | At 88 frames, finish sound effect
+	rts			; /
 
 AudioMain:
 	lda #$c0		; \ Set Frame Counter
@@ -532,7 +533,7 @@ WriteNoisePitch:
 	sta NOISE_LO
 	rts
 
-PlaySparkBounceSFX:
+PlaySparkBounceSFX2:
 	lda #0
 	sta SparkSFXTimer
 	clc
@@ -544,12 +545,12 @@ PlaySparkBounceSFX:
 	and #0
 	ora #$80
 	sta SFX3Cur
-	bne lf8e8
+	bne ContinueShocked
 lf8bf:
 	inc SparkSFXTimer
 	lda SparkSFXTimer
 	cmp SparkSFXLength
-	bne lf8e8
+	bne ContinueShocked
 lf8ca:
 	lda #$10
 	sta SQ1_VOL
@@ -567,7 +568,7 @@ PlayShocked:
 	sta SFX1Cur
 	lda #2
 	sta SFX1Req
-lf8e8:
+ContinueShocked:
 	ldxy ShockedSqBase
 	jsr WriteSq1XY
 	lda RNGOutput
@@ -581,110 +582,112 @@ lf8e8:
 	sta SQ2_LO
 	rts
 
-lf907:
-	jmp PlaySparkBounceSFX
+PlaySparkBounceSFX:	; Locally branchable jump point
+	jmp PlaySparkBounceSFX2
 
 lf90a:
 	lda MusicCur	; \ Check if music is not playing
-	beq lf91b		; / If not playing then continue as normal
-	cmp #$df	; \ Songs #$DF?
-	beq lf91b	; / Wouldn't that be redundant?
-	lda SFX1Req	; \
-	and #$e0	; | Check for sound effects that stops the music
-	beq :+		; / if found, then return
+	beq @CanPlay	; / If not playing then continue as normal
+	cmp #$df		; \ If playing Enemy Parachute theme, it can play alongside
+	beq @CanPlay	; /
+	lda SFX1Req		; \ Check for sound effects that stop the music
+	and #%11100000	; | (Shocked, Splash, or Falling)
+	beq :+			; / if none found, then return
 	jsr InitAllSoundMemory
-lf91b:
-	lda SFX1Req
-	asl
-	bcs PlayShocked
-	asl
-	bcs PlaySplash
-	asl
-	bcs PlayFalling
-	lda SFX1Cur
-	asl
-	bcs lf8e8
-	lda SFX1Cur
-	and #$e0
-	bne :+
-	lda MusicCur
-	cmp #$df
-	beq lf94b
-	lda MusicCur
-	bne :+
-	lda SFX3Req
-	asl
-	bcs lf907
-	asl
-	bcs lf977
-	lda SFX3Cur
-	asl
-	bcs lf94f
-	asl
-	bcs lf993
-lf94b:
+	@CanPlay:
+	lda SFX1Req		; \ Check SFX1 requests
+	asl				; |
+	bcs PlayShocked	; |	Bit 7: Shocked
+	asl				; |
+	bcs PlaySplash	; | Bit 6: Splash
+	asl				; |
+	bcs PlayFalling	; / Bit 5: Falling
+	lda SFX1Cur			; \
+	asl					; | Check if Shocked SFX is playing
+	bcs ContinueShocked	; /
+	lda SFX1Cur		; \
+	and #%11100000	; | Return if Shocked, Splash, or Falling is playing
+	bne :+			; /
+	lda MusicCur	; \
+	cmp #$df		; | If currently playing Enemy Parachuting theme
+	beq lf94b		; / then ???
+	lda MusicCur	; \	Return if anything else is playing
+	bne :+			; /
+	lda SFX3Req				; \ Check SFX3 requests
+	asl						; |
+	bcs PlaySparkBounceSFX	; | Bit 7: Spark Bounce
+	asl						; |
+	bcs PlayFishChompSFX	; / Bit 6: Fish Chomp
+	lda SFX3Cur					; \ Check current SFX3 playing
+	asl							; |
+	bcs ContinueSparkBounceSFX	; | Bit 7: Spark Bounce
+	asl							; |
+	bcs ContinueFishChompSFX	; / Bit 6: Fish Chomp
+	lf94b:
 	jsr lf725
 	:rts
 
-lf94f:
+ContinueSparkBounceSFX:
 	jmp lf8bf
+
 PlaySplash:
-	lda #$0f
-	sta SplashSFXPhase
-	lda SFX1Cur
-	and #$0f
-	ora #$40
-	sta SFX1Cur
-	ldxy lf9d1
-	bne lf98f
+	lda #$0f			; \ Initialize SplashSFXPhase
+	sta SplashSFXPhase	; /
+	lda SFX1Cur	; \
+	and #$0f	; | Preserve End SFX, Pop, Lightning Strike, and Player Footstep
+	ora #$40	; | Add in Splash to current SFX1
+	sta SFX1Cur	; /
+	ldxy SplashSq1	; Write Pulse 1 data
+	bne WriteSplashFallChompSq1	; Always taken
 
 PlayFalling:
-	lda #2		; \ Also request pop sfx
+	lda #2		; \ Also request pop SFX
 	sta SFX1Req	; /
 	lda SFX1Cur	; \
 	and #$0f	; | Preserve End SFX, Pop, Lightning Strike, and Player Footstep
 	ora #$20	; | Add in Falling to current SFX1
 	sta SFX1Cur	; /
-	ldxy FallingSq1
-	bne lf98f
-lf977:
-	lda #0
-	sta ChompSFXTimer
-	lda SFX3Cur
-	and #0
-	ora #$40
-	sta SFX3Cur
-	ldxy lf9d5
-	jsr WriteSq2
-	ldxy lf9d9
-lf98f:
-	jsr WriteSq1XY
-	rts
+	ldxy FallingSq1	; Write Pulse 1 data
+	bne WriteSplashFallChompSq1	; Always taken
 
-lf993:
+PlayFishChompSFX:
+	lda #0				; \ Initialize timer to 0
+	sta ChompSFXTimer	; /
+	lda SFX3Cur	; \
+	and #0		; | Set current SFX3 to Fish Chomp
+	ora #$40	; | (the lda/and/ora could have been simplified to just an lda #$40...)
+	sta SFX3Cur	; /
+	ldxy FishChompSq2	; \ Play Pulse 2 channel of chomp SFX
+	jsr WriteSq2		; /
+	ldxy FishChompSq1	; Play Pulse 1 channel of chomp SFX
+WriteSplashFallChompSq1:
+	jsr WriteSq1XY	; \ Could have been a single JMP instruction
+	rts				; /
+
+ContinueFishChompSFX:
 	inc ChompSFXTimer
 	lda ChompSFXTimer
 	cmp #$12
 	beq lf9ca
 	cmp #6
-	bcc lf9b1
-	lda RNGOutput
-	ora #$10
-	and #$7f
-	sta FishChompPitchSq1
-	rol
-	sta FishChompPitchSq2
-	jmp lf9bd
-lf9b1:
-	inc FishChompPitchSq2
-	inc FishChompPitchSq2
-	inc FishChompPitchSq1
-	inc FishChompPitchSq1
-lf9bd:
-	lda FishChompPitchSq2
-	sta SQ2_LO
-	lda FishChompPitchSq1
-	sta SQ1_LO
+	bcc @IncPitch
+	lda RNGOutput			; \
+	ora #$10				; | Randomize pulse 1 pitch
+	and #$7f				; | 16-127
+	sta FishChompPitchSq1	; /
+	rol						; \ Pulse 2 pitch is double of pulse 1
+	sta FishChompPitchSq2	; /
+	jmp @WritePitch
+	@IncPitch:
+	inc FishChompPitchSq2	; \
+	inc FishChompPitchSq2	; | Increase both pitches by 2
+	inc FishChompPitchSq1	; |
+	inc FishChompPitchSq1	; /
+	@WritePitch:
+	lda FishChompPitchSq2	; \
+	sta SQ2_LO				; | Set both low byte of respective channels to pitches
+	lda FishChompPitchSq1	; |
+	sta SQ1_LO				; /
 	rts
 
 lf9ca:
@@ -692,11 +695,11 @@ lf9ca:
 
 FallingSq1:
 	.BYTE $b8,$d5,$20,$00
-lf9d1:
+SplashSq1:
 	.BYTE $9f,$93,$80,$22
-lf9d5:
+FishChompSq2:
 	.BYTE $3f,$ba,$e0,$06
-lf9d9:
+FishChompSq1:
 	.BYTE $3f,$bb,$ce,$06
 lf9dd:
 	.BYTE $b8,$93,$50,$02
@@ -785,8 +788,8 @@ lfa64:
 	rts
 
 lfa7f:
-	jsr WriteSq2
-	rts
+	jsr WriteSq2	; \ Could be simplified to single jmp instruction
+	rts				; /
 
 PlayBubbleCollect:
 	ldy #10
@@ -1033,31 +1036,93 @@ MusicTrackInitData: ;Music Track Init Data
 BubbleCollectSq2:
 	.BYTE $82,$02
 	.BYTE $8b,$02
-	.BYTE $80,$08,$02,$10,$02,$16,$02,$52,$02,$02,$02,$1a
+	.BYTE $80,$08
+		.BYTE $02
+		.BYTE $10
+		.BYTE $02
+		.BYTE $16
+		.BYTE $02
+		.BYTE $52
+		.BYTE $02
+		.BYTE $02
+		.BYTE $02
+		.BYTE $1a
 	.BYTE $00
 BubbleCollectTri:
 	.BYTE $82,$02
-	.BYTE $80,$10,$02,$16,$02,$52,$02,$5a,$02,$02,$02,$56,$81,$02
+	.BYTE $80,$10
+		.BYTE $02
+		.BYTE $16
+		.BYTE $02
+		.BYTE $52
+		.BYTE $02
+		.BYTE $5a
+		.BYTE $02
+		.BYTE $02
+		.BYTE $02
+		.BYTE $56
+	.BYTE $81,$02
 
 RespawnSq1:
-	.BYTE $80,$12,$02,$0c,$02,$04,$02,$0c,$02,$04,$02,$2a,$02
-	.BYTE $81,$04,$02
-	.BYTE $80,$04,$02
+	.BYTE $80,$12
+		.BYTE $02
+		.BYTE $0c
+		.BYTE $02
+		.BYTE $04
+		.BYTE $02
+		.BYTE $0c
+		.BYTE $02
+		.BYTE $04
+		.BYTE $02
+		.BYTE $2a
+		.BYTE $02
 	.BYTE $81,$04
-	.BYTE $88,$02,$02
+		.BYTE $02
+	.BYTE $80,$04
+		.BYTE $02
+	.BYTE $81,$04
+	.BYTE $88,$02
+		.BYTE $02
 	.BYTE $00
 RespawnSq2:
-	.BYTE $88,$02,$02
-	.BYTE $80,$04,$02,$2a,$02,$24,$02,$2a,$02,$24,$02,$1c,$02
-	.BYTE $81,$22,$02
-	.BYTE $80,$22,$02
+	.BYTE $88,$02
+		.BYTE $02
+	.BYTE $80,$04
+		.BYTE $02
+		.BYTE $2a
+		.BYTE $02
+		.BYTE $24
+		.BYTE $02
+		.BYTE $2a
+		.BYTE $02
+		.BYTE $24
+		.BYTE $02
+		.BYTE $1c
+		.BYTE $02
+	.BYTE $81,$22
+		.BYTE $02
+	.BYTE $80,$22
+		.BYTE $02
 	.BYTE $81,$24
 	.BYTE $88,$02
 RespawnTri:
 	.BYTE $88,$02
-	.BYTE $80,$56,$02,$4e,$02,$12,$02,$4e,$02,$12,$02,$0c,$02
-	.BYTE $81,$10,$02
-	.BYTE $80,$10,$02
+	.BYTE $80,$56
+		.BYTE $02
+		.BYTE $4e
+		.BYTE $02
+		.BYTE $12
+		.BYTE $02
+		.BYTE $4e
+		.BYTE $02
+		.BYTE $12
+		.BYTE $02
+		.BYTE $0c
+		.BYTE $02
+	.BYTE $81,$10
+		.BYTE $02
+	.BYTE $80,$10
+		.BYTE $02
 	.BYTE $81,$12
 	.BYTE $88,$02
 
@@ -1218,7 +1283,7 @@ BonusTripSq2:
 		.BYTE $02
 		.BYTE $02
 	.BYTE $86,$02
-	.BYTE $c7
+	.BYTE $c7	; Repeat 7 times
 		.BYTE $84,$02
 		.BYTE $ff
 	.BYTE $c4	; Repeat 4 times
@@ -1247,34 +1312,78 @@ BonusTripSq2:
 			.BYTE $24	; E 4
 			.BYTE $02
 		.BYTE $ff
-	.BYTE $c8
+	.BYTE $c8	; Repeat 8 times
 		.BYTE $84,$02
 		.BYTE $ff
 BonusTripTri:
-	.BYTE $81,$14,$02,$02,$14,$1a,$14,$02,$02
-	.BYTE $88,$10,$10,$10,$10,$14,$10
+	.BYTE $81,$14
+		.BYTE $02
+		.BYTE $02
+		.BYTE $14
+		.BYTE $1a
+		.BYTE $14
+		.BYTE $02
+		.BYTE $02
+	.BYTE $88,$10
+		.BYTE $10
+		.BYTE $10
+		.BYTE $10
+		.BYTE $14
+		.BYTE $10
 	.BYTE $85,$3c
 	.BYTE $81,$44
 	.BYTE $85,$4a
 	.BYTE $81,$44
-	.BYTE $88,$28,$24,$20,$46,$42,$40
-	.BYTE $c6
-		.BYTE $81,$3c,$02,$02,$44,$02,$02,$02,$4a,$02,$46,$36,$36,$38,$38,$02,$3a,$02
-		.BYTE $80,$3c,$3c
-		.BYTE $81,$02,$24,$02,$02,$2c,$24
-		.BYTE $88,$24,$1e,$46,$36,$38,$3a
+	.BYTE $88,$28
+		.BYTE $24
+		.BYTE $20
+		.BYTE $46
+		.BYTE $42
+		.BYTE $40
+	.BYTE $c6	; Repeat 6 times
+		.BYTE $81,$3c
+			.BYTE $02
+			.BYTE $02
+			.BYTE $44
+			.BYTE $02
+			.BYTE $02
+			.BYTE $02
+			.BYTE $4a
+			.BYTE $02
+			.BYTE $46
+			.BYTE $36
+			.BYTE $36
+			.BYTE $38
+			.BYTE $38
+			.BYTE $02
+			.BYTE $3a
+			.BYTE $02
+		.BYTE $80,$3c
+			.BYTE $3c
+		.BYTE $81,$02
+			.BYTE $24
+			.BYTE $02
+			.BYTE $02
+			.BYTE $2c
+			.BYTE $24
+		.BYTE $88,$24
+			.BYTE $1e
+			.BYTE $46
+			.BYTE $36
+			.BYTE $38
+			.BYTE $3a
 		.BYTE $ff
-	.BYTE $c4
+	.BYTE $c4	; Repeat 4 times
 		.BYTE $84,$02
 		.BYTE $ff
 BonusTripNoise:
-	.BYTE $d8
+	.BYTE $d8	; Repeat 24 times
 		.BYTE $81,$06
 		.BYTE $ff
-	.BYTE $c6
+	.BYTE $c6	; Repeat 6 times
 		.BYTE $88,$06
 		.BYTE $ff
-	.BYTE $c7
+	.BYTE $c7	; Repeat 7 times
 		.BYTE $81,$06
 			.BYTE $06
 		.BYTE $80,$06
@@ -1286,17 +1395,17 @@ BonusTripNoise:
 		.BYTE $81,$06
 			.BYTE $06
 		.BYTE $ff
-	.BYTE $c6
+	.BYTE $c6	; Repeat 6 times
 		.BYTE $88,$06
 		.BYTE $ff
-	.BYTE $e0
+	.BYTE $e0	; Repeat 32 times
 		.BYTE $81,$06
 			.BYTE $06
 		.BYTE $ff
 	.BYTE $82,$0f
 	.BYTE $81,$06
 		.BYTE $06
-	.BYTE $ea
+	.BYTE $ea	; Repeat 42 times
 		.BYTE $06,$06
 			.BYTE $06
 			.BYTE $06
@@ -1317,7 +1426,7 @@ PauseTri:
 GameOverSq1:
 	.BYTE $82,$1c	; C 4
 		.BYTE $1c	; C 4
-	.BYTE $c3
+	.BYTE $c3	; Repeat 3 times
 		.BYTE $82,$1c	; C 4
 			.BYTE $1c	; C 4
 		.BYTE $81,$1c	; C 4
@@ -1325,7 +1434,7 @@ GameOverSq1:
 			.BYTE $1c	; C 4
 			.BYTE $02
 		.BYTE $ff
-	.BYTE $c7
+	.BYTE $c7	; Repeat 7 times
 		.BYTE $88,$1c	; C 4
 		.BYTE $ff
 	.BYTE $00
@@ -1578,60 +1687,162 @@ PhaseClearNoise:
 
 NewStartSq1:
 	.BYTE $c2
-		.BYTE $88,$1c,$1c,$1c,$1c,$1c,$1c
+		.BYTE $88,$1c
+			.BYTE $1c
+			.BYTE $1c
+			.BYTE $1c
+			.BYTE $1c
+			.BYTE $1c
 		.BYTE $83,$1c
-		.BYTE $80,$04,$04,$2a,$02
+		.BYTE $80,$04
+			.BYTE $04
+			.BYTE $2a
+			.BYTE $02
 		.BYTE $82,$1c
 		.BYTE $ff
-	.BYTE $81,$4c,$02,$4c,$02,$2a,$02,$4c,$1c
-	.BYTE $81,$4c,$02,$4c,$02,$4c
+	.BYTE $81,$4c
+		.BYTE $02
+		.BYTE $4c
+		.BYTE $02
+		.BYTE $2a
+		.BYTE $02
+		.BYTE $4c
+		.BYTE $1c
+	.BYTE $81,$4c
+		.BYTE $02
+		.BYTE $4c
+		.BYTE $02
+		.BYTE $4c
 	.BYTE $00
 NewStartSq2:
-	.BYTE $88,$2e,$2e,$2e,$30,$04,$30
+	.BYTE $88,$2e
+		.BYTE $2e
+		.BYTE $2e
+		.BYTE $30
+		.BYTE $04
+		.BYTE $30
 	.BYTE $c4
-		.BYTE $80,$2e,$04
+		.BYTE $80,$2e
+			.BYTE $04
 		.BYTE $ff
 	.BYTE $83,$02
-	.BYTE $88,$2e,$2e,$2e,$30,$04,$30
+	.BYTE $88,$2e
+		.BYTE $2e
+		.BYTE $2e
+		.BYTE $30
+		.BYTE $04
+		.BYTE $30
 	.BYTE $c4
-		.BYTE $80,$2e,$04
+		.BYTE $80,$2e
+			.BYTE $04
 		.BYTE $ff
 	.BYTE $83,$02
-	.BYTE $84,$02,$02
+	.BYTE $84,$02
+		.BYTE $02
 NewStartTri:
 	.BYTE $c2
-		.BYTE $88,$3e,$3e,$3e,$42,$46,$42
+		.BYTE $88,$3e
+			.BYTE $3e
+			.BYTE $3e
+			.BYTE $42
+			.BYTE $46
+			.BYTE $42
 		.BYTE $84,$3e
 		.BYTE $ff
 	.BYTE $85,$3e
 	.BYTE $81,$3e
-	.BYTE $88,$1c,$46,$1c
-	.BYTE $81,$02,$3e,$3e,$3e
-	.BYTE $82,$34,$02
+	.BYTE $88,$1c
+		.BYTE $46
+		.BYTE $1c
+	.BYTE $81,$02
+		.BYTE $3e
+		.BYTE $3e
+		.BYTE $3e
+	.BYTE $82,$34
+		.BYTE $02
 NewStartNoise:
 	.BYTE $c2
-		.BYTE $88,$06,$06,$06,$06,$06,$06
-		.BYTE $82,$06,$06,$06,$06
+		.BYTE $88,$06
+			.BYTE $06
+			.BYTE $06
+			.BYTE $06
+			.BYTE $06
+			.BYTE $06
+		.BYTE $82,$06
+			.BYTE $06
+			.BYTE $06
+			.BYTE $06
 		.BYTE $ff
 	.BYTE $c2
-		.BYTE $81,$06,$06
-		.BYTE $80,$06,$06
-		.BYTE $81,$06,$06,$06,$06
-		.BYTE $80,$06,$06
+		.BYTE $81,$06
+			.BYTE $06
+		.BYTE $80,$06
+			.BYTE $06
+		.BYTE $81,$06
+			.BYTE $06
+			.BYTE $06
+			.BYTE $06
+		.BYTE $80,$06
+			.BYTE $06
 		.BYTE $ff
 	.BYTE $09
 
 SuperBonusSq1:
-	.BYTE $80,$10,$02,$10,$02,$10,$02,$0c,$0c,$0c,$02,$0c,$02,$14,$14,$14,$02,$14,$02
-	.BYTE $85,$10,$00
+	.BYTE $80,$10
+		.BYTE $02
+		.BYTE $10
+		.BYTE $02
+		.BYTE $10
+		.BYTE $02
+		.BYTE $0c
+		.BYTE $0c
+		.BYTE $0c
+		.BYTE $02
+		.BYTE $0c
+		.BYTE $02
+		.BYTE $14
+		.BYTE $14
+		.BYTE $14
+		.BYTE $02
+		.BYTE $14
+		.BYTE $02
+	.BYTE $85,$10
+		.BYTE $00
 SuperBonusSq2:
-	.BYTE $80,$32,$02,$32,$02,$32,$02
+	.BYTE $80,$32
+		.BYTE $02
+		.BYTE $32
+		.BYTE $02
+		.BYTE $32
+		.BYTE $02
 	.BYTE $c2
-		.BYTE $32,$32,$32,$02,$32,$02
+		.BYTE $32
+		.BYTE $32
+		.BYTE $32
+		.BYTE $02
+		.BYTE $32
+		.BYTE $02
 		.BYTE $ff
 	.BYTE $85,$32
 SuperBonusTri:
-	.BYTE $80,$54,$02,$54,$02,$54,$02,$50,$50,$50,$02,$50,$02,$56,$56,$56,$02,$56,$02
+	.BYTE $80,$54
+		.BYTE $02
+		.BYTE $54
+		.BYTE $02
+		.BYTE $54
+		.BYTE $02
+		.BYTE $50
+		.BYTE $50
+		.BYTE $50
+		.BYTE $02
+		.BYTE $50
+		.BYTE $02
+		.BYTE $56
+		.BYTE $56
+		.BYTE $56
+		.BYTE $02
+		.BYTE $56
+		.BYTE $02
 	.BYTE $85,$54
 SuperBonusNoise:
 	.BYTE $c4
