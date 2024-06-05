@@ -60,7 +60,7 @@ PropellerObjectCollisionCheck:
 		bcc @CheckYOffset	; / Don't bounce them vertically
 		lda #2						; \ Set Object(y).YVelInt to 2
 		sta ObjectYVelInt,y			; | (Send them flying downward if they hit the right side)
-		jsr PlayBumpSFX				; | Also play Bump SFX
+		jsr ReqBumpSFX				; | Also play Bump SFX
 		jsr ObjectYApplyYVelocity	; /
 		bne @CheckYOffset	; Always go on to Check Y
 		@LeftSideHit:
@@ -69,7 +69,7 @@ PropellerObjectCollisionCheck:
 			lda #<-2					; \ Set Object(y).YVelInt to -2
 			sta ObjectYVelInt,y			; | (Send them flying upward if they hit the left side)
 			jsr ObjectYApplyYVelocity	; |
-			jsr PlayBumpSFX				; / Also play Bump SFX
+			jsr ReqBumpSFX				; / Also play Bump SFX
 		@CheckYOffset:
 			lda Temp13		; \ If Y offset is negative, 
 			bmi @TopSideHit	; / then the top side of the propeller was hit
@@ -78,7 +78,7 @@ PropellerObjectCollisionCheck:
 			lda #2						; \ Set Object(y).XVelInt to 2
 			sta ObjectXVelInt,y			; | (Send them flying rightward if they hit the bottom side)
 			jsr ObjectYApplyXVelocity	; |
-			jsr PlayBumpSFX				; / Also play Bump SFX
+			jsr ReqBumpSFX				; / Also play Bump SFX
 			bne @Next
 		@TopSideHit:
 			cmp #<-3	; \ If Y offset is between -3 and 0 then
@@ -86,13 +86,13 @@ PropellerObjectCollisionCheck:
 			lda #<-2					; \ Set Object(y).XVelInt to -2
 			sta ObjectXVelInt,y			; | (Send them flying leftward if they hit the top side)
 			jsr ObjectYApplyXVelocity	; |
-			jsr PlayBumpSFX				; / Also play Bump SFX
+			jsr ReqBumpSFX				; / Also play Bump SFX
 		@Next:
 		dey
 		bpl @Loop
 	rts
 
-PlayBumpSFX:
+ReqBumpSFX:
 	lda SFX2Req	; \
 	ora #$02	; | Play Bump SFX
 	sta SFX2Req	; /

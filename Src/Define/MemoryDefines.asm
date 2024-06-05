@@ -307,8 +307,8 @@ Sq2SubTrackLoops	.set $D9
 TriSubTrackLoops	.set $DA
 NoiseSubTrackLoops	.set $DB
 
-SoundX				.set $DC
-SoundY				.set $DD
+NewSq1Vol			.set $DC
+NewSq2Vol			.set $DD
 ; $00DE = ?
 TrackTempo			.set $DF
 

@@ -2386,7 +2386,7 @@ ObjectXPlatformCollision:
 			jsr ReduceYVelocity
 		cpx #2
 		bcs @NoBumpSFX
-		jsr PlayBumpSFX
+		jsr ReqBumpSFX
 		@NoBumpSFX:
 		lda LandingFlag
 		bne :+
