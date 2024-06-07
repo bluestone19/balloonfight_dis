@@ -311,7 +311,7 @@ NoiseNoteSettings:	; Vol, Lo, Hi
 	.BYTE $03,$05,$40	; C
 	.BYTE $04,$07,$40	; F: Hard hit
 
-ClearSquareSweeps:
+UpdatePulseSettings:
 	lda #$7f		; \ Set Pulse Channels:
 	sta SQ1_SWEEP	; | No Sweep
 	sta SQ2_SWEEP	; /
@@ -375,11 +375,11 @@ AudioMain:
 
 TryFootstepNoise:
 	lda SFX1Cur		; \
-	and #%00000110	; |
+	and #%00000110	; | Return if Pop or Lightning Strike sound effects are playing
 	bne :-			; /
-	lda SFX1Cur
-	and #$f0
-	sta SFX1Cur
+	lda SFX1Cur	; \
+	and #$f0	; |
+	sta SFX1Cur	; /
 	ldxy FootstepNoise
 	jmp WriteNoiseRTS
 CheckMusic:
@@ -401,13 +401,13 @@ InitAllSoundMemory:
 	sta NOISE_VOL	; | - Noise Channel
 	sta SQ1_VOL		; | - Pulse 1 Channel
 	sta SQ2_VOL		; / - Pulse 2 Channel
-	lda #$00
-	sta SFX1Cur
+	lda #$00	; \ Clear current SFX1 sounds
+	sta SFX1Cur	; /
 ResetCurrentSounds:
-	sta SFX2Cur
+	sta SFX2Cur	; Clear Current SFX2 sounds
 	sta MusicCur	; Clear Current Music/Jingle
-	sta SplashSFXPhase
-	sta SFX3Cur
+	sta SplashSFXPhase	; Reset Splash SFX phase
+	sta SFX3Cur	; Clear Current SFX3 sounds
 	sta TRI_LINEAR	; Clear Triangle Channel Linear Counter
 	sta DMC_RAW	; Clear DMC Channel Load Counter
 	sta UnknownSoundFlag
@@ -461,36 +461,36 @@ CheckPopCountdown:
 ClearAllSoundEffects:
 	jmp InitAllSoundMemory
 CheckSFX1Change:
-	lda SFX1Req
-	lsr
-	bcs ClearAllSoundEffects
-	lda MusicCur
-	cmp #$df
-	beq ContinueSFX1ChangeCheck
-	cmp #$7f
-	beq ContinueSFX1ChangeCheck
-	cmp #$20
-	beq ContinueSFX1ChangeCheck
-	lda MusicCur
-	bne :+
-ContinueSFX1ChangeCheck:
+	lda SFX1Req					; \
+	lsr							; | If bit 0 of SFX1Req is set, clear all sound effects
+	bcs ClearAllSoundEffects	; /
+	lda MusicCur	; \
+	cmp #$df		; | Continue if currently playing Parachute music
+	beq @Continue	; /
+	cmp #$7f		; \ Continue if currently playing Enemy Down
+	beq @Continue	; /
+	cmp #$20		; \ Continue if currently playing Bonus / Trip music
+	beq @Continue	; /
+	lda MusicCur	; \ Return if playing anything else
+	bne :+			; /
+	@Continue:
 	lda SplashSFXPhase
 	cmp #$0f
 	beq PlaySplashNoise
 	cmp #$f0
 	beq CheckSplashCountdown
-	lda SFX1Req
-	lsrr 2
-	bcs PlayPopNoise
-	lsr
-	bcs TryLightningStrikeSFX
-	lsr
-	bcs GotoTryFootstepNoise
-	lda SFX1Cur
-	lsrr 2
-	bcs CheckPopCountdown
-	lsr
-	bcs CheckLightningSFXCountdown
+	lda SFX1Req			; \
+	lsrr 2				; | If SFX1Req bit 1 set, play Pop SFX
+	bcs PlayPopNoise	; /
+	lsr							; \ Bit 2 is Lightning Strike
+	bcs TryLightningStrikeSFX	; /
+	lsr							; \ Bit 3 is Player Footsteps
+	bcs GotoTryFootstepNoise	; /
+	lda SFX1Cur				; \
+	lsrr 2					; | If SFX1Cur bit 1 set, manage Pop SFX
+	bcs CheckPopCountdown	; /
+	lsr								; \ If SFX1Cur bit 2 set, manage Lightning Strike
+	bcs ManageLightningStrikeSFX	; /
 	:rts
 
 GotoTryFootstepNoise:
@@ -511,7 +511,7 @@ WriteNoiseRTS:
 	jsr WriteNoiseXY
 	rts
 
-CheckLightningSFXCountdown:
+ManageLightningStrikeSFX:
 	inc LightningSFXTimer
 	lda LightningSFXTimer
 	cmp #3
@@ -752,30 +752,30 @@ PlayPointCountSFX:
 	jmp PointCountBumpWriteSq2	; /
 
 lfa38:
-	lda MusicCur
-	beq @Continue
-	and #$0f
-	cmp #$0f
-	bne :+
+	lda MusicCur	; \
+	beq @Continue	; / If no music is playing, continue with check
+	and #$0f	; \
+	cmp #$0f	; | Return if not playing Enemy Down, Parachuting, or Bubble Collect jingles
+	bne :+		; /
 	@Continue:
-	lda SFX1Cur
-	and #$80
-	bne :+
-	lda SFX3Cur
-	and #$c0
-	bne :+
-	lda SFX2Req
-	lsr
-	bcs PlayPointCountSFX
-	lsr
-	bcs PlayBumpSFX
-	lsr
-	bcs PlayBubbleCollect
-	lsrr 2
-	bcs PlayBirdTweetSFX
-	lda SFX2Cur
-	lsrr 2
-	bcs ManageBumpSFX
+	lda SFX1Cur	; \
+	and #$80	; | Return if Shocked is playing
+	bne :+		; /
+	lda SFX3Cur	; \
+	and #$c0	; | Return if Fish Chomp or Spark Bounce is playing
+	bne :+		; /
+	lda SFX2Req				; \ Check SFX2 Requests
+	lsr						; |
+	bcs PlayPointCountSFX	; | Bit 0: Point Count
+	lsr						; |
+	bcs PlayBumpSFX			; | Bit 1: Bump
+	lsr						; |
+	bcs PlayBubbleCollect	; | Bit 2: Bubble Collect
+	lsrr 2					; |
+	bcs PlayBirdTweetSFX	; / Bit 4: Bird Tweet/Flap
+	lda SFX2Cur			; \
+	lsrr 2				; | If was currently playing Bump SFX, manage it
+	bcs ManageBumpSFX	; /
 	:rts
 
 PlayBirdTweetSFX:
@@ -821,13 +821,13 @@ ManageEnemyLandSFX:
 
 CheckSFX2Change:
 	lda MusicCur
-	beq ContinueSFX2Check
+	beq @Continue
 	cmp #8
-	beq ContinueSFX2Check
+	beq @Continue
 	and #$0f
 	cmp #$0f
 	bne :+
-ContinueSFX2Check:
+	@Continue:
 	lda SFX1Cur
 	and #$80
 	bne :+
@@ -919,20 +919,24 @@ PlayPause:
 	ldy #2
 	lda #$04
 	bne lfba5
+
 PlayRespawn:
 	ldy #9
 	lda #$80
 	bne lfb6d
+
 PlayEatenByFish:
 	ldy #7
 	lda #$40
 	bne lfb6d
+
 PlayBonusTrip:	; Balloon Trip / Bonus Phase
 	lda #0
 	sta TripMusicFlag
 	ldy #6
 	lda #$20
 	bne lfbc1
+
 PlaySuperBonus:		; Music/Jingle: Bonus Game Perfect
 	ldy #5
 	lda #$10
@@ -940,7 +944,7 @@ lfb6d:
 	jsr LoadSoundSequence
 	ldx #$fc	; \ Settings for pulse channels:
 	ldy #$fc
-	jsr ClearSquareSweeps
+	jsr UpdatePulseSettings
 	inc UnknownSoundFlag
 	bne ContinueMusicUpdate
 PlayNewStart:
@@ -962,6 +966,7 @@ lfb8d:
 	lda #$7f		; \ Pulse 2 Channel:
 	sta SQ2_SWEEP	; / No Sweep
 	bne lfbaf
+
 	jsr LoadSoundSequence
 	ldx #$04	; \ Settings for pulse channels:
 	ldy #$04
@@ -971,7 +976,7 @@ lfba5:
 	ldx #$80	; \ Settings for pulse channels:
 	ldy #$80	; / Duty = 50%, + ???
 lfbac:
-	jsr ClearSquareSweeps
+	jsr UpdatePulseSettings
 lfbaf:
 	lda #0
 	sta UnknownSoundFlag
