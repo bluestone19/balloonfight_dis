@@ -364,11 +364,11 @@ AudioMain:
 	jsr lfa38
 	jsr CheckSFX2Change
 	jsr CheckSFX1Change
-	lda SFX2Req
-	sta LastSFX2Req
+	lda SFX2Req		; \ Keep a copy of previous SFX2 requests
+	sta LastSFX2Req	; /
 	lda #0			; \
 	sta SFX1Req		; |
-	sta SFX2Req		; | Clear Music/SFX Flags
+	sta SFX2Req		; | Clear Music/SFX request Flags
 	sta MusicReq	; |
 	sta SFX3Req		; /
 	:rts
@@ -382,6 +382,7 @@ TryFootstepNoise:
 	sta SFX1Cur	; /
 	ldxy FootstepNoise
 	jmp WriteNoiseRTS
+
 CheckMusic:
 	lda MusicCur
 	cmp #$20
@@ -417,16 +418,18 @@ InitSquare2Noise:
 	lda #$10		; \ Constant volume on:
 	sta SQ2_VOL		; | - Pulse 2 Channel
 	sta NOISE_VOL	; / - Noise Channel
-	lda #0
-	beq ResetCurrentSounds
+	lda #0					; \ Move on to reset more sound variables
+	beq ResetCurrentSounds	; / Always taken
+
 ResetSplashSFXPhase:
-	lda #0
-	sta SplashSFXPhase
+	lda #0				; \ Reset SplashSFXPhase to 0
+	sta SplashSFXPhase	; /
 	rts
 
 PlaySplashNoise2:
 	ldxy SplashNoise2
 	jmp WriteNoiseRTS
+
 CheckSplashCountdown:
 	inc SplashSFXTimer
 	lda SplashSFXTimer
@@ -443,6 +446,7 @@ PlaySplashNoise:
 	sta SplashSFXPhase
 	ldxy SplashPopNoise
 	jmp WriteNoiseRTS
+
 PlayPopNoise:
 	lda SFX1Cur
 	and #$f0
@@ -452,14 +456,17 @@ PlayPopNoise:
 	sta PopSFXCountdown
 	ldxy SplashPopNoise
 	jmp WriteNoiseRTS
+
 CheckPopCountdown:
 	inc PopSFXCountdown
 	lda PopSFXCountdown
 	cmp #$10
 	bne :+
 	jmp ClearSFX1Lower
+
 ClearAllSoundEffects:
 	jmp InitAllSoundMemory
+
 CheckSFX1Change:
 	lda SFX1Req					; \
 	lsr							; | If bit 0 of SFX1Req is set, clear all sound effects
@@ -565,23 +572,23 @@ EndSFX3:
 	rts
 
 PlayShocked:
-	jsr InitAllSoundMemory
-	lda #$80
-	sta SFX1Cur
-	lda #2
-	sta SFX1Req
+	jsr InitAllSoundMemory	; Clear all other sounds
+	lda #$80	; \ Set current SFX1 to only Shocked
+	sta SFX1Cur	; /
+	lda #2		; \ Also request Pop SFX
+	sta SFX1Req	; /
 ContinueShocked:
-	ldxy ShockedSqBase
-	jsr WriteSq1XY
-	lda RNGOutput
-	and #$0f
-	sta SQ1_LO
-	ldxy ShockedSqBase
-	jsr WriteSq2
-	lda RNGOutput
-	lsrr 2
-	and #$0f
-	sta SQ2_LO
+	ldxy ShockedSqBase	; \ Write base SFX data to Pulse 1
+	jsr WriteSq1XY		; /
+	lda RNGOutput	; \
+	and #$0f		; | Alter lower pitch byte to be 0-15 randomly
+	sta SQ1_LO		; /
+	ldxy ShockedSqBase	; \ Write base SFX data to Pulse 2
+	jsr WriteSq2		; /
+	lda RNGOutput	; \
+	lsrr 2			; | Alter lower pitch byte of Pulse 2 to the same random value but shifted 2 bits right
+	and #$0f		; | Also ultimately 0-15
+	sta SQ2_LO		; /
 	rts
 
 PlaySparkBounceSFX:	; Locally branchable jump point
@@ -626,8 +633,8 @@ lf90a:
 	asl							; |
 	bcs ContinueFishChompSFX	; / Bit 6: Fish Chomp
 	@Skip:
-	jsr FlapAndBubbleCheck
-	:rts
+	jsr FlapAndBubbleCheck	; \ Can be simplified to a jmp
+	:rts					; /
 
 ContinueSparkBounceSFX:
 	jmp ContinueSparkBounceSFX2
