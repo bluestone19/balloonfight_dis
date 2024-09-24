@@ -502,6 +502,7 @@ CheckSFX1Change:
 
 GotoTryFootstepNoise:
 	jmp TryFootstepNoise
+	
 TryLightningStrikeSFX:
 	lda SFX1Cur
 	and #$80
@@ -515,8 +516,8 @@ TryLightningStrikeSFX:
 	sta LightningSFXPitch
 	ldxy LightningStrikeNoise
 WriteNoiseRTS:
-	jsr WriteNoiseXY
-	rts
+	jsr WriteNoiseXY	; \ Could be simplified to just a jmp
+	rts					; /
 
 ManageLightningStrikeSFX:
 	inc LightningSFXTimer
@@ -804,8 +805,8 @@ PointCountBumpWriteSq2:
 	rts				; /
 
 PlayBubbleCollect:
-	ldy #10
-	lda #$ef
+	ldy #10	; Load sequence 10: Bubble Collect
+	lda #$ef	; Set CurMusic to $EF (Bubble Collect)
 	jmp lfba5
 
 TweetSq2Base:
@@ -872,28 +873,28 @@ EnemyLandingSFX:
 	sta NOISE_VOL
 	ldxy EnemyLandTri1
 WriteTriRTS:
-	jsr WriteTriXY
-	rts
+	jsr WriteTriXY	; \ Could be simplified to jmp
+	rts				; /
 
 PlayParachuting:	; Sequenced SFX: Parachuting
-	lda LastSFX2Req
-	and #$20
-	bne @SkipPopReq
-	lda #2
-	sta PopParachuteReq
+	lda LastSFX2Req		; \
+	and #$20			; |
+	bne @SkipPopReq		; | Set PopParachuteReq flag if Pop SFX was also requested
+	lda #2				; |
+	sta PopParachuteReq	; /
 	@SkipPopReq:
-	ldy #$08
-	lda #$df
+	ldy #8	; Load sequence 8: Parachuting
+	lda #$df	; Set CurMusic to $DF (Parachuting)
 	jmp lfba5
 
 PlayEnemyDown:	; Sequenced SFX: Enemy Down
-	ldy #4
-	lda #$7f
+	ldy #4	; Load sequence 4: Enemy Down
+	lda #$7f	; Set CurMusic to $7F (Enemy Down)
 	jmp lfba5
 
 PlayPhaseClear:		; Music/Jingle: Stage Clear
-	ldy #0
-	lda #$02
+	ldy #0	; Load sequence 0: Phase Clear
+	lda #%00000010	; Mark bit 1 of CurMusic
 	jmp lfbc1
 
 ManageMusic:
@@ -923,45 +924,46 @@ ContinueMusicUpdate:
 	jmp ContinuePlayingMusic
 
 PlayPause:
-	ldy #2
-	lda #$04
+	ldy #2	; Load sequence 2: Pause
+	lda #%00000100	; Mark bit 2 of CurMusic
 	bne lfba5
 
 PlayRespawn:
-	ldy #9
-	lda #$80
+	ldy #9	; Load sequence 9: Respawn
+	lda #%10000000	; Mark bit 7 of CurMusic
 	bne lfb6d
 
 PlayEatenByFish:
-	ldy #7
-	lda #$40
+	ldy #7	; Load sequence 7: Eaten By Fish
+	lda #%01000000	; Mark bit 6 of CurMusic
 	bne lfb6d
 
 PlayBonusTrip:	; Balloon Trip / Bonus Phase
-	lda #0
-	sta TripMusicFlag
-	ldy #6
-	lda #$20
+	lda #0				; \ Mark flag that this music should continue to play
+	sta TripMusicFlag	; / (Allows music to restart after unpausing)
+	ldy #6	; Load sequence 6: Bonus Phase / Balloon Trip
+	lda #%00100000	; Mark bit 5 of CurMusic
 	bne lfbc1
 
 PlaySuperBonus:		; Music/Jingle: Bonus Game Perfect
-	ldy #5
-	lda #$10
+	ldy #5	; Load sequence 5: Super Bonus
+	lda #%00010000	; Mark bit 4 of CurMusic
 lfb6d:
 	jsr LoadSoundSequence
 	ldx #$fc	; \ Settings for pulse channels:
 	ldy #$fc
 	jsr UpdatePulseSettings
 	inc UnknownSoundFlag
-	bne ContinueMusicUpdate
+	bne ContinueMusicUpdate	; Branch always taken
+
 PlayNewStart:
-	ldy #3
-	lda #$08
-	bne lfb86
+	ldy #3	; Load sequence 3: New Start
+	lda #%00001000	; Mark bit 3 of CurMusic
+	bne lfb86	; Branch always taken
 	
 PlayGameOver:
-	ldy #1
-	lda #$01
+	ldy #1	; Load sequence 1: Game Over
+	lda #%00000001	; Mark bit 0 of CurMusic
 lfb86:
 	jsr LoadSoundSequence
 	ldx #$80	; \ Settings for pulse channels:
@@ -972,16 +974,18 @@ lfb8d:
 	sta SQ1_SWEEP	; / Sweep, Shift = 3
 	lda #$7f		; \ Pulse 2 Channel:
 	sta SQ2_SWEEP	; / No Sweep
-	bne lfbaf
+	bne lfbaf	; Branch always taken
 
+;UNUSED & Inaccessible
 	jsr LoadSoundSequence
 	ldx #$04	; \ Settings for pulse channels:
-	ldy #$04
+	ldy #$04	; / Duty = 12.5%, + ???
 	bne lfbac
+
 lfba5:
 	jsr LoadSoundSequence
 	ldx #$80	; \ Settings for pulse channels:
-	ldy #$80	; / Duty = 50%, + ???
+	ldy #$80	; / Duty = 50%, Period = 1qf
 lfbac:
 	jsr UpdatePulseSettings
 lfbaf:
@@ -996,12 +1000,12 @@ lfbaf:
 lfbc1:
 	jsr LoadSoundSequence
 	ldx #$80	; \ Settings for pulse channels:
-	ldy #$ba
-	bne lfb8d
+	ldy #$ba	; / P1: Duty = 50%, Period = 1qf. P2: Duty = 50%, Envelope loop, constant volume of 10 + period = 11qf
+	bne lfb8d	; Branch always taken
 
 .include "Data/MusicData.asm"
 
-.BYTE $ff,$ff,$ff,$ff	; Unused
+.BYTE $ff,$ff,$ff,$ff	; Unused/Filler
 
 GotoAudioMain:
 	jmp AudioMain

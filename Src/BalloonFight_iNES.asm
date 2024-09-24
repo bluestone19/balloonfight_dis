@@ -25,4 +25,4 @@
 
 ;Insert CHR ROM data
 .SEGMENT "TILES"
-.incbin "BalloonFight.chr"
+.incbin "Chr/BalloonFight.chr"

@@ -1057,7 +1057,6 @@ MenuCursorYOptions:
 	.BYTE 140,156,172
 
 .include "Data/PhaseData.asm"
-
 .include "Data/SpriteAnimData.asm"
 
 DrawObjectX:
@@ -1085,139 +1084,139 @@ DrawObjectX:
 			bpl @ClearLoop		; /
 		rts
 	@StandardSprite:
-	cpx #8				; \ If Object is Fish
-	beq @AnimateFish	; /
-	lda ObjectStatus,x		; \
-	aslr 2					; | (Object Status * 4) + Animation Frame
-	adc ObjectAnimFrame,x	; /
-	cpx #2				; \ If Object is a enemy
-	bcs @AnimateEnemy	; / Otherwise, it's a player
-	ldy ObjectBalloons,x			; \ 
-	adc PlayerAnimBalloonOffset,y	; | Y = (Object Status * 4) + Animation Frame
-	tay								; / + [PlayerAnimBalloonOffset + Balloons]
-	lda PlayerAnimLower,y	; \
-	sta LoadPointerLo		; | Set pointer
-	lda PlayerAnimUpper,y	; |
-	sta LoadPointerHi		; /
-	lda PlayerInvincible,x	; \ If Player X is invincible
-	beq le429				; /
-	ldy ObjectBalloons,x	; Y = Player X Balloons
-	lda PlayerFlashAnimBalloonOffset,y	; \
-	adc ObjectAnimFrame,x				; | Y = [PlayerFlashAnimBalloonOffset+Balloons]+Frame
-	tay									; /
-	lda PlayerFlashAnimLower,y	; \
-	sta LoadPointerLo			; | Set pointer
-	lda PlayerFlashAnimUpper,y	; |
-	sta LoadPointerHi			; /
-	jmp le429
-	@AnimateEnemy:
-	ldy ObjectBalloons,x
-	cadcy EnemyAnimBalloonOffset
-	tay
-	lda EnemyAnimLower,y
-	sta LoadPointerLo
-	lda EnemyAnimUpper,y
-	sta LoadPointerHi
-	bne le429
-	@AnimateFish:
-	ldy ObjectStatus,x
-	bmi @ClearSprite
-	lda FishSprPointersLower,y
-	sta LoadPointerLo
-	lda FishSprPointersUpper,y
-	sta LoadPointerHi
-	le429:
-	lda ObjectXPosInt,x
-	sta Temp15
-	lda ObjectYPosInt,x
-	sta Temp12
-	txa
-	beq le444
-	cpx #1
-	bne le43c
-	lda #1
-	bne le444
-	le43c:
-	lda ObjectType,x
-	cadc #2
-	and #3
-	le444:
-	ldy ObjectDirection,x
-	beq le44b
-	ora #$40
-	le44b:
-	ldy ObjectBalloons,x
-	cpy #2
-	bne le459
-	ldy ObjectStatus,x
-	cpy #5
-	bne le459
-	eor #$40
-	le459:
-	ldy ObjectYPosInt,x
-	cpy #$c9
-	bcs le463
-	cpx #9
-	bne le465
-	le463:
-	ora #$20
-	le465:
-	sta Temp14
-	tpa SpriteLeftXOffsets, ScorePointer
-	lda ObjectDirection,x
-	beq le47c
-	tpa SpriteRightXOffsets, ScorePointer
-	le47c:
-	ldy #0
-	lda (LoadPointer),y
-	inc LoadPointerLo
-	bne @le486
-	inc LoadPointerHi
-	@le486:
-	asl
-	sta Temp13
-	asl
-	adc Temp13
-	adc ScorePointerLo
-	sta ScorePointerLo
-	bcc @le494
-	inc ScorePointerHi
-	@le494:
+		cpx #8				; \ If Object is Fish
+		beq @LoadFishSpr	; /
+		lda ObjectStatus,x		; \
+		aslr 2					; | (Object Status * 4) + Animation Frame
+		adc ObjectAnimFrame,x	; /
+		cpx #2				; \ If Object is a enemy
+		bcs @LoadEnemySpr	; / Otherwise, it's a player
+		ldy ObjectBalloons,x			; \ 
+		adc PlayerAnimBalloonOffset,y	; | Y = (Object Status * 4) + Animation Frame
+		tay								; / + [PlayerAnimBalloonOffset + Balloons]
+		lda PlayerAnimLower,y	; \
+		sta LoadPointerLo		; | Set pointer
+		lda PlayerAnimUpper,y	; |
+		sta LoadPointerHi		; /
+		lda PlayerInvincible,x	; \ If Player X isn't invincible, start to assemble sprite
+		beq @AssembleSprite		; / Otherwise, draw player in invincible state
+		ldy ObjectBalloons,x	; Y = Player X Balloons
+		lda PlayerFlashAnimBalloonOffset,y	; \
+		adc ObjectAnimFrame,x				; | Y = [PlayerFlashAnimBalloonOffset+Balloons]+Frame
+		tay									; /
+		lda PlayerFlashAnimLower,y	; \
+		sta LoadPointerLo			; | Set pointer
+		lda PlayerFlashAnimUpper,y	; |
+		sta LoadPointerHi			; /
+		jmp @AssembleSprite
+	@LoadEnemySpr:
+		ldy ObjectBalloons,x			; \
+		cadcy EnemyAnimBalloonOffset	; | Y = EnemyAnimBalloonOffset[EnemyBalloons]
+		tay								; /
+		lda EnemyAnimLower,y	; \
+		sta LoadPointerLo		; | LoadPointer = Pointer to Enemy Anim Y
+		lda EnemyAnimUpper,y	; |
+		sta LoadPointerHi		; /
+		bne @AssembleSprite
+	@LoadFishSpr:
+		ldy ObjectStatus,x	; \ Don't draw fish if Status < 0
+		bmi @ClearSprite	; /
+		lda FishSprPointersLower,y	; \
+		sta LoadPointerLo			; | LoadPointer = Pointer to Fish Sprite Y
+		lda FishSprPointersUpper,y	; |
+		sta LoadPointerHi			; /
+	@AssembleSprite:
+		lda ObjectXPosInt,x	; \ Temp15 = Object's X position
+		sta Temp15			; /
+		lda ObjectYPosInt,x	; \ Temp12 = Object's Y Position
+		sta Temp12			; /
+		txa						; \
+		beq @SetFlipAttribute	; | Jump to @SetFlipAttribute if sprite is Player 1 or 2 
+		cpx #1					; |
+		bne @SetEnemyPalette	; | Jump to @SetEnemyPalette if sprite is not a player
+		lda #1					; |
+		bne @SetFlipAttribute	; / Jump is always taken if this is Player 2 sprite, with A = 1 (Attribute palette = 1)
+		@SetEnemyPalette:
+			lda ObjectType,x	; \
+			cadc #2				; | A = (ObjectType + 2) % 4
+			and #3				; / (Sets sprite attribute palette based on type)
+		@SetFlipAttribute:
+			ldy ObjectDirection,x	; \
+			beq @SkipDirSet			; | If sprite is facing right, A = A || #$40
+			ora #$40				; / (Sets attribute horizontal flip flag)
+			@SkipDirSet:
+			ldy ObjectBalloons,x	; \
+			cpy #2					; | Reverse flip flag if Balloons == 2
+			bne @CheckPriority		; |
+			ldy ObjectStatus,x		; |
+			cpy #5					; | Reverse flip flag if Status == 5
+			bne @CheckPriority		; |
+			eor #$40				; / A = A XOR #$40 (Flips attribute horizontal flip flag)
+		@CheckPriority:
+			ldy ObjectYPosInt,x	; \
+			cpy #201			; | If Y >= 201, then set priority to behind background
+			bcs @SetPriority	; /
+			cpx #9				; \ If object is in slot 9(???)
+			bne @SkipPriority	; /
+			@SetPriority:
+				ora #$20	; Set attribute priority to behind the background
+		@SkipPriority:
+		sta Temp14	; Store attribute in Temp14
+		tpa SpriteLeftXOffsets, ScorePointer	; Load pointer to table of sprite x offsets for facing left
+		lda ObjectDirection,x	; \ If Object is facing left then use left offsets
+		beq @UseLeftOffsets		; / Otherwise load sprite right offsets
+		tpa SpriteRightXOffsets, ScorePointer	; Load pointer to table of sprite x offsets for facing right
+		@UseLeftOffsets:
+		ldy #0				; \ Load first byte from the selected animation frame
+		lda (LoadPointer),y	; / This byte determines inter-row offsets
+		inc LoadPointerLo	; \
+		bne @SkipLoadCarry	; | Increment LoadPointer to first tile of sprite
+		inc LoadPointerHi	; /
+		@SkipLoadCarry:
+		asl			; \
+		sta Temp13	; | Temp13 = OffsetID * 6
+		asl			; |
+		adc Temp13	; /
+		adc ScorePointerLo		; \
+		sta ScorePointerLo		; | ScorePointer += Temp13
+		bcc @SkipOffsetCarry	; | ScorePointer now points to sprite offset table
+		inc ScorePointerHi		; /
+		@SkipOffsetCarry:
 		phx	; Preserve X
-		ldx #5
+		ldx #5	; X = 5 (Remaining sprite tiles)
 		ldy #0
-		@Loop:
+		@SpriteLoop:
 			lda Temp12	; Object's Y Position
-			cadcx SpriteYOffsets
-			sta (OAMPointer),y
+			cadcx SpriteYOffsets	; Add Y Offset
+			sta (OAMPointer),y	; Set sprite's Y Position
 			sta Temp12	; Store Y Position with offset for next piece of sprite
-			iny
-			sty Temp13
-			ldy #0
-			lda (LoadPointer),y
-			inc LoadPointerLo
-			bne @le4b1
-			inc LoadPointerHi
-			@le4b1:
-			ldy Temp13
-			sta (OAMPointer),y
-			iny
-			lda Temp14
-			sta (OAMPointer),y
-			iny
-			sty Temp13
-			ldy #0
-			lda Temp15
-			cadcy (ScorePointer)
-			inc ScorePointerLo
-			bne @le4ca
-			inc ScorePointerHi
-			@le4ca:
-			ldy Temp13
-			sta (OAMPointer),y
-			iny
-			dex
-			bpl @Loop
+			iny			; \ Use Temp13 to store offset of next OAM byte to set
+			sty Temp13	; / Temp13 = Y+1 (Tile index)
+			ldy #0	; Y = 0
+			lda (LoadPointer),y	; Load tile index of this sprite into A
+			inc LoadPointerLo	; \
+			bne @SkipTileCarry	; | Increment LoadPointer for next tile read
+			inc LoadPointerHi	; /
+			@SkipTileCarry:
+			ldy Temp13			; \ Set tile index
+			sta (OAMPointer),y	; /
+			iny	; Next: Attributes
+			lda Temp14			; \ Set attributes from Temp14
+			sta (OAMPointer),y	; / Previously set with palette, horizontal flip, and priority
+			iny	; Next: X Position
+			sty Temp13	; Preserve Y in Temp13 again
+			ldy #0					; \ Y is set to 0 because ScorePointer is incremented each time
+			lda Temp15				; | A = Object X Position (Temp15) + X Offset (At ScorePointer)
+			cadcy (ScorePointer)	; /
+			inc ScorePointerLo		; \
+			bne @SkipOffsetCarry2	; | Increment pointer to next X offset
+			inc ScorePointerHi		; /
+			@SkipOffsetCarry2:
+			ldy Temp13			; \ Restore offset of OAM X Position
+			sta (OAMPointer),y	; / Set X Position
+			iny	; Next: Y position of next sprite
+			dex	; Decrement remaining sprites
+			bpl @SpriteLoop	; Loop until no sprites left
 		plx	; Restore X
 	rts
 
@@ -1301,105 +1300,9 @@ DrawBubbleSprite:
 		plx	; Restore X
 		rts
 
-SplashManage:
-	ldx SplashAnim	; \ X = Splash animation frame
-	bmi :+			; / Return if negative
-	lda SplashAnimLo,x	; \
-	sta LoadPointerLo	; | LoadPointer = Pointer to Splash Animation X Data
-	lda SplashAnimHi,x	; |
-	sta LoadPointerHi	; /
-	ldy #0
-	ldx #0
-	@LoadLoop:
-		lda (LoadPointer),y	; \ Load Data into OAM
-		sta OAM+$e0,x		; /
-		iny	; \ Go on to next byte in data & OAM
-		inx	; /
-		cmp #$f0	; \
-		bne @Skip	; | If this object is offscreen, move on to next object in OAM
-		inxr 3		; /
-		@Skip:
-		cpx #16			; \ Loop and continue to load unless finished
-		bne @LoadLoop	; /
-	ldy #15
-	@Loop2:
-		lda OAM+$e0,y		; \
-		cadc SplashXOffset	; | Offset the splash sprites by the Splash X Offset
-		sta OAM+$e0,y		; /
-		deyr 4	; Go to next X Position
-		bpl @Loop2
-	lda FrameCounter	; \
-	and #3				; | Only update anim frame every 4th frame
-	bne :+				; /
-	dec SplashAnim	; Go to next water plonk animation frame
-	:rts
+.include "SplashManage.asm"
 
-.define SplashPointers Splash5, Splash4, Splash3, Splash2, Splash1
-SplashAnimLo:
-	.LOBYTES SplashPointers
-SplashAnimHi:
-	.HIBYTES SplashPointers
-
-; The splash sprite data is stored in this funny little format
-; The four sprites that make up the splash are all defined by one line
-; A single $f0 means that sprite is not used in this frame, otherwise it is copied to OAM
-; All the sprites use palette 3. X is offset by splash position.
-Splash1:
-	.BYTE $d0,$ae,$03,$04
-	.BYTE $f0	; Sprite 1: Empty
-	.BYTE $f0	; Sprite 2: Empty
-	.BYTE $f0	; Sprite 3: Empty
-Splash2:
-	.BYTE $c8,$af,$03,$04
-	.BYTE $d0,$b0,$03,$04
-	.BYTE $f0	; Sprite 2: Empty
-	.BYTE $f0	; Sprite 3: Empty
-Splash3:
-	.BYTE $c8,$b1,$03,$fc
-	.BYTE $c8,$b2,$03,$04
-	.BYTE $d0,$b3,$03,$04
-	.BYTE $f0	; Sprite 3: Empty
-Splash4:
-	.BYTE $c8,$b4,$03,$00
-	.BYTE $c8,$b4,$43,$08	; Horizontal flip
-	.BYTE $d0,$b5,$03,$00
-	.BYTE $d0,$b5,$43,$08	; Horizontal flip
-Splash5:
-	.BYTE $f0	; Sprite 0: Empty
-	.BYTE $f0	; Sprite 1: Empty
-	.BYTE $f0	; Sprite 2: Empty
-	.BYTE $f0	; Sprite 3: Empty
-
-;These are all physical constant data for the 12 object types
-ObjectGravityData:		;Fractional
-	.BYTE $04,$04,$05,$06,$03,$03,$03,$06,$0a,$0a,$0a,$0a
-ObjectFlapAccelData:	;Fractional
-	.BYTE $28,$32,$46,$78,$00,$00,$00,$64,$00,$00,$00,$00
-
-ObjectAirXAccelData:	;Fractional
-	.BYTE $0a,$1e,$32,$70,$00,$00,$00,$70,$00,$00,$00,$00
-ObjectGroundXAccelData:	;Fractional
-	.BYTE $14,$3c,$64,$a0,$00,$00,$00,$a0,$00,$00,$00,$00
-
-ObjectMaxXVelDataFrac:
-	.BYTE $70,$b0,$e0,$40,$80,$80,$80,$40,$00,$00,$00,$00
-ObjectMaxXVelDataInt:
-	.BYTE $00,$00,$00,$01,$00,$00,$00,$01,$00,$00,$00,$00
-
-ObjectMinXVelDataFrac:
-	.BYTE $90,$50,$20,$c0,$80,$80,$80,$c0,$00,$00,$00,$00
-ObjectMinXVelDataInt:
-	.BYTE $ff,$ff,$ff,$fe,$ff,$ff,$ff,$fe,$00,$00,$00,$00
-
-ObjectMaxYVelDataFrac:
-	.BYTE $50,$90,$c0,$40,$40,$40,$40,$40,$00,$00,$00,$00
-ObjectMaxYVelDataInt:
-	.BYTE $00,$00,$00,$01,$00,$00,$00,$01,$02,$02,$02,$02
-
-ObjectMinYVelDataFrac:
-	.BYTE $b0,$70,$40,$c0,$c0,$c0,$c0,$c0,$c0,$c0,$c0,$c0
-ObjectMinYVelDataInt:
-	.BYTE $ff,$ff,$ff,$fe,$ff,$ff,$ff,$fe,$fe,$01,$fe,$fe
+.include "Data/PhysicsConstants.asm"
 
 ObjectManage:
 	jsr CheckObjectPairCollision
@@ -1794,82 +1697,82 @@ ManageActiveObjectState:
 			:rts
 
 ManageObjectLanding:
-	lda LandingFlag
-	bne le9b6
-	lda PlayerInvincible,x
-	beq le99a
-	lda BTPlatformX
-	beq le99a
-	ssbcx ObjectXPosInt
-	jsr GetAbsoluteValue
-	cmp #5
-	bcc le9b6
-	le99a:
-	cpx #2
-	bcc le9a4
-	lda ObjectBalloons,x
-	cmp #2
-	bne :+
-	le9a4:
-	lda ObjectStatus,x
-	cmp #2
-	bcc :+
-	cmp #6
-	bcs :+
-	lda #1				; \ Object state = 1 (Air Idle)
-	sta ObjectStatus,x	; /
-	sta ObjectCountdown,x
-	rts
-	le9b6:
-	lda #0					; \
-	sta ObjectYVelFrac,x	; | Object[X].YVel = 0
-	sta ObjectYVelInt,x		; | Object[X].YPosFrac = 0 (Align to top of pixel)
-	sta ObjectYPosFrac,x	; /
-	sta LandingFlag	; Clear LandingFlag
-	cpx #2
-	bcc le9fd
-	lda ObjectBalloons,x
-	cmp #2
-	beq le9f3
-	cmp #1
-	bne :+
-	lda ObjectStatus,x
-	cmp #2
-	bcs :+
-	lda #2
-	sta ObjectStatus,x
-	lda EnemyStartDelay
-	sta ObjectAnimTimer,x
-	lda #0					; \
-	sta ObjectXVelFrac,x	; | Object[X].XVel = 0
-	sta ObjectXVelInt,x		; /
-	sta ObjectDriftXVelFrac,x	; \ Object[X].DriftXVel = 0
-	sta ObjectDriftXVelInt,x	; /
-	lda #$40	; \ Play Enemy Landing SFX
-	sta SFX2Req	; /
-	:rts
-	le9f3:
-		lda #0				; \ Object status = 0 (Flying/Falling)
-		sta ObjectStatus,x	; /
-		lda #1
-		sta ObjectCountdown,x
+	lda LandingFlag	; \ Go directly to landing logic if flag already set
+	bne @IsLanding	; /
+	lda PlayerInvincible,x	; \
+	beq @SkipBTPlatform		; | If player's invincibility is gone or the Balloon Trip platform is gone,
+	lda BTPlatformX			; | Skip BT Platform check
+	beq @SkipBTPlatform		; /
+	ssbcx ObjectXPosInt		; \
+	jsr GetAbsoluteValue	; | If object's X position is within 5px of BT Platform's X pos, land
+	cmp #5					; | Platform becomes intangible as soon as player moves and loses invincibility
+	bcc @IsLanding			; /
+	@SkipBTPlatform:
+		cpx #2					; \ Skip balloon check if object is player
+		bcc @SkipBalloonCheck	; /
+		lda ObjectBalloons,x	; \
+		cmp #2					; | Return if enemy's Balloons != 2
+		bne :+					; /
+		@SkipBalloonCheck:
+		lda ObjectStatus,x	; \
+		cmp #2				; |
+		bcc :+				; | Return if Status < 2 or Status >= 6
+		cmp #6				; | (Only continue if grounded)
+		bcs :+				; /
+		lda #1					; \ Object state = 1 (Air Idle)
+		sta ObjectStatus,x		; | Object countdown = 1
+		sta ObjectCountdown,x	; /
 		rts
-	le9fd:
-		lda ObjectStatus,x
-		cmp #1
-		bne :+
-		cmp #6
-		bcs :+
-		lda ObjectXVelFrac,x
-		ora ObjectXVelInt,x
-		bne lea13
-		lda #3
-		bne lea15
-		lea13:
-		lda #2
-		lea15:
-		sta ObjectStatus,x
+	@IsLanding:
+		lda #0					; \
+		sta ObjectYVelFrac,x	; | Object[X].YVel = 0
+		sta ObjectYVelInt,x		; |
+		sta ObjectYPosFrac,x	; / Object[X].YPosFrac = 0 (Align to top of pixel)
+		sta LandingFlag	; Clear Landing Flag
+		cpx #2				; \ If object is player, handle player landing
+		bcc @PlayerLanding	; /
+		lda ObjectBalloons,x	; \
+		cmp #2					; | Check if enemy is flying
+		beq @EnemyFlying		; / If so, don't land
+		cmp #1	; \ Return if enemy isn't parachuting
+		bne :+	; /
+		lda ObjectStatus,x	; \
+		cmp #2				; | Return if enemy is already grounded
+		bcs :+				; /
+		lda #2				; \ Set enemy state to ground idle
+		sta ObjectStatus,x	; /
+		lda EnemyStartDelay		; \ Store enemy start delay in enemy's animation timer
+		sta ObjectAnimTimer,x	; /
+		lda #0					; \
+		sta ObjectXVelFrac,x	; | Object[X].XVel = 0
+		sta ObjectXVelInt,x		; /
+		sta ObjectDriftXVelFrac,x	; \ Object[X].DriftXVel = 0
+		sta ObjectDriftXVelInt,x	; /
+		lda #$40	; \ Play Enemy Landing SFX
+		sta SFX2Req	; /
 		:rts
+		@EnemyFlying:
+			lda #0				; \ Object status = 0 (Flying/Falling)
+			sta ObjectStatus,x	; /
+			lda #1					; \ Object countdown = 1
+			sta ObjectCountdown,x	; /
+			rts
+		@PlayerLanding:
+			lda ObjectStatus,x	; \
+			cmp #1				; | Return if Status != 1 or Status >= 6
+			bne :+				; | (The second comparison is redundant?)
+			cmp #6				; | Continue only if idle in air
+			bcs :+				; /
+			lda ObjectXVelFrac,x	; \
+			ora ObjectXVelInt,x		; | Jump to @LandWithVel if X Velocity isn't 0
+			bne @LandWithVel		; /
+			lda #3				; \ Set Status to ground idle if landing with 0 X Velocity
+			bne @SetNewState	; /
+			@LandWithVel:
+				lda #2	; If landing with X Velocity, go to walking state
+			@SetNewState:
+				sta ObjectStatus,x	; Set state after landing (grounded)
+			:rts
 
 
 ;----------------------
@@ -2275,7 +2178,7 @@ ManageBubbleX:
 	:rts
 
 ObjectXPlatformCollision:
-	ldy ObjectBalloons,x	; \
+	ldy ObjectBalloons,x	; `1\
 	dey						; | If Object[X].Balloons > 0, continue with check
 	bpl @ObjectValid		; |
 	:rts					; / Return if object has no balloons
@@ -2606,14 +2509,14 @@ ManageCollisionDamage:
 	bne @lefc0				; | If Balloons != 2 or is player
 	cpx #2					; |
 	bcs @lefc0				; / If Balloons == 2 and not player
-	sty Temp12
-	ldy ObjectStatus,x
-	lda lf053,y
-	ldy Temp12
-	pha
-	pla
-	bne @lefb7
-	jmp @Skip	; Skip
+	sty Temp12	; Preserve Y in Temp12
+	ldy ObjectStatus,x	; \ 
+	lda lf053,y			; /
+	ldy Temp12	; Restore Y from Temp12
+	pha			; \
+	pla			; | If ??? isn't 0, then lefb7
+	bne @lefb7	; |
+	jmp @Skip	; / Skip if ??? is 0
 	@lefb7:
 	sta ObjectStatus,x
 	lda #0

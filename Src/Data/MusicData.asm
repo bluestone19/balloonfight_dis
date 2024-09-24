@@ -1,16 +1,16 @@
 MusicTrackInitData: ;Music Track Init Data
 	; Offsets to each track's init data
-		.BYTE PhaseClearInitData - MusicTrackInitData
-		.BYTE GameOverInitData - MusicTrackInitData
-		.BYTE PauseInitData - MusicTrackInitData
-		.BYTE NewStartInitData - MusicTrackInitData
-		.BYTE EnemyDownInitData - MusicTrackInitData
-		.BYTE SuperBonusInitData - MusicTrackInitData
-		.BYTE BonusTripInitData - MusicTrackInitData
-		.BYTE EatenByFishInitData - MusicTrackInitData
-		.BYTE ParachuteInitData - MusicTrackInitData
-		.BYTE RespawnInitData - MusicTrackInitData
-		.BYTE BubbleCollectInitData - MusicTrackInitData
+		.BYTE PhaseClearInitData - MusicTrackInitData		; Sequence 0: Phase Clear
+		.BYTE GameOverInitData - MusicTrackInitData			; Sequence 1: Game Over
+		.BYTE PauseInitData - MusicTrackInitData			; Sequence 2: Pause
+		.BYTE NewStartInitData - MusicTrackInitData			; Sequence 3: New Start
+		.BYTE EnemyDownInitData - MusicTrackInitData		; Sequence 4: Enemy Down
+		.BYTE SuperBonusInitData - MusicTrackInitData		; Sequence 5: Super Bonus
+		.BYTE BonusTripInitData - MusicTrackInitData		; Sequence 6: Bonus Phase / Balloon Trip
+		.BYTE EatenByFishInitData - MusicTrackInitData		; Sequence 7: Eaten By Fish
+		.BYTE ParachuteInitData - MusicTrackInitData		; Sequence 8: Parachuting
+		.BYTE RespawnInitData - MusicTrackInitData			; Sequence 9: Respawn
+		.BYTE BubbleCollectInitData - MusicTrackInitData	; Sequence 10: Bubble Collect 
 
 	PhaseClearInitData: ;Phase Clear Music Init Data
 		.BYTE 12
