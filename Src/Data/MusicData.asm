@@ -49,31 +49,31 @@ MusicTrackInitData: ;Music Track Init Data
 BubbleCollectSq2:
 	.BYTE $82,$02
 	.BYTE $8b,$02
-	.BYTE $80,$08
+	.BYTE $80,$08	; D 5
 		.BYTE $02
-		.BYTE $10
+		.BYTE $10	; F#5
 		.BYTE $02
-		.BYTE $16
+		.BYTE $16	; A 5
 		.BYTE $02
-		.BYTE $52
+		.BYTE $52	; D 6
 		.BYTE $02
 		.BYTE $02
 		.BYTE $02
-		.BYTE $1a
+		.BYTE $1a	; B 5
 	.BYTE $00
 BubbleCollectTri:
 	.BYTE $82,$02
-	.BYTE $80,$10
+	.BYTE $80,$10	; F#5
 		.BYTE $02
-		.BYTE $16
+		.BYTE $16	; A 5
 		.BYTE $02
-		.BYTE $52
+		.BYTE $52	; D 6
 		.BYTE $02
-		.BYTE $5a
+		.BYTE $5a	; F#6
 		.BYTE $02
 		.BYTE $02
 		.BYTE $02
-		.BYTE $56
+		.BYTE $56	; E 6
 	.BYTE $81,$02
 
 RespawnSq1:
@@ -87,7 +87,7 @@ RespawnSq1:
 		.BYTE $02
 		.BYTE $04
 		.BYTE $02
-		.BYTE $2a
+		.BYTE $2a	; G 4
 		.BYTE $02
 	.BYTE $81,$04
 		.BYTE $02
@@ -102,11 +102,11 @@ RespawnSq2:
 		.BYTE $02
 	.BYTE $80,$04
 		.BYTE $02
-		.BYTE $2a
+		.BYTE $2a	; G 4
 		.BYTE $02
 		.BYTE $24
 		.BYTE $02
-		.BYTE $2a
+		.BYTE $2a	; G 4
 		.BYTE $02
 		.BYTE $24
 		.BYTE $02
@@ -122,7 +122,7 @@ RespawnTri:
 	.BYTE $88,$02
 	.BYTE $80,$56
 		.BYTE $02
-		.BYTE $4e
+		.BYTE $4e	; C 6
 		.BYTE $02
 		.BYTE $12
 		.BYTE $02

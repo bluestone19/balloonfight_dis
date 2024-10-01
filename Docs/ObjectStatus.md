@@ -11,6 +11,11 @@ Status IDs have different meanings based on what object is in that slot. For exa
 * 3: Ground idle
 * 4: Forward Skid (Player stopped walking and is sliding)
 * 5: Turn Skid (Player turned around while walking)
+* 6: Air Hit
+* 7: Walking Hit
+* 8: Ground Hit
+* 9: Forward Skid Hit
+* 10: Turn Skid Hit
 
 ## Enemy States
 * -1: Empty slot

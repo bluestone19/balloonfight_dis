@@ -2307,9 +2307,9 @@ ObjectXPlatformCollision:
 		@HorizontalBounce:
 			jsr ObjectBounceX
 			jsr ReduceXVelocity
-			lda ObjectXVelInt,x
-			ora ObjectXVelFrac,x
-			beq :+
+			lda ObjectXVelInt,x		; \
+			ora ObjectXVelFrac,x	; | Return if Object X's X Velocity is 0
+			beq :+					; /
 			lda ObjectDirection,x	; \
 			eor #1					; | Reverse Object X's Direction
 			sta ObjectDirection,x	; /
@@ -2392,8 +2392,8 @@ CheckObjectPairCollision:
 			ora CollisionFlags
 			sta CollisionFlags
 			@leec0:
-			lda #0					; \
-			sta CollisionUnknown	; /
+			lda #0					; \ Clear CollisionHitFlag flag
+			sta CollisionHitFlag	; /
 			lsr CollisionFlags	; \ CollisionFlags.bit0 = Velocity Y related
 			bcc @leecd			; |
 			jsr ObjectYVelSbcYX	; | 
@@ -2413,8 +2413,8 @@ CheckObjectPairCollision:
 				jsr ReduceYVelocity	; |
 				jsr SwapXY			; /
 			@SkipYBounce:
-			lda #1
-			sta CollisionUnknown
+			lda #1					; \ Set CollisionHitFlag flag
+			sta CollisionHitFlag	; /
 			@leef1:
 			lsr CollisionFlags	; \ CollisionFlags.bit2 = Velocity X related
 			bcc @leefa			; |
@@ -2435,8 +2435,8 @@ CheckObjectPairCollision:
 				jsr ReduceXVelocity	; |
 				jsr SwapXY			; /
 			@SkipXBounce:
-			lda #1
-			sta CollisionUnknown
+			lda #1					; \ Set CollisionHitFlag flag
+			sta CollisionHitFlag	; /
 			@lef1e:
 			jsr ManageCollisionDamage
 			jsr SwapXY
@@ -2454,82 +2454,82 @@ CheckObjectPairCollision:
 
 ManageCollisionDamage:
 	cpx #2				; \ Is Object X a player?
-	bcc @IncludesPlayer	; |
+	bcc @IncludesPlayer	; | This check is not redundant because this function is called with the pair in both orders.
 	cpy #2				; | Is Object Y a player?
 	bcc @IncludesPlayer	; /
 	jmp @Skip	; Skip if both enemies
 	@IncludesPlayer:
 	lda #0				; \ Reset Collision Score Offset
-	sta ColScoreOffset	; /
+	sta IsParachuteCol	; /
 	lda ObjectHitCooldown,x	; \
 	beq @ColReady			; | If the object has a hit cooldown active, skip
 	jmp @Skip				; /
 	@ColReady:
-	lda CollisionUnknown	; \
-	bne @FlagSet			; | Skip if CollisionUnknown isn't set
+	lda CollisionHitFlag	; \
+	bne @FlagSet			; | Skip if CollisionHitFlag isn't set
 	jmp @Skip				; /
 	@FlagSet:
-	cpx #2
-	bcs @XIsEnemy
-	lda PlayerInvincible,x
-	beq @lef72
-	jmp @Skip	; Skip
-	@XIsEnemy:
-	lda ObjectBalloons,x
-	cmp #1
-	bne @lef72
-	lda ObjectStatus,x
-	cmp #2
-	bcs @lef7f
-	lda #1
-	sta ColScoreOffset
-	@lef72:
-	lda ObjectYPosInt,y
-	cadc #4
-	cmp ObjectYPosInt,x
-	bcc @lef7f
-	jmp @Skip	; Skip
-	@lef7f:
-	lda #20					; \ Give 20 frames before next hit
-	sta ObjectHitCooldown,x	; /
-	lda #0					; \ Reset Animation frame
-	sta ObjectAnimFrame,x	; /
-	cpy #2
-	bcc @lef97
-	lda ObjectBalloons,y
-	cmp #2
-	beq @lef97
-	jmp @Skip	; Skip
-	@lef97:
-	lda SFX1Req	; \
-	ora #$02	; | Play Pop SFX
-	sta SFX1Req	; /
-	lda ObjectBalloons,x	; \
-	cmp #2					; |
-	bne @lefc0				; | If Balloons != 2 or is player
-	cpx #2					; |
-	bcs @lefc0				; / If Balloons == 2 and not player
-	sty Temp12	; Preserve Y in Temp12
-	ldy ObjectStatus,x	; \ 
-	lda lf053,y			; /
-	ldy Temp12	; Restore Y from Temp12
-	pha			; \
-	pla			; | If ??? isn't 0, then lefb7
-	bne @lefb7	; |
-	jmp @Skip	; / Skip if ??? is 0
-	@lefb7:
-	sta ObjectStatus,x
-	lda #0
-	sta ObjectAnimFrame,x
-	beq @lefea
-	@lefc0:
-	dec ObjectBalloons,x
-	bne @lefce
+	cpx #2						; \ Check if X >= 2 (Object X is enemy)
+	bcs @CheckEnemyParachute	; / If so, skip invincibility check
+	lda PlayerInvincible,x	; \
+	beq @IsVulnerable		; | Continue if player X doesn't have invincibility anymore
+	jmp @Skip				; / Skip damage if player is invincible
+	@CheckEnemyParachute:
+		lda ObjectBalloons,x	; \
+		cmp #1					; | If enemy isn't flying, continue parachute check
+		bne @IsVulnerable		; / Otherwise move on to next step
+		lda ObjectStatus,x	; \
+		cmp #2				; | If enemy is grounded & vulnerable, then they're not parachuting, and skip height difference check.
+		bcs @YIsHittingX	; / If they aren't flying and aren't grounded, they're parachuting
+		lda #1				; \ Set IsParachuteCol
+		sta IsParachuteCol	; /
+	@IsVulnerable:
+		lda ObjectYPosInt,y	; \
+		cadc #4				; |
+		cmp ObjectYPosInt,x	; | Skip if ObjectY.YPos + 4 >= ObjectX.YPos 
+		bcc @YIsHittingX	; | This checks if Object Y is high enough compared to X to do damage
+		jmp @Skip			; /
+	@YIsHittingX:
+		lda #20					; \ Give 20 frames before next hit
+		sta ObjectHitCooldown,x	; /
+		lda #0					; \ Reset Animation frame
+		sta ObjectAnimFrame,x	; /
+		cpy #2			; \ Continue if Object Y is player
+		bcc @YCanAttack	; /
+		lda ObjectBalloons,y	; \
+		cmp #2					; | Continue if Object Y has 2 balloons
+		beq @YCanAttack			; /
+		jmp @Skip	; Skip if Y is an enemy without 2 balloons (Downed enemy can't hit player)
+	@YCanAttack:
+		lda SFX1Req	; \
+		ora #$02	; | Play Pop SFX
+		sta SFX1Req	; /
+		lda ObjectBalloons,x	; \
+		cmp #2					; | If Object X Balloons == 2 and is player,
+		bne @SkipHitAnim		; | then it should play hit animation for current state
+		cpx #2					; | Otherwise skip animation if doesn't have 2 balloons or isn't player
+		bcs @SkipHitAnim		; /
+		sty Temp12	; Preserve Y in Temp12
+		ldy ObjectStatus,x		; \ Load next status for being hit
+		lda PlayerNextStatus,y	; /
+		ldy Temp12	; Restore Y from Temp12
+		pha					; \
+		pla					; | If next status isn't 0, then update status
+		bne @UpdateStatus	; |
+		jmp @Skip			; / Skip if next status is 0 (Never taken due to hit cooldown)
+	@UpdateStatus:
+		sta ObjectStatus,x	; Set status to new state (Being hit + previous state)
+		lda #0					; \ Reset frame of animation for Object X
+		sta ObjectAnimFrame,x	; /
+		beq @UpdateType	; Always taken
+	@SkipHitAnim:
+	dec ObjectBalloons,x	; \ Decrement target's balloons
+	bne @SkipYVelBump		; / If they aren't at 0 yet, continue to next step
 	lda #<-1				; \
-	sta ObjectYVelInt,x		; | Set Object X's Y Velocity to -1
-	lda #0					; |
+	sta ObjectYVelInt,x		; | If target's out of balloons now, they're going down
+	lda #0					; | Set Object X's Y Velocity to -1 to make the little jump up before falling
 	sta ObjectYVelFrac,x	; /
-	@lefce:
+	@SkipYVelBump:
 	lda #0					; \
 	sta ObjectStatus,x		; | Object[X].Status = 0
 	sta ObjectXVelFrac,x	; | Object[X].XVelocity = 0
@@ -2544,77 +2544,83 @@ ManageCollisionDamage:
 		sta ObjectDriftXVelInt,x	; |
 		lda #$80					; |
 		sta ObjectDriftXVelFrac,x	; /
-	@lefea:
-	sty Temp12
-	ldy ObjectType,x
-	lda lf05e,y
-	sta ObjectType,x
-	lda #1
-	sta ObjectUpgradeFlag,x
-	ldy Temp12
-	cpy #2
-	bcs @Skip	; Skip
-	lda ObjectType,x
-	cmp #7
-	beq @lf011
-	cmp #8
-	bcc @lf011
-	lda SFX2Req
-	ora #$80
-	sta SFX2Req
-	@lf011:
-	ldy ObjectType,x
-	lda lf06a,y
-	sta Temp13
-	lda ColScoreOffset
-	beq @lf023
-	lda lf076,y
-	sta Temp13
-	@lf023:
-	lda lf082,y
-	cadc ColScoreOffset
-	sta Temp14
-	lda Temp12
-	sta TargetUpdateScore
-	pha
-	phx
-	lda Temp13
-	pha
-	lda Temp14
-	jsr CreateScorePopup
-	pla
-	jsr AddScore
-	plx
-	ply
+	@UpdateType:
+		sty Temp12	; Preserve Y
+		ldy ObjectType,x		; \
+		lda ObjectHitNextType,y	; | Update object type into vulnerable state/downed state
+		sta ObjectType,x		; /
+		lda #1					; \
+		sta ObjectUpgradeFlag,x	; / Set Upgrade flag
+		ldy Temp12	; Restore Y
+		cpy #2		; \
+		bcs @Skip	; / If Y >= 2 then Skip
+		lda ObjectType,x	; Check object X's type
+		cmp #7				; \ If type is 7 (Player w/ 1 Balloon)
+		beq @ManagePoints	; /
+		cmp #8				; \ If type < 8 (Is alive)
+		bcc @ManagePoints	; /
+		lda SFX2Req	; \
+		ora #$80	; | Play enemy down SFX if this isn't a player and has been knocked down
+		sta SFX2Req	; /
+	@ManagePoints:
+		ldy ObjectType,x	; \
+		lda ObjectHitPts1,y	; | Load points for attack into Temp13 based on target object type
+		sta Temp13			; /
+		lda IsParachuteCol	; \ If IsParachuteCol is set, then use second points table
+		beq @NotParachuting	; /
+		lda ObjectHitPts2,y	; \ Load points for attack into Temp13
+		sta Temp13			; / (Higher points for ripping parachute)
+		@NotParachuting:
+		lda ObjectPtsPopup,y	; \
+		cadc IsParachuteCol		; | Temp14 = ID of score value for popup
+		sta Temp14				; /
+		lda Temp12				; \
+		sta TargetUpdateScore	; |	TargetUpdateScore = ObjectY
+		pha						; / Push Y to stack
+		phx	; Preserve X
+		lda Temp13	; \ Preserve Temp13 on stack (It is destroyed during CreateScorePopup)
+		pha			; /
+		lda Temp14				; \ Create score popup based on hit value
+		jsr CreateScorePopup	; /
+		pla				; \ Add score based on Temp13
+		jsr AddScore	; /
+		plx	; \ Restore X & Y
+		ply	; /
 	@Skip:
-	lda ObjectType,x	; \ If Object X is not dead
-	cmp #11				; | then don't play any SFX
+	lda ObjectType,x	; \ If Object X is not dead player
+	cmp #11				; | then don't play the fall SFX
 	bne :+				; /
 	lda PhaseType	; \ If it's Bonus Phase
-	bne :+			; / then don't play any SFX
-	lda #$20	; \ Play Falling SFX
+	bne :+			; / then don't play fall SFX
+	lda #$20	; \ Play Player Falling SFX
 	sta SFX1Req	; /
 	:rts
 
-lf053:
+PlayerNextStatus:
 	.BYTE 6,6,7,8,9,10
-	.BYTE 0,0,0,0,0
-lf05e:
+	; Unused, unless you can get hit twice in one frame (Impossible due to cooldown)
+	.BYTE 0,0,0,0,0	
+
+ObjectHitNextType:
 	.BYTE 4,5,6,7
 	.BYTE 8,9,10,11
+	; Unused due to being already down
 	.BYTE 8,9,10,11
-lf06a:
-	.BYTE 0,0,0,0
+
+; Points values are actually multiplied by 10 implicitly because of the visual extra 0 on score counters
+ObjectHitPts1:	; Used for typical attacks
+	.BYTE 0,0,0,0	; Unused because you can't be hit and end up with 2 balloons
 	.BYTE 50,75,100,100
 	.BYTE 75,100,150,100
-lf076:
-	.BYTE 0,0,0,0
-	.BYTE 50,75,100,100
-	.BYTE 100,150,200,100
-lf082:
-	.BYTE 0,0,0,0
-	.BYTE 1,2,3,3
-	.BYTE 2,3,4,3
+ObjectHitPts2:	; Used for when ripping parachute
+	.BYTE 0,0,0,0	; Unused because you can't be hit and end up with 2 balloons
+	.BYTE 50,75,100,100	; Unused because you can't be parachuting, get hit, and end up with 1 balloon
+	.BYTE 100,150,200,100	; Last byte unused because player can't parachute
+
+ObjectPtsPopup:
+	.BYTE 0,0,0,0	; Unused because you can't be hit and end up with 2 balloons
+	.BYTE 1,2,3,3	; 500, 750, 1000, 1000
+	.BYTE 2,3,4,3	; 750, 1000, 1500, 1000
 
 GetAbsoluteValue:
 	pha			; \
@@ -2785,24 +2791,27 @@ DivideDriftVel:
 	rts
 
 UpdateRNG:
+	; RNG uses an LFSR with taps at bits 0, 1, and 15, as well as a constant term of 1 XOR'd in. The initial state is 0, but the constant term allows it to break out of that.
 	phx	;Preserve X
-	ldx #11				; \ Loop 11 times
+	ldx #11	; Iterate LFSR 11 times (Loop stops as soon as X reaches 0)
 	@Loop:
-		asl RNGLower	; |
-		rol RNGUpper	; |
-		rolr 2			; | Do Pseudo Random
-		eor RNGLower	; | Number Generator stuff?
-		rol				; |
-		eor RNGLower	; |
-		lsrr 2			; |
-		eor #$ff		; |
-		and #1			; |
-		ora RNGLower	; |
-		sta RNGLower	; |
-		dex				; |
-		bne @Loop		; /
-	plx
-	lda RNGOutput	; Return A = [$1B]
+		asl RNGLower	; \ Shift everything left 1 bit. Carry now is previous highest bit
+		rol RNGUpper	; /
+		rolr 2	; Rotate Carry bit into bit 1 of A
+		eor RNGLower	; XOR that bit with previous lowest bit
+		rol				; \ XOR that bit with previous second lowest bit
+		eor RNGLower	; /
+		lsrr 2	; Shift working bit back to bit 0
+		eor #$ff	; Invert A
+		and #1	; Only bit 0 of A matters
+		ora RNGLower	; \ Insert new bit from A into lowest bit
+		sta RNGLower	; /
+		; We are now left with everything shifted left one bit, with new lowest bit being !(U7 XOR L0 XOR L1)
+		dex			; \ Decrement X until X == 0
+		bne @Loop	; /
+	plx	; Restore X
+	; RNGLower is now entirely new, and RNGUpper now has the previous lower 5 bits and 3 new bits as well
+	lda RNGOutput	; Return A = RNGOutput
 	rts
 
 StartGame:
