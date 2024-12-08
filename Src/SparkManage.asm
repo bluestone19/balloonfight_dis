@@ -207,7 +207,7 @@ ManageSparks:	; Only for Games A & B. Balloon Trip not included
 		@Continue:
 		lda SparkLightning,x
 		bmi @LeftScreenBounce
-		tay
+		tay	; Y = SparkLightning
 		phx	; Preserve X
 		ldx CurrentSparkCloud	; X = Cloud creating new spark
 		lda CloudXPos,x							; \
@@ -235,27 +235,27 @@ ManageSparks:	; Only for Games A & B. Balloon Trip not included
 		adc #5	; | Add 5 to Y
 		tay		; /
 		@SkipYInc:
-		lda LightningStrikeTileData0,y
-		sta OAM+$e1
-		lda LightningStrikeTileData1,y
-		sta OAM+$e5
-		lda LightningStrikeTileData2,y
-		sta OAM+$e9
-		lda LightningStrikeAttributeData,x
-		sta OAM+$e2
-		sta OAM+$e6
-		sta OAM+$ea
+		lda LightningStrikeTileData0,y			; \
+		sta OAM+$e1	;Lightning Strike Spr 0 Tile  |
+		lda LightningStrikeTileData1,y			; |
+		sta OAM+$e5	;Lightning Strike Spr 1 Tile  |
+		lda LightningStrikeTileData2,y			; |
+		sta OAM+$e9	;Lightning Strike Spr 2 Tile  /
+		lda LightningStrikeAttributeData,x		; \
+		sta OAM+$e2	;Lightning Strike Spr 0 Attr  |
+		sta OAM+$e6	;Lightning Strike Spr 1 Attr  |
+		sta OAM+$ea	;Lightning Strike Spr 2 Attr  /
 		plx	; Restore X (Loop index)
-		lda FrameCounter
-		and #7
-		bne @SkipSettingSparkLightning
-		lda SparkLightning,x
-		cadc #4
-		sta SparkLightning,x
-		cmp #$14
-		bcc @SkipSettingSparkLightning
-		lda #$ff
-		sta SparkLightning,x
+		lda FrameCounter				; \
+		and #7							; | Once every 8 frames
+		bne @SkipSettingSparkLightning	; |
+		lda SparkLightning,x			; | Increment SparkLightning by 4
+		cadc #4							; |
+		sta SparkLightning,x			; /
+		cmp #$14						; \
+		bcc @SkipSettingSparkLightning	; | If SparkLightning >= 14 set it to -1
+		lda #<-1						; |
+		sta SparkLightning,x			; /
 		@SkipSettingSparkLightning:
 		lda SparkLightning,x
 		cmp #16

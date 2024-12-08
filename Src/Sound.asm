@@ -82,7 +82,7 @@ LoadByteAfterLengthUpd:
 	lda (CurTrackPointer),y	; / Then immediately parse that note too
 ByteIsNoteData:
 	tay	; Y = Note data
-	txa					; \
+	txa					; \	X & A = Channel
 	cmp #3				; | If current channel is Noise
 	beq PlayNoiseNote	; /
 	pha	; Push current channel to stack
@@ -101,19 +101,19 @@ ChannelIsFree:
 	tay	; \ Preserve upper pitch
 	plx	; |	X = current channel
 	tya	; /
-	bne SetChannelVolumeToDC
+	bne @PreserveChannelVol
 	ldy #0
 	txa
 	cmp #2
-	beq SetChannelVolumeContinue
+	beq @SetChannelVol
 	ldy #16
-	bne SetChannelVolumeContinue
-SetChannelVolumeToDC:
-	ldy NewSq1Vol,x
-SetChannelVolumeContinue:
-	tya
-	ldy SoundRegOffset
-	sta SQ1_VOL,y
+	bne @SetChannelVol
+	@PreserveChannelVol:
+		ldy NewSq1Vol,x
+	@SetChannelVol:
+		tya
+		ldy SoundRegOffset
+		sta SQ1_VOL,y
 SetCountdownThenContinue:
 	lda Sq1NoteLength,x	; \ Set new note's countdown to defined length
 	sta Sq1Countdown,x	; /
@@ -127,20 +127,20 @@ Sq2BusyCheck:
 	jmp SetCountdownThenContinue
 
 TriangleLengthChange:
-	tya
-	ldy UnknownSoundFlag
-	beq @lf5ce
-	lda #$ff
-	bne @SetLinear
+	tya	; Restore note data to A
+	ldy UnknownSoundFlag	; \ If UnknownSoundFlag is set,
+	beq @lf5ce				; /
+	lda #$ff		; \
+	bne @SetLinear	; / Branch always taken, set tri linear to 0xFF
 	@lf5ce:
-	cadc #<-2
-	aslr 2
+	cadc #<-2	; \ A = (A - 2) * 4
+	aslr 2		; /
 	cmp #$3C		; \
 	bcc @SetLinear	; | Cap at $3C
 	lda #$3C		; /
 	@SetLinear:
-	sta TRI_LINEAR
-	sta $de
+		sta TRI_LINEAR		; \ Store new value for Triangle Linear
+		sta NewTriLinear	; /
 	jmp LoadByteAfterLengthUpd
 
 PlayNoiseNote:
@@ -360,9 +360,9 @@ AudioMain:
 	lda #$c0		; \ Set Frame Counter
 	sta APU_FRAME	; / to 4-step sequence, clear frame interrupt flag
 	jsr ManageMusic
-	jsr lf90a
-	jsr lfa38
-	jsr CheckSFX2Change
+	jsr CheckImportantSFX
+	jsr CheckSFX2LowChange
+	jsr CheckSFX2UpperChange
 	jsr CheckSFX1Change
 	lda SFX2Req		; \ Keep a copy of previous SFX2 requests
 	sta LastSFX2Req	; /
@@ -378,16 +378,16 @@ TryFootstepNoise:
 	and #%00000110	; | Return if Pop or Lightning Strike sound effects are playing
 	bne :-			; /
 	lda SFX1Cur	; \
-	and #$f0	; |
-	sta SFX1Cur	; /
-	ldxy FootstepNoise
-	jmp WriteNoiseRTS
+	and #$f0	; | Clear the lower bits of SFX1Cur
+	sta SFX1Cur	; / (Footsteps, Lightning Strike, Balloon Pop, End SFX)
+	ldxy FootstepNoise	; \ Load & play Footstep SFX in noise channel
+	jmp WriteNoiseRTS	; /
 
 CheckMusic:
-	lda MusicCur
-	cmp #$20
-	bne CheckSFX
-	inc TripMusicFlag
+	lda MusicCur	; \
+	cmp #$20		; | Skip ahead to CheckSFX unless Balloon Trip/Bonus music is playing
+	bne CheckSFX	; /
+	inc TripMusicFlag	; Set flag to match if Balloon Trip/Bonus music is playing
 InitNeededChannels:
 	and #$0f				; \ Initialize Sound Channels
 	cmp #$0f				; | differently depending on
@@ -427,25 +427,25 @@ ResetSplashSFXPhase:
 	rts
 
 PlaySplashNoise2:
-	ldxy SplashNoise2
-	jmp WriteNoiseRTS
+	ldxy SplashNoise2	; \ Load Noise data then write to channel to play
+	jmp WriteNoiseRTS	; /
 
 CheckSplashCountdown:
-	inc SplashSFXTimer
-	lda SplashSFXTimer
-	cmp #$10
-	beq PlaySplashNoise2
-	cmp #$20
-	beq ResetSplashSFXPhase
+	inc SplashSFXTimer	; \ Increment then check frame timer for splash SFX
+	lda SplashSFXTimer	; /
+	cmp #16					; \ After 16 frames, play second part of splash SFX
+	beq PlaySplashNoise2	; /
+	cmp #32					; \ After 32 frames, end splash SFX
+	beq ResetSplashSFXPhase	; /
 	rts
 
 PlaySplashNoise:
-	lda #0
-	sta SplashSFXTimer
-	lda #$f0
-	sta SplashSFXPhase
-	ldxy SplashPopNoise
-	jmp WriteNoiseRTS
+	lda #0				; \
+	sta SplashSFXTimer	; / Initialize timer for splash SFX
+	lda #$f0			; \
+	sta SplashSFXPhase	; / Set splash SFX phase to first part
+	ldxy SplashPopNoise	; \ Play first part of splash
+	jmp WriteNoiseRTS	; /
 
 PlayPopNoise:
 	lda SFX1Cur
@@ -481,11 +481,11 @@ CheckSFX1Change:
 	lda MusicCur	; \ Return if playing anything else
 	bne :+			; /
 	@Continue:
-	lda SplashSFXPhase
-	cmp #$0f
-	beq PlaySplashNoise
-	cmp #$f0
-	beq CheckSplashCountdown
+	lda SplashSFXPhase	; Check stage of Splash SFX
+	cmp #$0f			; \ If Splash Phase is $0F, play second part
+	beq PlaySplashNoise	; /
+	cmp #$f0					; \ If phase if $F0, check countdown to first part of Splash SFX
+	beq CheckSplashCountdown	; /
 	lda SFX1Req			; \
 	lsrr 2				; | If SFX1Req bit 1 set, play Pop SFX
 	bcs PlayPopNoise	; /
@@ -533,9 +533,9 @@ ManageLightningStrikeSFX:
 	lda #$10
 	sta NOISE_VOL
 ClearSFX1Lower:
-	lda SFX1Cur
-	and #$f0
-	sta SFX1Cur
+	lda SFX1Cur	; \
+	and #$f0	; | Clear the bottom 4 bits of SFX1Cur
+	sta SFX1Cur	; / (Player Footsteps, Lightning Strike, Balloon Pop, and SFX End)
 	:rts
 
 WriteNoisePitch:
@@ -595,7 +595,7 @@ ContinueShocked:
 PlaySparkBounceSFX:	; Locally branchable jump point
 	jmp PlaySparkBounceSFX2
 
-lf90a:
+CheckImportantSFX:
 	lda MusicCur	; \ Check if music is not playing
 	beq @CanPlay	; / If not playing then continue as normal
 	cmp #$df		; \ If playing Enemy Parachute theme, it can play alongside
@@ -748,8 +748,8 @@ ManageBumpSFX:
 	lda #$10	; \
 	sta SQ2_VOL	; /
 	lda SFX2Cur	; \
-	and #$e0	; |
-	sta SFX2Cur	; /
+	and #$e0	; | Clear lower 5 bits of SFX2Cur
+	sta SFX2Cur	; / (Point counting, Bump, Bubble Collect, Enemy Flap)
 	:rts
 
 PlayPointCountSFX:
@@ -759,7 +759,7 @@ PlayPointCountSFX:
 	ldxy PointCountSq2			; |
 	jmp PointCountBumpWriteSq2	; /
 
-lfa38:
+CheckSFX2LowChange:
 	lda MusicCur	; \
 	beq @Continue	; / If no music is playing, continue with check
 	and #$0f	; \
@@ -827,38 +827,38 @@ ManageEnemyLandSFX:
 	ldxy EnemyLandTri2	; \
 	bne WriteTriRTS		; /
 
-CheckSFX2Change:
-	lda MusicCur
-	beq @Continue
-	cmp #8
-	beq @Continue
-	and #$0f
-	cmp #$0f
-	bne :+
+CheckSFX2UpperChange:
+	lda MusicCur	; \
+	beq @Continue	; | If currently playing no music or only playing new start, upper SFX2 requests can be done
+	cmp #$08		; |
+	beq @Continue	; /
+	and #$0f	; \
+	cmp #$0f	; | If playing Bubble Collect, Enemy Parachute, or Enemy Down, do not process another upper SFX2 request
+	bne :+		; /
 	@Continue:
-	lda SFX1Cur
-	and #$80
-	bne :+
-	lda SFX2Req
-	asl
-	bcs PlayEnemyDown
-	asl
-	bcs EnemyLandingSFX
-	lda SFX2Cur
-	aslr 2
-	bcs ManageEnemyLandSFX
-	lda SFX2Req
-	and #$20
-	beq lfad9
-	lda MusicCur
-	beq PlayParachuting
+	lda SFX1Cur	; \
+	and #$80	; | Return if playing Player Flapping, Player Falling, Splash, or Shocked SFX
+	bne :+		; /
+	lda SFX2Req			; \ Check SFX2 Upper requests
+	asl					; |
+	bcs PlayEnemyDown	; | If bit 7 set, play Enemy Down
+	asl					; |
+	bcs EnemyLandingSFX	; / If bit 6 set, play Enemy Landing
+	lda SFX2Cur				; \
+	aslr 2					; | Continue Enemy Landing SFX if currently playing
+	bcs ManageEnemyLandSFX	; /
+	lda SFX2Req			; \
+	and #$20			; | If no request for parachute jingle, branch away
+	beq NoParachuteReq	; /
+	lda MusicCur		; \ Play Parachuting theme if it was requested
+	beq PlayParachuting	; /
 	:rts
+	NoParachuteReq:
+		lda MusicCur	; \
+		cmp #$df		; | Return if playing Parachuting music
+		bne :-			; /
+		jmp CheckSFX
 
-lfad9:
-	lda MusicCur
-	cmp #$df
-	bne :-
-	jmp CheckSFX
 EnemyLandingSFX:
 	lda SFX2Cur
 	and #$1f
@@ -951,7 +951,7 @@ PlaySuperBonus:		; Music/Jingle: Bonus Game Perfect
 lfb6d:
 	jsr LoadSoundSequence
 	ldx #$fc	; \ Settings for pulse channels:
-	ldy #$fc
+	ldy #$fc	; / 
 	jsr UpdatePulseSettings
 	inc UnknownSoundFlag
 	bne ContinueMusicUpdate	; Branch always taken
@@ -959,16 +959,16 @@ lfb6d:
 PlayNewStart:
 	ldy #3	; Load sequence 3: New Start
 	lda #%00001000	; Mark bit 3 of CurMusic
-	bne lfb86	; Branch always taken
+	bne NewStartGameOverSettings	; Branch always taken
 	
 PlayGameOver:
 	ldy #1	; Load sequence 1: Game Over
 	lda #%00000001	; Mark bit 0 of CurMusic
-lfb86:
+NewStartGameOverSettings:
 	jsr LoadSoundSequence
 	ldx #$80	; \ Settings for pulse channels:
 	ldy #$80	; / Duty = 50%, + ???
-lfb8d:
+StoreSettingsSweep:
 	jsr StoreNewSqVol
 	lda #$83		; \ Pulse 1 Channel:
 	sta SQ1_SWEEP	; / Sweep, Shift = 3
@@ -980,7 +980,7 @@ lfb8d:
 	jsr LoadSoundSequence
 	ldx #$04	; \ Settings for pulse channels:
 	ldy #$04	; / Duty = 12.5%, + ???
-	bne lfbac
+	bne lfbac	; Branch always taken (If it ever could be)
 
 lfba5:
 	jsr LoadSoundSequence
@@ -996,12 +996,13 @@ lfbaf:
 	beq ContinueMusicUpdate
 	lda #$d5
 	sta SQ1_SWEEP
-	bne ContinueMusicUpdate
+	bne ContinueMusicUpdate	; Branch always taken
+
 lfbc1:
 	jsr LoadSoundSequence
 	ldx #$80	; \ Settings for pulse channels:
 	ldy #$ba	; / P1: Duty = 50%, Period = 1qf. P2: Duty = 50%, Envelope loop, constant volume of 10 + period = 11qf
-	bne lfb8d	; Branch always taken
+	bne StoreSettingsSweep	; Branch always taken
 
 .include "Data/MusicData.asm"
 

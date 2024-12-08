@@ -309,7 +309,8 @@ NoiseSubTrackLoops	.set $DB
 
 NewSq1Vol			.set $DC
 NewSq2Vol			.set $DD
-; $00DE = ?
+NewTriLinear		.set $DE
+
 TrackTempo			.set $DF
 
 ; Channel Track Pointers

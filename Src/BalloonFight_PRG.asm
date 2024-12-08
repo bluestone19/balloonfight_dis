@@ -1355,9 +1355,9 @@ ObjectUpdateAction:
 	cpx #2			; \ If Enemy then rely on RNG
 	bcs @AutoInput	; / If Player then rely on joypad
 	lda FrameCounter	; \
-	and #15				; | Enemy only reacts every 16 frames
+	and #15				; | Demo player only reacts every 16 frames
 	bne @GetPlayerInput	; /
-	jsr UpdateRNG		; \ Update Enemy Action
+	jsr UpdateRNG		; \ Randomize demo player Action
 	sta ObjectAction,x	; /
 	@GetPlayerInput:
 		lda DemoFlag	; \ If Demo Play then
@@ -2178,7 +2178,7 @@ ManageBubbleX:
 	:rts
 
 ObjectXPlatformCollision:
-	ldy ObjectBalloons,x	; `1\
+	ldy ObjectBalloons,x	; \
 	dey						; | If Object[X].Balloons > 0, continue with check
 	bpl @ObjectValid		; |
 	:rts					; / Return if object has no balloons
@@ -2792,6 +2792,7 @@ DivideDriftVel:
 
 UpdateRNG:
 	; RNG uses an LFSR with taps at bits 0, 1, and 15, as well as a constant term of 1 XOR'd in. The initial state is 0, but the constant term allows it to break out of that.
+	; This arrangement actually has a period of 65535, the maximum of a 16-bit LFSR like this. Nice!
 	phx	;Preserve X
 	ldx #11	; Iterate LFSR 11 times (Loop stops as soon as X reaches 0)
 	@Loop:
