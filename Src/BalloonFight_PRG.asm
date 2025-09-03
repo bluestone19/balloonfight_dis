@@ -1030,9 +1030,9 @@ StartDemo:
 	sta SND_CHN	; /
 	sta GameMode		; Set Game Mode to 00 (Balloon Fight)
 	jsr StartDemoGame
-	lda #0
-	sta DemoFlag
-	beq GotoTitleScreen
+	lda #0			; When the demo comes back,
+	sta DemoFlag	; Disable the demo flag
+	beq GotoTitleScreen	; Always taken
 
 TSNextOption:	;Title Screen choices
 	.BYTE 1,2,0
@@ -2199,7 +2199,7 @@ ObjectXPlatformCollision:
 		sta CollisionFlags	; /
 		; Check Top
 			lda (TopPointer),y	; \
-			ssbc #24			; | If Platform[Y].TopY - 24 >= Object[X].YPos then skip
+			ssbc #24			; | If Platform[Y].TopY - Object[X].YPos >= 24 then no collision (Object too far up)
 			cmp ObjectYPosInt,x	; |
 			bcs @Next			; /
 			adc #3

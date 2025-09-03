@@ -807,7 +807,7 @@ PointCountBumpWriteSq2:
 PlayBubbleCollect:
 	ldy #10	; Load sequence 10: Bubble Collect
 	lda #$ef	; Set CurMusic to $EF (Bubble Collect)
-	jmp lfba5
+	jmp PulseSetting3
 
 TweetSq2Base:
 	.BYTE $d9,$86,$a8,$48
@@ -885,17 +885,17 @@ PlayParachuting:	; Sequenced SFX: Parachuting
 	@SkipPopReq:
 	ldy #8	; Load sequence 8: Parachuting
 	lda #$df	; Set CurMusic to $DF (Parachuting)
-	jmp lfba5
+	jmp PulseSetting3
 
 PlayEnemyDown:	; Sequenced SFX: Enemy Down
 	ldy #4	; Load sequence 4: Enemy Down
 	lda #$7f	; Set CurMusic to $7F (Enemy Down)
-	jmp lfba5
+	jmp PulseSetting3
 
 PlayPhaseClear:		; Music/Jingle: Stage Clear
 	ldy #0	; Load sequence 0: Phase Clear
 	lda #%00000010	; Mark bit 1 of CurMusic
-	jmp lfbc1
+	jmp PulseSetting4
 
 ManageMusic:
 	lda TripMusicFlag	; \ Play Balloon Trip Music
@@ -926,29 +926,29 @@ ContinueMusicUpdate:
 PlayPause:
 	ldy #2	; Load sequence 2: Pause
 	lda #%00000100	; Mark bit 2 of CurMusic
-	bne lfba5
+	bne PulseSetting3
 
 PlayRespawn:
 	ldy #9	; Load sequence 9: Respawn
 	lda #%10000000	; Mark bit 7 of CurMusic
-	bne lfb6d
+	bne PulseSetting1
 
 PlayEatenByFish:
 	ldy #7	; Load sequence 7: Eaten By Fish
 	lda #%01000000	; Mark bit 6 of CurMusic
-	bne lfb6d
+	bne PulseSetting1
 
 PlayBonusTrip:	; Balloon Trip / Bonus Phase
 	lda #0				; \ Mark flag that this music should continue to play
 	sta TripMusicFlag	; / (Allows music to restart after unpausing)
 	ldy #6	; Load sequence 6: Bonus Phase / Balloon Trip
 	lda #%00100000	; Mark bit 5 of CurMusic
-	bne lfbc1
+	bne PulseSetting4
 
 PlaySuperBonus:		; Music/Jingle: Bonus Game Perfect
 	ldy #5	; Load sequence 5: Super Bonus
 	lda #%00010000	; Mark bit 4 of CurMusic
-lfb6d:
+PulseSetting1:
 	jsr LoadSoundSequence
 	ldx #$fc	; \ Settings for pulse channels:
 	ldy #$fc	; / 
@@ -976,18 +976,18 @@ StoreSettingsSweep:
 	sta SQ2_SWEEP	; / No Sweep
 	bne lfbaf	; Branch always taken
 
-;UNUSED & Inaccessible
+PulseSetting2:	;UNUSED & Inaccessible
 	jsr LoadSoundSequence
 	ldx #$04	; \ Settings for pulse channels:
 	ldy #$04	; / Duty = 12.5%, + ???
-	bne lfbac	; Branch always taken (If it ever could be)
+	bne UPSLocal	; Branch always taken (If it ever could be)
 
-lfba5:
+PulseSetting3:
 	jsr LoadSoundSequence
 	ldx #$80	; \ Settings for pulse channels:
 	ldy #$80	; / Duty = 50%, Period = 1qf
-lfbac:
-	jsr UpdatePulseSettings
+	UPSLocal:
+		jsr UpdatePulseSettings
 lfbaf:
 	lda #0
 	sta UnknownSoundFlag
@@ -998,7 +998,7 @@ lfbaf:
 	sta SQ1_SWEEP
 	bne ContinueMusicUpdate	; Branch always taken
 
-lfbc1:
+PulseSetting4:
 	jsr LoadSoundSequence
 	ldx #$80	; \ Settings for pulse channels:
 	ldy #$ba	; / P1: Duty = 50%, Period = 1qf. P2: Duty = 50%, Envelope loop, constant volume of 10 + period = 11qf

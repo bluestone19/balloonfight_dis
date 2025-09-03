@@ -1,0 +1,15 @@
+# Main Menu Cursor Details
+The position of the main menu cursor is stored in 0x3F. Alternatively, you could call this something like "Current Game Mode," but in practice it's only really used to determine things on the main menu and at the very start of a game. At least, that seems like it was the intention.
+
+## Moving
+This value is only ever changed on the title screen. It also can only be moved forward, and never back. It cycles through three positions exactly as you would expect. Starts on 00 (1-Player Game) and then moves to 01 (2-Player Game) then finally moves to 02 (Balloon Trip) before returning to 00. This is not done by adding or doing any math at all, it uses a lookup table to find the next option.
+
+## Next Option Table
+This is a three-byte table containing the values 1, 2, 0. It is only ever used within the TitleScreenLoop, and only if the select button is pushed. Theoretically, if the cursor position was set to something out of bounds, it would start reading the following bytes as if they made sense. This out of bounds data does include some pointers which will have different values depending on the version of the game.
+
+## Cursor Y Position Table
+Another three byte table containing the values of 140, 156, and 172. These values determine the Y position of the balloon cursor sprite on screen. If indexed out of bounds, you'd be reading the phase data since it's immediately afterward. This does include pointers, so these values will differ based on the version.
+
+## Game Modes
+The cursor position is used to directly control two flags: GameMode (0x16) and TwoPlayerFlag (0x40). GameMode is set to the cursor position shifted left once bitwise (or equivalently, divided by two) and the two player flag is set to the position bitwise ANDed with 1. So the two player flag can't get any weird values from the menu cursor, but theoretically the GameMode flag could be set to something other than 0 or 1 given an unusual position.
+So, if we messed with the cursor, could we select some kind of secret unused game mode? Sort of. If you could somehow get to the "fourth option" you would get Balloon Trip but two player. The mode wasn't designed for two player though, so the second player spawns in their normal position which is unfortunately now just over water. If player two dies, the music will be cut off. There are two lives shown under the RANK text, but there is no respawning. The game will end if and only if player one dies. Player two's score is not shown in game, since the RANK text fills the spot, but it is tracked and can be seen if you check the demo afterward. However, player two can't earn points from survival or popping Balloons. The only way to gain points is by attacking player one. Bubbles no longer appear in this state. Overall, it's basically just normal Balloon Trip but with a second player who can at most just be an obstacle.
